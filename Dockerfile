@@ -1,4 +1,9 @@
 FROM ruby:2.7
+
+RUN apt-get update && \
+    apt-get install -y \
+         default-mysql-client \
+         default-libmysqlclient-dev
 WORKDIR /panscan
 # COPY Gemfile /panscan/Gemfile
 # COPY Gemfile.lock /panscan/Gemfile.lock
