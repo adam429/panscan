@@ -3,9 +3,12 @@
 
 ## build
 
-`docker build -t panscan .`
+`docker build -t adam429/pan-repo:panscan .`
 
 ## run
 
-`docker container run -d -p 80:3000 --name panscan panscan:latest`
+`docker container run -d -p 80:80 --name panscan adam429/pan-repo:panscan`
 
+## push
+
+`docker push adam429/pan-repo:panscan`
