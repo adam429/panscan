@@ -1,0 +1,118 @@
+<h1>Epoch View</h1>
+
+epoch: <a href="/epoch/<%= @epoch.epoch-1 %>">&lt;&lt;</a> <%= @epoch.epoch %> <a href="/epoch/<%= @epoch.epoch+1 %>">&gt;&gt;</a></br>
+start_timestamp: <%= @epoch.start_timestamp %> </br>
+lock_timestamp: <%= @epoch.lock_timestamp %> </br>
+total_bet: <%= @epoch.total_count %></br>
+total_amount: <%= @epoch.total_amount %> </br>
+bull_payout: <%= @epoch.bull_payout %> </br>
+bear_payout: <%= @epoch.bear_payout %> </br>
+bet_result: <%= @epoch.bet_result %> </br>
+----------------------------------------------------</br>
+<% (1..5).to_a.reverse.each do |i| 
+last_block = @epoch.get_last_block.block_number - i%>
+
+last <%= i %> round |
+acc_bet <%= (@epoch.get_count(last_block)).round(2) %> (<%= (@epoch.get_count(last_block)*100 / @epoch.total_count).round(1) %>%)  |
+acc_amount <%= (@epoch.get_amount(last_block)).round(2) %> (<%= (@epoch.get_amount(last_block)*100 / @epoch.total_amount).round(1) %>%)  |
+payout(bull/bear) <%= @epoch.get_bull_payout(last_block-1).round(2) %> <%= @epoch.get_bear_payout(last_block-1).round(2) %>
+<br/>
+
+<% end %>
+----------------------------------------------------</br>
+
+
+
+<table>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td>ob payout</td>
+<td></td>
+<td></td>
+<td></td>
+<td>action amount</td>
+</tr>
+<tr>
+<td>id</td>
+<td>block</td>
+<td>timestamp</td>
+<td>bet%</td>
+<td>address</td>
+<td>bull/bear</td>
+<td>method</td>
+<td>status</td>
+<td>amount</td>
+<td>bull/bear</td>
+<td>acc amount</td>
+
+</tr>
+
+
+<% @epoch.tx.each_with_index do |tx,index|
+    active_rate = (@epoch.get_address_bet(tx.from)*100/288).round
+%>
+<tr>
+  <td><a href="https://bscscan.com/tx/<%= tx.tx_hash %>"><%=index%></a> </td>
+  <td>  <a href="https://bscscan.com/block/<%= tx.block_number %>"><%= tx.block_number %></a>(<%= @epoch.get_last_block_order(tx.block_number) %>) </td>
+  <td>  <%= tx.block_time.to_formatted_s(:db)[-8,8] %></a> </td>
+  <td>  
+    <% if tx.method_name[0,3]=="bet" %>
+    <span style="color:<%= 
+            if active_rate >=75 then
+              "#6a040f"
+            elsif active_rate >=50 then
+              "#d62828"
+            elsif active_rate >=25 then
+              "#f77f00"
+            elsif active_rate >=5 then
+              "#fcbf49"
+            else
+              "#eae2b7"
+            end
+        %>">
+        (<%= "00#{active_rate}%"[-3,3] %>)  
+    </span>
+    <% end %>
+  </td>
+  <td>
+    <a href="/address/<%= tx.from %>"><%= tx.from %></a>
+  </td>
+  
+  <td> 
+    <%= @epoch.get_bull_payout(tx.block_number-1).round(2) %>
+    <%= @epoch.get_bear_payout(tx.block_number-1).round(2) %>
+  </td>
+
+  <td>     <span style="background-color: <%= "lightsalmon" if @epoch.get_wrong_bet(tx.method_name,tx.block_number) %>">
+ <%= tx.method_name %>
+ </span>
+  </td>
+  <td>  
+    <span style="color:<%= tx.tx_status ? "green" : "red" %>">
+        <%= tx.tx_status %> 
+    </span>
+  
+  </td>
+  <td>  <%= @epoch.get_bet_amount(tx)!=nil ? @epoch.get_bet_amount(tx).round(4) : ""  %> </td>
+  <td> 
+    |
+    
+    <span style='background-color:<%= @epoch.get_bull_amount(tx.block_number)>@epoch.get_bear_amount(tx.block_number) ? "palegreen" : ""  %>' >
+      <%= @epoch.get_bull_amount(tx.block_number).round(2) %>
+    </span>
+    <span style='background-color:<%= @epoch.get_bull_amount(tx.block_number)<@epoch.get_bear_amount(tx.block_number) ? "palegreen" : ""  %>' >
+
+      <%= @epoch.get_bear_amount(tx.block_number).round(2) %>
+    </span>
+  </td>
+  <td>|
+      <%= (@epoch.get_amount(tx.block_number)).round(2) %> 
+      (<%= (@epoch.get_amount(tx.block_number)*100 / @epoch.total_amount).round(1) %>%) 
+  </td>
+</tr>
+<% end %>
+</table>
