@@ -25,21 +25,21 @@
 #   database: db/production.sqlite3
 
 development:
-  adapter: mysql2
+  adapter: postgresql
   encoding: utf8
-  database: panbot
-  pool: 5
-  port: 3306  
-  username: <%= ENV.fetch('db_user') %>
-  password: "<%= ENV.fetch('db_pwd') %>"
-  host: <%= ENV.fetch('db_host') %>
-
-production:
-  adapter: mysql2
-  encoding: utf8
-  database: panbot
+  database: chaindb
   pool: 5
   username: <%= ENV.fetch('db_user') %>
   password: <%= ENV.fetch('db_pwd') %>
   host: <%= ENV.fetch('db_host') %>
-  port: 3306  
+  port: 5432  
+
+production:
+  adapter: postgresql
+  encoding: utf8
+  database: chaindb
+  pool: 5
+  username: <%= ENV.fetch('db_user') %>
+  password: <%= ENV.fetch('db_pwd') %>
+  host: <%= ENV.fetch('db_host') %>
+  port: 5432  
