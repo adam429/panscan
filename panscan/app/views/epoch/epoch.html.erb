@@ -1,14 +1,14 @@
 <h1>Epoch View</h1>
 
-epoch: <a href="/epoch/<%= @epoch.epoch-1 %>">&lt;&lt;</a> <%= @epoch.epoch %> <a href="/epoch/<%= @epoch.epoch+1 %>">&gt;&gt;</a></br>
-start_timestamp: <%= @epoch.start_timestamp %> </br>
-lock_timestamp: <%= @epoch.lock_timestamp %> </br>
-total_bet: <%= @epoch.total_count %></br>
-total_amount: <%= @epoch.total_amount %> </br>
-bull_payout: <%= @epoch.bull_payout %> </br>
-bear_payout: <%= @epoch.bear_payout %> </br>
-bet_result: <%= @epoch.bet_result %> </br>
-----------------------------------------------------</br>
+epoch: <a href="/epoch/<%= @epoch.epoch-1 %>">&lt;&lt;</a> <%= @epoch.epoch %> <a href="/epoch/<%= @epoch.epoch+1 %>">&gt;&gt;</a><br/>
+start_timestamp: <%= @epoch.start_timestamp %> <br/>
+lock_timestamp: <%= @epoch.lock_timestamp %> <br/>
+total_bet: <%= @epoch.total_count %><br/>
+total_amount: <%= @epoch.total_amount %> <br/>
+bull_payout: <%= @epoch.bull_payout %> <br/>
+bear_payout: <%= @epoch.bear_payout %> <br/>
+bet_result: <%= @epoch.bet_result %> <br/>
+----------------------------------------------------<br/>
 <% (1..5).to_a.reverse.each do |i| 
 last_block = @epoch.get_last_block.block_number - i%>
 
@@ -19,7 +19,7 @@ payout(bull/bear) <%= @epoch.get_bull_payout(last_block-1).round(2) %> <%= @epoc
 <br/>
 
 <% end %>
-----------------------------------------------------</br>
+----------------------------------------------------<br/>
 
 
 
@@ -54,10 +54,14 @@ payout(bull/bear) <%= @epoch.get_bull_payout(last_block-1).round(2) %> <%= @epoc
 
 <% @epoch.tx.each_with_index do |tx,index|
     active_rate = (@epoch.get_address_bet(tx.from)*100/288).round
+    last_block_order=@epoch.get_last_block_order(tx.block_number)
 %>
 <tr>
   <td><a href="https://bscscan.com/tx/<%= tx.tx_hash %>"><%=index%></a> </td>
-  <td>  <a href="https://bscscan.com/block/<%= tx.block_number %>"><%= tx.block_number %></a>(<%= @epoch.get_last_block_order(tx.block_number) %>) </td>
+  <td>  <a href="https://bscscan.com/block/<%= tx.block_number %>"><%= tx.block_number %></a>
+   <span style="background-color: <%= "lightpink" if last_block_order<=3 %>">(<%= last_block_order %>) 
+   </span>
+  </td>
   <td>  <%= tx.block_time.to_formatted_s(:db)[-8,8] %></a> </td>
   <td>  
     <% if tx.method_name[0,3]=="bet" %>

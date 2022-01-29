@@ -1,0 +1,32 @@
+<h1>Model Stats</h1>
+epoch count: <%= @epoch.count %><br/>
+
+------------------------------------------------------------------------------------<br/>
+<table>
+<tr>
+<td>#</td>
+<td> | epoch</td>
+<td> | lock_price</td>
+<td> | close_price</td>
+<td> | bet_result</td>
+<td> | total_amount</td>
+<td> | bull_payout</td>
+<td> | bear_payout</td>
+<td> | start_timestamp</td>
+<td> | lock_timestamp</td>
+</tr>
+<% @epoch.each_with_index do |epoch,index| %>
+<tr>
+<td><%= index%> </td>
+<td> | <a href='/epoch/<%= epoch.epoch %>'><%= epoch.epoch %></a> </td>
+<td> | <%= epoch.lock_price %> </td>
+<td> | <%= epoch.close_price %> </td>
+<td> | <%= epoch.bet_result %> </td>
+<td> | <%= epoch.total_amount %> </td>
+<td> | <%= epoch.bull_payout %> </td>
+<td> | <%= epoch.bear_payout %> </td>
+<td> | <%= epoch.start_timestamp.to_formatted_s(:db) %> </td>
+<td> | <%= epoch.lock_timestamp.to_formatted_s(:db) %> </td>
+</tr>
+<% end%>
+</table>

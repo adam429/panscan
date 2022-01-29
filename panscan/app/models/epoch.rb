@@ -31,14 +31,14 @@ class Epoch < ActiveRecord::Base
 
     def get_last_block
         if @last_block==nil then
-            @last_block = block.where("block_time = ?",lock_timestamp).first
+            @last_block = block.where("? < block_time and block_time < ?",lock_timestamp-1.5,lock_timestamp+1.5).first
         end
         @last_block
     end
 
     def get_first_block
         if @first_block==nil then
-            @first_block = block.where("block_time = ?",start_timestamp).first
+            @first_block = block.where("? < block_time and block_time < ?",start_timestamp-1.5,start_timestamp+1.5).first
         end
         @first_block
     end
@@ -84,6 +84,7 @@ class Epoch < ActiveRecord::Base
     end
 
     def get_last_block_order(block_number)
+        return nil if get_last_block==nil
         return get_last_block.block_number - block_number 
     end
 
@@ -95,7 +96,8 @@ class Epoch < ActiveRecord::Base
     def get_address_bet(address)
         if @address_map==nil then
             epoch_last = self.get_last_block.block_number
-            epoch_first = Epoch.find_by_epoch(self.epoch-288).get_first_block.block_number
+            # epoch_first = Epoch.find_by_epoch(self.epoch-288).get_first_block.block_number
+            epoch_first = Epoch.where("epoch >= ?",self.epoch-288).order(:epoch).first.get_first_block.block_number
             @address_map = Tx.where("?<= block_number and block_number <= ? and (method_name = ? or method_name = ?)",epoch_first,epoch_last,"betBear","betBull").group(:from).count
         end
         @address_map[address] or 0
@@ -138,6 +140,11 @@ class Epoch < ActiveRecord::Base
             return true if get_bull_payout(block_number-1)>get_bear_payout(block_number-1)
         end
         return false
+    end
+
+    def self.get_epoch(block_number)
+        block_time = Block.find_by_block_number(block_number).block_time
+        Epoch.where("start_timestamp<=? and ?<=lock_timestamp",block_time,block_time-10).first
     end
   end
   

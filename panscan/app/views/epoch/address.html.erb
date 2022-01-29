@@ -1,1 +1,96 @@
-<h1> WIP </h1>
+<h1> Address View </h1>
+
+address: <%= @address %><br/>
+
+----------------------------------------------------<br/>
+== bet epoch (<%= @tx.size %>) == <br/>
+
+<table>
+<tr>
+<td> | #</td>
+<td> | epoch</td>
+<td> | block_number</td>
+<td> | block_time</td>
+<td> | ob_payout</td>
+<td> | method</td>
+<td> | status</td>
+<td> | amount</td>
+</tr>
+<%
+  avg_last_block_order = []
+  wrong_bet_list =[]
+  avg_amount = []
+  invest_cnt = 0
+  invest_amt = 0
+  return_amt = 0
+
+  
+  @tx.each_with_index do |tx,i| 
+    x = @tx_map[tx.tx_hash]
+    avg_amount.push(x[1]) if x!=nil
+
+    epoch = Epoch.get_epoch(tx.block_number)
+
+    next if epoch==nil
+
+    last_block_order = epoch.get_last_block_order(tx.block_number)
+
+    next if last_block_order==nil
+    avg_last_block_order.push(last_block_order) if tx.tx_status 
+    wrong_bet = epoch.get_wrong_bet(tx.method_name,tx.block_number);
+    wrong_bet_list.push wrong_bet
+
+    if tx.tx_status then
+      invest_cnt = invest_cnt +1
+      invest_amt = invest_amt + (@tx_map[tx.tx_hash] or [0,0,0])[1]
+      return_amt = return_amt - invest_amt
+      if tx.method_name=="betBear" and epoch.bet_result=="bear" then
+        return_amt = return_amt + invest_amt * epoch.bear_payout
+      end
+      if tx.method_name=="betBull" and epoch.bet_result=="bull" then
+        return_amt = return_amt + invest_amt * epoch.bull_payout
+      end
+    end
+
+%>
+  <tr>
+  <td> | <%= i%></td>
+  <td> | <a href="/epoch/<%= epoch.epoch %>"><%= epoch.epoch %></a></td>
+  <td> | <span style="background-color: <%= "lightpink" if last_block_order<=3 %>"> <%= tx.block_number %>(<%=  last_block_order %>)</span> </td>
+  <td> | <%= tx.block_time.to_formatted_s(:db)[-8,8] %> </td>
+  <td> | <%= epoch.get_bull_payout(tx.block_number-1).round(2) %> <%= epoch.get_bear_payout(tx.block_number-1).round(2) %></td>
+  <td> |  <span style="background-color: <%= "lightsalmon" if wrong_bet %>"> <%= tx.method_name %></span></td>
+  <td> |    <span style="color:<%= tx.tx_status ? "green" : "red" %>">
+        <%= tx.tx_status %> 
+    </span>
+  </td>
+  <td> | <%= @tx_map[tx.tx_hash]!=nil ? (@tx_map[tx.tx_hash] or [0,0,0])[1].round(4) : "" %></td>
+
+  </tr>
+<% end %>
+</table>
+----------------------------------------------------<br/>
+
+bet_epoch: <%= @tx.size %> - all_epoch: <%= Epoch.count %>  - bet_ratio: <%= (@tx.size*100 / Epoch.count).round(2) %>% <br/>
+bet_bull_ratio: <%= (@tx.where("method_name=?",'betBull').count.to_f  / @tx.count).round(2)  %><br/>
+bet_success_rate: <%=  (@tx.where("tx_status=?",true).count.to_f /  @tx.count).round(2)  %> <br/>
+<br/>
+avg_amount: <%= (avg_amount.sum / avg_amount.size.to_f).round(4)  %> <br/>
+<% def calculate_percentile(array, percentile)
+  array.sort[(percentile * array.length).ceil - 1] or 0
+end
+%>
+
+amount_percentile 25%: <%= calculate_percentile(avg_amount,0.25).round(4) %> | 50%: <%= calculate_percentile(avg_amount,0.5).round(4) %> | 75%: <%= calculate_percentile(avg_amount,0.75).round(4) %><br/>
+<br/>
+avg_last_block_order: <%= (avg_last_block_order.sum / avg_last_block_order.size.to_f).round(2)  %> <br/>
+right_bet_ratio: <%= (wrong_bet_list.filter{|x| x==false}.size / wrong_bet_list.size.to_f).round(4)  %> <br/>
+<br/>
+invest_cnt: <%= invest_cnt%> 
+invest_amt: <%= invest_amt.round(4)%> 
+return_amt: <%= return_amt.round(4)%> <br/>
+
+<% if invest_amt!=0 then%>
+total_roi: <%= (return_amt / invest_amt).round(4)%>
+round_roi: <%= ((return_amt / invest_amt) /invest_cnt) .round(4)%> <br/>
+<% end%>
