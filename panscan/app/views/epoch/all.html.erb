@@ -1,5 +1,5 @@
 <h1>Model Stats</h1>
-epoch count: <%= @epoch.count %><br/>
+epoch count: <%= @epoch_count %><br/>
 
 ------------------------------------------------------------------------------------<br/>
 <table>
@@ -19,8 +19,8 @@ epoch count: <%= @epoch.count %><br/>
 <tr>
 <td><%= index%> </td>
 <td> | <a href='/epoch/<%= epoch.epoch %>'><%= epoch.epoch %></a> </td>
-<td> | <%= epoch.lock_price %> </td>
-<td> | <%= epoch.close_price %> </td>
+<td> | <%= epoch.lock_price.round(2) %> </td>
+<td> | <%= epoch.close_price.round(2) %> </td>
 <td> | <%= epoch.bet_result %> </td>
 <td> | <%= epoch.total_amount %> </td>
 <td> | <%= epoch.bull_payout %> </td>
@@ -30,3 +30,6 @@ epoch count: <%= @epoch.count %><br/>
 </tr>
 <% end%>
 </table>
+------------------------------------------------------------------------------------<br/>
+
+ <%== pagy_nav(@pagy) %>
