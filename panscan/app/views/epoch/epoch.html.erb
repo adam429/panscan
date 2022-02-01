@@ -10,7 +10,7 @@ bear_payout: <%= @epoch.bear_payout %> <br/>
 bet_result: <%= @epoch.bet_result %> <br/>
 ----------------------------------------------------<br/>
 <% (1..5).to_a.reverse.each do |i| 
-last_block = @epoch.get_last_block.block_number - i%>
+last_block = @epoch.lock_block_number - i%>
 
 last <%= i %> round |
 acc_bet <%= (@epoch.get_count(last_block)).round(2) %> (<%= (@epoch.get_count(last_block)*100 / @epoch.total_count).round(1) %>%)  |
@@ -19,6 +19,7 @@ payout(bull/bear) <%= @epoch.get_bull_payout(last_block-1).round(2) %> <%= @epoc
 <br/>
 
 <% end %>
+
 ----------------------------------------------------<br/>
 
 
@@ -53,16 +54,21 @@ payout(bull/bear) <%= @epoch.get_bull_payout(last_block-1).round(2) %> <%= @epoc
 
 
 <% @epoch.tx.each_with_index do |tx,index|
-    active_rate = (@epoch.get_address_bet(tx.from)*100/288).round
+    #active_rate = (@epoch.get_address_bet(tx.from)*100/288).round
     last_block_order=@epoch.get_last_block_order(tx.block_number)
+    active_rate = 0
 %>
+
 <tr>
   <td><a href="https://bscscan.com/tx/<%= tx.tx_hash %>"><%=index%></a> </td>
-  <td>  <a href="https://bscscan.com/block/<%= tx.block_number %>"><%= tx.block_number %></a>
+  
+  <td><a href="https://bscscan.com/block/<%= tx.block_number %>"><%= tx.block_number %></a>
    <span style="background-color: <%= "lightpink" if last_block_order<=3 %>">(<%= last_block_order %>) 
    </span>
   </td>
+
   <td>  <%= tx.block_time.to_formatted_s(:db)[-8,8] %></a> </td>
+
   <td>  
     <% if tx.method_name[0,3]=="bet" %>
     <span style="color:<%= 
@@ -82,6 +88,7 @@ payout(bull/bear) <%= @epoch.get_bull_payout(last_block-1).round(2) %> <%= @epoc
     </span>
     <% end %>
   </td>
+
   <td>
     <a href="/address/<%= tx.from %>"><%= tx.from %></a>
   </td>
@@ -94,6 +101,7 @@ payout(bull/bear) <%= @epoch.get_bull_payout(last_block-1).round(2) %> <%= @epoc
   <td>     <span style="background-color: <%= "lightsalmon" if @epoch.get_wrong_bet(tx.method_name,tx.block_number) %>">
  <%= tx.method_name %>
  </span>
+  
   </td>
   <td>  
     <span style="color:<%= tx.tx_status ? "green" : "red" %>">
