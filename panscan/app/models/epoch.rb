@@ -18,11 +18,9 @@ class Epoch < ApplicationRecord
     end
     def event
         Event.where(block_number:self.block.map {|x| x.block_number}).order("block_number")
-        # Event.where(" epoch = ? ",self.epoch).order("block_number")
     end
     def tx
         Tx.where(block_number:self.block.map {|x| x.block_number}).order("block_number")
-        # Tx.where(" epoch = ? ",self.epoch).order("block_number")
     end
 
     def _block
@@ -121,58 +119,6 @@ class Epoch < ApplicationRecord
         return false
     end
 
-    # todo
-    def get_bet_amount(tx)
-        amount = JSON.parse(tx.event.first.params)["amount"] if tx.tx_status and (tx.method_name=="betBear" or tx.method_name=="betBull")
-        return amount
-        # return tx.amount.to_f/1e18 if tx.tx_status and (tx.method_name=="betBear" or tx.method_name=="betBull")
-    end
-    # def get_bet_amount(tx)
-    #     gen_map()
-    #     @tx_map[tx.tx_hash][1] if tx.tx_status and (tx.method_name=="betBear" or tx.method_name=="betBull")
-    # end
-
-    # def gen_map()
-    #     if @tx_map==nil or @block_map==nil  then
-    #         @tx_map = {}
-    #         self.event.each {|event|
-    #             amount = JSON.parse(event.params)["amount"]
-    #             @tx_map[event.tx_hash] = [
-    #                 event.name,
-    #                 amount,
-    #                 event.block_number
-    #             ]
-    #         }            
-    #         bull_amount = 0
-    #         bear_amount = 0
-    #         count =0
-
-    #         @block_map = {}
-    #         self.block.each {|block|
-    #             tx = @tx_map.to_a.map {|x| x.flatten}.filter {|x| x[3]==block.block_number}
-    #             tx = tx.filter do |x| x[1]=="BetBull" or x[1]=="BetBear" end
-    #             tx.each do |x|
-    #             if x[1]=="BetBull" then
-    #                 bull_amount=bull_amount+x[2]
-    #             end
-    #             if x[1]=="BetBear" then
-    #                 bear_amount=bear_amount+x[2]
-    #             end
-    #             end
-    #             count = count +tx.size
-    #             @block_map[block.block_number] = [
-    #                 bull_amount==0?0:(bull_amount+bear_amount)/bull_amount,
-    #                 bear_amount==0?0:(bull_amount+bear_amount)/bear_amount, 
-    #                 bull_amount,
-    #                 bear_amount,
-    #                 count
-    #             ]
-    #         }            
-
-    #     end
-    # end
-
-
     def get_address_bet(address)
         # if @address_map==nil then
         #     epoch_last = lock_block_number
@@ -182,11 +128,5 @@ class Epoch < ApplicationRecord
         # end
         # @address_map[address] or 0
     end
-
-
-    # def self.get_epoch(block_number)
-    #     block_time = Block.find_by_block_number(block_number).block_time
-    #     Epoch.where("start_timestamp<=? and ?<=lock_timestamp",block_time,block_time-10).first
-    # end
 
 end

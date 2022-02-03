@@ -29,8 +29,7 @@ address: <%= @address %><br/>
     x = @tx_map[tx.tx_hash]
     avg_amount.push(x[1]) if x!=nil
 
-    epoch = Epoch.get_epoch(tx.block_number)
-
+    epoch = @epoch_map[tx.tx_hash]
     next if epoch==nil
 
     last_block_order = epoch.get_last_block_order(tx.block_number)
@@ -42,13 +41,14 @@ address: <%= @address %><br/>
 
     if tx.tx_status then
       invest_cnt = invest_cnt +1
-      invest_amt = invest_amt + (@tx_map[tx.tx_hash] or [0,0,0])[1]
-      return_amt = return_amt - invest_amt
+      bet_amt = (@tx_map[tx.tx_hash] or [0,0,0])[1]
+      invest_amt = invest_amt + bet_amt
+      return_amt = return_amt - bet_amt
       if tx.method_name=="betBear" and epoch.bet_result=="bear" then
-        return_amt = return_amt + invest_amt * epoch.bear_payout
+        return_amt = return_amt + bet_amt * epoch.bear_payout
       end
       if tx.method_name=="betBull" and epoch.bet_result=="bull" then
-        return_amt = return_amt + invest_amt * epoch.bull_payout
+        return_amt = return_amt + bet_amt * epoch.bull_payout
       end
     end
 

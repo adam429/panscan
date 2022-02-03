@@ -112,7 +112,7 @@ payout(bull/bear) <%= @epoch.get_bull_payout(last_block-1).round(2) %> <%= @epoc
     </span>
   
   </td>
-  <td>  <%= @epoch.get_bet_amount(tx)!=nil ? @epoch.get_bet_amount(tx).round(4) : ""  %> </td>
+  <td>  <%= tx.bet_amount ? tx.bet_amount.round(4) : "" %> </td>
   <td> 
     |
     
