@@ -7,7 +7,8 @@ class EpochController < ApplicationController
     end
 
     def epoch
-        @epoch = Epoch.find_by_epoch(params[:id])
+        @epoch      = Epoch.find_by_epoch(params[:id].to_i)
+        @epoch_next = Epoch.find_by_epoch(params[:id].to_i+1)
     end
 
     def address
