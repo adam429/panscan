@@ -54,8 +54,8 @@ payout(bull/bear) <%= @epoch.get_bull_payout(last_block-1).round(2) %> <%= @epoc
 
 
 <% 
-    list_tx = @epoch.tx.to_a + @epoch_next.tx.where("block_number < ?",@epoch.lock_block_number+10).to_a
-    # list_tx = @epoch.tx
+    list_tx = @epoch.tx.to_a
+    list_tx = list_tx + @epoch_next.tx.where("block_number < ?",@epoch.lock_block_number+10).to_a if @epoch_next
     list_tx.each_with_index do |tx,index|
     active_rate = (@epoch.get_address_bet(tx.from)*100/288).round
     last_block_order=@epoch.get_last_block_order(tx.block_number)
