@@ -120,13 +120,12 @@ class Epoch < ApplicationRecord
     end
 
     def get_address_bet(address)
-        # if @address_map==nil then
-        #     epoch_last = lock_block_number
-        #     # epoch_first = Epoch.find_by_epoch(self.epoch-288).get_first_block.block_number
-        #     epoch_first = Epoch.where("epoch >= ?",self.epoch-288).order(:epoch).first.start_block_number
-        #     @address_map = Tx.where("?<= block_number and block_number <= ? and (method_name = ? or method_name = ?)",epoch_first,epoch_last,"betBear","betBull").group(:from).count
-        # end
-        # @address_map[address] or 0
+        if @address_map==nil then
+            epoch_last = lock_block_number
+            epoch_first = Epoch.where("epoch >= ?",self.epoch-288).order(:epoch).first.start_block_number
+            @address_map = Tx.where("?<= block_number and block_number <= ? and (method_name = ? or method_name = ?)",epoch_first,epoch_last,"betBear","betBull").group(:from).count
+        end
+        @address_map[address] or 0
     end
 
 end
