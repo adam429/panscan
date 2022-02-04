@@ -1,2 +1,24 @@
 <h1>Model Stats</h1>
-<%= "Block.count #{Block.count} - Tx.count #{Tx.count} - Event.count #{Event.count} - Epoch.count #{Epoch.count} - EpochDetail.count #{EpochDetail.count}" %>
+<%= "Block.count #{Block.count} - Tx.count #{Tx.count} - Event.count #{Event.count} - Epoch.count #{Epoch.count} - EpochDetail.count #{EpochDetail.count} - Address.count #{Address.count} - Transfer.count #{Transfer.count}" %>
+<h4>Details</h4>
+<%= "Block.max_block #{Block.order(:block_number).first.block_number}" %><br/>
+<%= "Block.min_block #{Block.order(:block_number).last.block_number}" %><br/>
+<%= "Block.first_block #{Block.first.block_number}" %><br/>
+<%= "Block.last_block #{Block.last.block_number}" %><br/>
+<br/>
+
+<%= "Epoch.max_epoch #{Epoch.order(:epoch).first.epoch}" %><br/>
+<%= "Epoch.min_epoch #{Epoch.order(:epoch).last.epoch}" %><br/>
+<br/>
+
+
+<%= "Transfer.max_block #{Transfer.order(:block_number).first.block_number}" %><br/>
+<%= "Transfer.min_block #{Transfer.order(:block_number).last.block_number}" %><br/>
+<%= "Transfer.first_block #{Transfer.first.block_number}" %><br/>
+<%= "Transfer.last_block #{Transfer.last.block_number}" %><br/>
+<br/>
+
+
+<%= "Address.contract #{Address.where(is_contract:true).count} / #{(Address.where(is_contract:true).count*100.to_f / Address.count).round(2)}%" %><br/>
+<%= "Address.panbot #{Address.where(is_panbot:true).count} / #{(Address.where(is_panbot:true).count*100.to_f / Address.count).round(2)}%" %><br/>
+<br/>
