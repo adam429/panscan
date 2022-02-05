@@ -1,0 +1,10 @@
+<h1>Transfer </h1>
+<h4>Block <%= @block_number %> </h4>
+<% @transfer.each do |tx| %>
+  <%= tx.from %>
+  <%= tx.to %>
+  <%= tx.method_name%>
+
+  <%= tx.amount %>
+  <br/>
+<% end %>

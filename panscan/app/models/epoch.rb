@@ -37,13 +37,13 @@ class Epoch < ApplicationRecord
         Block.where("? <= block_time and block_time < ?",start_timestamp,next_epoch_starttime).order("block_number").limit(108)
     end
 
-    # def _event
-    #     Event.where(block_number:_block.map {|x| x.block_number}).order("block_number")
-    # end
+    def _event
+        Event.where(block_number:_block.map {|x| x.block_number}).order("block_number")
+    end
 
-    # def _tx
-    #     Tx.where(block_number:_block.map {|x| x.block_number}).order("block_number")
-    # end
+    def _tx
+        Tx.where(block_number:_block.map {|x| x.block_number}).order("block_number")
+    end
 
     def bet_result
         return "bear" if lock_price > close_price

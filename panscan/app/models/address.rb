@@ -46,19 +46,18 @@ class Address < ApplicationRecord
         return "Transfer",""
       else
         method_hash = input[0,10]
-        input_data = "0x"+input[10,input.size]  
+        # input_data = "0x"+input[10,input.size]  
         if @function_abi!=nil and @function_abi[method_hash] then
           method_hash = @function_abi[method_hash].name
-          method_params = ""
-          begin
-            method_params = self.class.decoder.decode_arguments(@function_abi[method_hash].inputs,input_data)
-          rescue
-            method_params = ""
-          end
-          return method_hash,method_params
-        else
-          return method_hash,""
         end
+        return method_hash,""
+        # method_params = ""
+          # begin
+          #   method_params = self.class.decoder.decode_arguments(@function_abi[method_hash].inputs,input_data)
+          # rescue
+          #   method_params = ""
+          # end
+          # return method_hash,method_params
       end
     end 
     

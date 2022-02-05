@@ -11,6 +11,11 @@ class EpochController < ApplicationController
         @epoch_next = Epoch.find_by_epoch(params[:id].to_i+1)
     end
 
+    def transfer
+        @block_number = params[:id].to_i
+        @transfer  = Transfer.where(block_number:@block_number)
+    end
+
     def address
         @address = params[:id]
     

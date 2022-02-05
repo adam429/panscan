@@ -64,7 +64,7 @@ payout(bull/bear) <%= @epoch.get_bull_payout(last_block-1).round(2) %> <%= @epoc
 <tr>
   <td><a href="https://bscscan.com/tx/<%= tx.tx_hash %>"><%=index%></a> </td>
   
-  <td><a href="https://bscscan.com/block/<%= tx.block_number %>"><%= tx.block_number %></a>
+  <td><a href="/transfer/<%= tx.block_number %>"><%= tx.block_number %></a>
    <span style="background-color: <%= "lightpink" if last_block_order<=3 %>">(<%= last_block_order %>) 
    </span>
   </td>
