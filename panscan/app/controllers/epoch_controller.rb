@@ -54,4 +54,22 @@ class EpochController < ApplicationController
         @epoch_count = Epoch.count
         @pagy, @epoch = pagy(Epoch.order("epoch desc"))        
     end
+
+    def stats_clean_cache
+        Cache.destroy_all
+        
+        redirect_to "/stats"
+    end
+
+    def address_tag
+        address = params[:id]
+        tag = params[:tag]
+        Address.update_tag(address,tag)
+        redirect_to "/transfer/address/#{address}"
+    end
+
+    def top_contract
+        @top500 = Transfer.top_address
+        @top500 = @top500.filter {|x| Address.is_contract(x[0])}
+    end
 end

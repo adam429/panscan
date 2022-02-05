@@ -6,6 +6,11 @@ class Cache < ActiveRecord::Base
       self.value_t=value if value.class==Time or value.class==DateTime or value.class==Date
       self.value_b=value if value.class==FalseClass or value.class==TrueClass
       self.value_type = value.class.to_s
+      
+      if value.class==Array or value.class==Hash then
+        self.value_s = JSON.dump(value) 
+        self.value_type = "JSON"
+      end
     end
     
     def value
@@ -14,6 +19,7 @@ class Cache < ActiveRecord::Base
       return self.value_s if self.value_type == "String"
       return self.value_t if self.value_type == "Time" or self.value_type == "DateTime" or self.value_type == "Date"
       return self.value_b if self.value_type == "FalseClass" or self.value_type == "TrueClass"
+      return JSON.parse(self.value_s) if self.value_type == "JSON"
     end
     
     def self.set(key,value)

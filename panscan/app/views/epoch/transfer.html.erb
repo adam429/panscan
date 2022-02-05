@@ -21,9 +21,7 @@
     </a><%= from_addr.is_panbot ? "[P]" : "" %>
   </td>
   <td> | <a href='/transfer/address/<%= tx.to %>' 
-        style='background-color:<%= tx.to==@address ? "lightgoldenrodyellow": ""%>' >
-        <%= to_addr.tag ? to_addr.tag : tx.to %>
-      </a><%= to_addr.is_panbot ? "[P]" : "" %></td>
+        style='background-color:<%= tx.to==@address ? "lightgoldenrodyellow": ""%>' ><%= to_addr.tag ? to_addr.tag : tx.to %></a><%= to_addr.is_panbot ? "[P]" : "" %></td>
   <td> | 
       <span style='background-color:<%= tx.method_name == "Transfer"? "palegreen" : ""  %>' >
         <%= tx.method_name%>

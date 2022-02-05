@@ -1,5 +1,7 @@
 <h1>Model Stats</h1>
 <%= "Block.count #{Block.count} - Tx.count #{Tx.count} - Event.count #{Event.count} - Epoch.count #{Epoch.count} - EpochDetail.count #{EpochDetail.count} - Address.count #{Address.count} - Transfer.count #{Transfer.count}" %>
+<%= button_to "Clean Cache", { action: "stats_clean_cache" } %>
+
 <h4>==Details==</h4>
 <%= "Block.max_block #{Block.order(:block_number).first.block_number}" %><br/>
 <%= "Block.min_block #{Block.order(:block_number).last.block_number}" %><br/>

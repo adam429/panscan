@@ -3,6 +3,21 @@ class Address < ApplicationRecord
       attr_accessor :client,:get_abi,:decoder,:panbot_address
     end
     
+    def self.update_tag(address,tag)
+      return if address==nil
+      
+      addr = Address.find_by_addr(address)
+      return if addr==nil
+
+      if tag=="" then
+        addr.tag = nil
+      else  
+        addr.tag = tag
+      end
+
+      addr.save
+    end
+    
     def self.load(address)
       return if address==nil
       
@@ -16,7 +31,7 @@ class Address < ApplicationRecord
       addr.is_panbot = is_panbot
       addr.is_contract = self.is_contract(address)
       addr.contract_abi = self.get_abi.call(address) if addr.is_contract 
-      
+            
       begin
         addr.save!
       rescue ActiveRecord::RecordNotUnique 

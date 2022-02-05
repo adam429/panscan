@@ -1,0 +1,22 @@
+<h1>Top Contract</h1>
+
+<table>
+<tr>
+  <td>#</td>
+  <td> | address</td>
+  <td> | tag</td>
+  <td> | count </td>
+</tr>
+<% @top500.each_with_index do |x,index|
+    address = x[0]
+    count = x[1]
+    addr = Address.find_by_addr(address)
+%>
+<tr>
+  <td><%=index%> </td>
+  <td> | <a href='/transfer/address/<%= address %>' ><%= address %></a></td>
+  <td> | <%= addr.tag %></td>
+  <td> | <%= count %></td>
+</tr>
+<% end %>
+</table>
