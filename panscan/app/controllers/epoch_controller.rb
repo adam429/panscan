@@ -13,7 +13,15 @@ class EpochController < ApplicationController
 
     def transfer
         @block_number = params[:id].to_i
-        @transfer  = Transfer.where(block_number:@block_number)
+
+        @pagy, @transfer = pagy(Transfer.where(block_number:@block_number))        
+    end
+
+    def trans_addr
+        @address = params[:id]
+        @addr = Address.find_by_addr(@address)
+
+        @pagy, @tx = pagy(Transfer.where('"from" = ? or "to"=?',@address,@address).order(:block_number))        
     end
 
     def address

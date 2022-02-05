@@ -9,6 +9,7 @@ Rails.application.routes.draw do
   get "/epoch/all", to: "epoch#all"
   get "/epoch/:id", to: "epoch#epoch"
   get "/address/:id", to: "epoch#address"
+  get "/transfer/address/:id", to: "epoch#trans_addr"
   get "/transfer/:id", to: "epoch#transfer"
   get "/log", to: "epoch#log"
 end

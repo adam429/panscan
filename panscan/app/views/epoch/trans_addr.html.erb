@@ -1,20 +1,31 @@
-<h1>Transfer </h1>
-<h4>Block <%= @block_number %> </h4>
+<h1>Transfer Address</h1>
+<h4>Address <%= @address %> </h4>
+panbot: <%= @addr.is_panbot ? "true" : "false" %>
+  <% if @addr.is_panbot then%> 
+   <a href= "/address/<%= @address %>" >[panbot bet]</a>
+  <% end %>
+ </br>
+contract: <%=@addr.is_contract ? "true" : "false" %> </br>
+tag: <%=@addr.tag %> </br>
+ </br>
 <table>
 <tr>
   <td>#</td>
+  <td> | block</td>
+  <td> | time</td>
   <td> | from</td>
   <td> | to</td>
-  <td> | method_name</td>
+  <td> | method</td>
   <td> | amount</td>
 </tr>
-<% @transfer.each_with_index do |tx,index| 
+<% @tx.each_with_index do |tx,index|
     from_addr = Address.find_by_addr(tx.from)
     to_addr = Address.find_by_addr(tx.to)
-
 %>
 <tr>
   <td><a href="https://bscscan.com/tx/<%= tx.tx_hash %>"><%=index%></a> </td>
+  <td> | <a href='/transfer/<%= tx.block_number %>'><%= tx.block_number %></a></td>
+  <td> | <%= tx.block_time.to_formatted_s(:db) %></td>
   <td> | <a href='/transfer/address/<%= tx.from %>' 
         style='background-color:<%= tx.from==@address ? "lightgoldenrodyellow": ""%>' >
         <%= from_addr.tag ? from_addr.tag : tx.from %>

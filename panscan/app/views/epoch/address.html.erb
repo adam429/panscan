@@ -1,6 +1,6 @@
 <h1> Address View </h1>
 
-address: <%= @address %><br/>
+address: <%= @address %>   <a href= "/transfer/address/<%= @address %>" >[transfer]</a> <br/>
 
 ----------------------------------------------------<br/>
 == bet epoch (<%= @tx.size %>) == <br/>
@@ -92,5 +92,4 @@ return_amt: <%= return_amt.round(4)%> <br/>
 
 <% if invest_amt!=0 then%>
 total_roi: <%= (return_amt / invest_amt).round(4)%>
-round_roi: <%= ((return_amt / invest_amt) /invest_cnt) .round(4)%> <br/>
 <% end%>
