@@ -62,7 +62,7 @@ class Task < ActiveRecord::Base
         loop do
             task = Task.take_task(runner) 
             task.run if task
-            sleep(1)
+            sleep(rand(10))
         end
     end
   end
