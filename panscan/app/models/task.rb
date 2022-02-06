@@ -9,12 +9,14 @@ class Task < ActiveRecord::Base
     
     def self.take_task(runner)
       task = Task.where(status:"open").first
-      task.status = "run"
-      task.runner = runner
-      task.output = ""
-      task.save
-  
-      task.log("#{Time.now} runner #{runner} take task #{task.id} : #{task.name}\n")
+      if task then
+        task.status = "run"
+        task.runner = runner
+        task.output = ""
+        task.save
+    
+        task.log("#{Time.now} runner #{runner} take task #{task.id} : #{task.name}\n")
+      end
       return task
     end
     
@@ -54,5 +56,12 @@ class Task < ActiveRecord::Base
         self.save      
       end
     end
-    
+
+    def self.run_loop(runner)
+        loop do
+            task = Task.take_task(node_name) 
+            task.run if task
+            sleep(1)
+        end
+    end
   end
