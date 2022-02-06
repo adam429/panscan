@@ -59,7 +59,7 @@ class Task < ActiveRecord::Base
 
     def self.run_loop(runner)
         loop do
-            task = Task.take_task(node_name) 
+            task = Task.take_task(runner) 
             task.run if task
             sleep(1)
         end
