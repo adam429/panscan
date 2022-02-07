@@ -18,14 +18,14 @@ class EpochController < ApplicationController
     end
 
     def trans_addr
-        @address = params[:id]
+        @address = params[:id].downcase
         @addr = Address.find_by_addr(@address)
 
         @pagy, @tx = pagy(Transfer.where('"from" = ? or "to"=?',@address,@address).order(:block_number))        
     end
 
     def address
-        @address = params[:id]
+        @address = params[:id].downcase
     
         @tx = Tx.where('"from" = ?',@address).where("method_name=? or method_name=?",'betBull','betBear').order(:block_number)
 

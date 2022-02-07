@@ -15,6 +15,9 @@ address: <%= @address %>   <a href= "/transfer/address/<%= @address %>" >[transf
 <td> | method</td>
 <td> | status</td>
 <td> | amount</td>
+<td> | payout</td>
+<td> | win_side</td>
+<td> | round_ret</td>
 </tr>
 <%
   avg_last_block_order = []
@@ -26,6 +29,7 @@ address: <%= @address %>   <a href= "/transfer/address/<%= @address %>" >[transf
 
   
   @tx.each_with_index do |tx,i| 
+    round_ret = 0
     x = @tx_map[tx.tx_hash]
     avg_amount.push(x[1]) if x!=nil
 
@@ -39,17 +43,22 @@ address: <%= @address %>   <a href= "/transfer/address/<%= @address %>" >[transf
     wrong_bet = epoch.get_wrong_bet(tx.method_name,tx.block_number);
     wrong_bet_list.push wrong_bet
 
+    win_bet = tx.method_name[-4,4].downcase == epoch.bet_result 
+
     if tx.tx_status then
       invest_cnt = invest_cnt +1
       bet_amt = (@tx_map[tx.tx_hash] or [0,0,0])[1]
       invest_amt = invest_amt + bet_amt
-      return_amt = return_amt - bet_amt
+      
+      round_ret =  - bet_amt
       if tx.method_name=="betBear" and epoch.bet_result=="bear" then
-        return_amt = return_amt + bet_amt * epoch.bear_payout
+        round_ret = round_ret+ bet_amt * epoch.bear_payout
       end
       if tx.method_name=="betBull" and epoch.bet_result=="bull" then
-        return_amt = return_amt + bet_amt * epoch.bull_payout
+        round_ret = round_ret+bet_amt * epoch.bull_payout
       end
+      return_amt = return_amt + round_ret
+
     end
 
 %>
@@ -65,6 +74,10 @@ address: <%= @address %>   <a href= "/transfer/address/<%= @address %>" >[transf
     </span>
   </td>
   <td> | <%= @tx_map[tx.tx_hash]!=nil ? (@tx_map[tx.tx_hash] or [0,0,0])[1].round(4) : "" %></td>
+  <td> | <%= epoch.bull_payout.round(2) %>  <%= epoch.bear_payout.round(2) %></td>
+  <td> | <span style="background-color: <%= win_bet ? "palegreen" : "lightsalmon"  %>"> <%= tx.tx_status==true ? epoch.bet_result : "" %> </span></td>
+  <td> | <%= tx.tx_status==true ? round_ret.round(4) : "" %></td>
+
 
   </tr>
 <% end %>

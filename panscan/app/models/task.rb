@@ -58,7 +58,6 @@ class Task < ActiveRecord::Base
     end
 
     def self.run_loop(runner)
-
         loop do
             task = Task.take_task(runner) 
             task.run if task

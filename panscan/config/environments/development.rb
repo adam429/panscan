@@ -69,4 +69,6 @@ Rails.application.configure do
   # config.action_cable.disable_request_forgery_protection = true
 
   config.hosts << "panscan.ivow.bet"
+
+#  config.web_console.permissions = '0.0.0.0/0'
 end
