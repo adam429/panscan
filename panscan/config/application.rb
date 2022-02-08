@@ -19,7 +19,10 @@ module Panscan
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
 
-    config.web_console.permissions = '172.26.0.0/16'
-    config.web_console.whitelisted_ips = ['172.26.0.0/16']
+    # config.web_console.permissions = '172.26.0.0/16'
+    # config.web_console.whitelisted_ips = ['172.26.0.0/16']
+    config.web_console.permissions = '0.0.0.0/0'
+    config.web_console.whitelisted_ips = ['0.0.0.0/0']
+
   end
 end
