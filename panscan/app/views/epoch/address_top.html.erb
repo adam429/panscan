@@ -1,0 +1,43 @@
+<h1>Top Address</h1>
+
+<a href="/address/top?name=<%= @prev %>&prev=<%= @prev %>&prev_order=<%=  @prev_order=="desc" ? "asc" : "desc" %>&where=">bet_cnt>=0</a> | 
+<a href="/address/top?name=<%= @prev %>&prev=<%= @prev %>&prev_order=<%=  @prev_order=="desc" ? "asc" : "desc" %>&where=bet_cnt>=100">bet_cnt>=100</a> | 
+<a href="/address/top?name=<%= @prev %>&prev=<%= @prev %>&prev_order=<%=  @prev_order=="desc" ? "asc" : "desc" %>&where=bet_cnt>=1000">bet_cnt>=1000</a> 
+<br/><br/>
+<table>
+<tr>
+  <td>#</td>
+  <td> | address</td>
+  <td> | <a href="/address/top?name=bet_cnt&prev=<%= @prev %>&prev_order=<%= @prev_order%>&where=<%= @where%>">bet_cnt</a></td>
+  <td>success</td>
+  <td> | <a href="/address/top?name=bet_bull_cnt&prev=<%= @prev %>&prev_order=<%= @prev_order%>&where=<%= @where%>">bet_bull</a></td>
+  <td></td>
+  <td> | <a href="/address/top?name=bet_bear_cnt&prev=<%= @prev %>&prev_order=<%= @prev_order%>&where=<%= @where%>">bet_bear</a></td>
+  <td></td>
+  <td> | <a href="/address/top?name=avg_bet_amt&prev=<%= @prev %>&prev_order=<%= @prev_order%>&where=<%= @where%>">bet_amt</a></td>
+  <td> | <a href="/address/top?name=avg_last_block_order&prev=<%= @prev %>&prev_order=<%= @prev_order%>&where=<%= @where%>">last_block</a></td>
+  <td> | <a href="/address/top?name=right_bet_ratio&prev=<%= @prev %>&prev_order=<%= @prev_order%>&where=<%= @where%>">right_bet</a></td>
+  <td> | <a href="/address/top?name=win_bet_ratio&prev=<%= @prev %>&prev_order=<%= @prev_order%>&where=<%= @where%>">win_bet</a></td>
+  <td> | <a href="/address/top?name=invest_amt&prev=<%= @prev %>&prev_order=<%= @prev_order%>&where=<%= @where%>">invest</a></td>
+  <td> | <a href="/address/top?name=return_amt&prev=<%= @prev %>&prev_order=<%= @prev_order%>&where=<%= @where%>">return</a></td>
+</tr>
+<% @address.each_with_index do |addr,index|%>
+<tr>
+  <td><%=index%> </td>
+  <td> | <a href='/address/<%= addr.addr %>' ><%= addr.short_addr %></a></td>
+  <td> | <%= addr.bet_cnt %> </td>
+  <td><%= (addr.invest_cnt.to_f / addr.bet_cnt).round(2)  %> </td>
+  <td> | <%= addr.bet_bull_cnt %> </td>
+  <td><%= (addr.bet_bull_cnt.to_f / addr.bet_cnt).round(2)  %> </td>
+  <td> | <%= addr.bet_bear_cnt %> </td>
+  <td><%= (addr.bet_bear_cnt.to_f / addr.bet_cnt).round(2)  %> </td>
+  <td> | <%= addr.avg_bet_amt.round(4) %> </td>
+  <td> | <%= addr.avg_last_block_order.round(2) %> </td>
+  <td> | <%= addr.right_bet_ratio.round(2) %> </td>
+  <td> | <%= addr.win_bet_ratio.round(2) %> </td>
+  <td> | <%= addr.invest_amt.round(4) %> </td>
+  <td> | <%= addr.return_amt.round(4) %> </td>
+</tr>
+<% end %>
+</table>
+

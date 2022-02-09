@@ -127,5 +127,4 @@ class Epoch < ApplicationRecord
         end
         @address_map[address] or 0
     end
-
 end

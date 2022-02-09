@@ -12,6 +12,7 @@ Rails.application.routes.draw do
   get "/epoch/all", to: "epoch#all"
   get "/epoch/:id", to: "epoch#epoch"
 
+  get "/address/top", to: "epoch#address_top"
   get "/address/:id", to: "epoch#address"
   post "/address/tag/:id", to: "epoch#address_tag"
 

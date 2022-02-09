@@ -85,4 +85,7 @@ class Address < ApplicationRecord
       @abi = JSON.parse(contract_abi)
     end
     
+    def short_addr
+      addr[0,6]+".."+addr[-4,4]
+    end
 end
