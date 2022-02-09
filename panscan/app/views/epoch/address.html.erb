@@ -1,7 +1,15 @@
 <h1> Address View </h1>
 
-address: <%= @address %>   <a href= "/transfer/address/<%= @address %>" >[transfer]</a> <br/>
-
+<h4>Address: <%= @address %>   <a href= "/transfer/address/<%= @address %>" >[transfer]</a> <br/></h4>
+----------------------------------------------------<br/>
+panbot: <%= @addr.is_panbot ? "true" : "false" %> </br>
+contract: <%=@addr.is_contract ? "true" : "false" %> </br>
+<%= form_with url: "/address/tag/#{@address}", method: :post do |form| %>
+  tag: <%=@addr.tag ? @addr.tag : "(blank)"%>  | 
+  <%= form.text_field :tag %>
+  <%= form.submit "Update Tag" %>
+<% end %>
+<a href="https://bscscan.com/address/<%= @address %>">[bnbscan]</a> </br>
 ----------------------------------------------------<br/>
 bet epoch: <%= @addr.bet_epoch_cnt %> / all_epoch: <%= Epoch.count %>  = bet_ratio: <%= (@addr.bet_epoch_cnt*100.to_f / Epoch.count).round(2) %>% <br/>
 <br/>

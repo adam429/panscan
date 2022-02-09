@@ -88,4 +88,28 @@ class Address < ApplicationRecord
     def short_addr
       addr[0,6]+".."+addr[-4,4]
     end
+
+    def calculate_percentile(json, percentile)
+      array = JSON.parse(json)
+      array.sort[(percentile * array.length).ceil - 1] or 0
+    end
+
+    def stats
+      """=== stats ===
+bet epoch: #{bet_epoch_cnt} / all_epoch: #{Epoch.count} = bet_ratio: #{(bet_epoch_cnt*100.to_f / Epoch.count).round(2)}%
+
+invest_cnt: #{invest_cnt} / bet_cnt: #{bet_cnt} = bet_success_rate: #{ (invest_cnt*100.to_f / bet_cnt).round(2)  }%
+
+bet_bull_cnt: #{bet_bull_cnt} / bet_cnt: #{bet_cnt} = bet_bull_ratio: #{( bet_bull_cnt*100.to_f / bet_cnt).round(2)}%
+
+avg_bet_amt: #{avg_bet_amt.round(4)}
+bet_amt_percentile 25%: #{calculate_percentile(bet_amt,0.25).round(4)} | 50%: #{calculate_percentile(bet_amt,0.5).round(4)}| 75%: #{calculate_percentile(bet_amt,0.75).round(4)}
+
+avg_last_block_order: #{avg_last_block_order.round(2)}
+right_bet_ratio: #{(right_bet_ratio*100).round(2)}%
+win_bet_ratio: #{(win_bet_ratio*100).round(2)}%
+
+invest_cnt: #{invest_cnt} invest_amt: #{invest_amt.round(4)} return_amt: #{return_amt.round(4)}
+total_roi: #{ (return_amt*100 / invest_amt).round(2)}% """
+    end
 end

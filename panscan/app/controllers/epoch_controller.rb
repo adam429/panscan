@@ -88,8 +88,9 @@ class EpochController < ApplicationController
                 @prev_order = "desc"                
             end
         end
-        @address = Address.where(params[:where]).where(is_panbot:true).order("#{@prev} #{@prev_order}").order(:id).limit(100)
+        @address = Address.where(params[:where]).where(is_panbot:true).order("#{@prev} #{@prev_order}").order(:id)
         @address = @address.where("#{@prev} <> ?",Float::NAN) if @prev=="avg_bet_amt" or @prev=="avg_last_block_order" or @prev=="right_bet_ratio" or @prev=="win_bet_ratio"
+        @pagy, @address = pagy(@address)        
 
     end
 end

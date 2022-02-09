@@ -1,19 +1,19 @@
-<h1>Transfer Address</h1>
-<h4>Address <%= @address %> <a href="https://bscscan.com/address/<%= @address %>">[bnbscan]</a> </h4>
-panbot: <%= @addr.is_panbot ? "true" : "false" %>
-  <% if @addr.is_panbot then%> 
+<h1>Address View - Transfer</h1>
+<h4>Address <%= @address %>   <% if @addr.is_panbot then%> 
    <a href= "/address/<%= @address %>" >[panbot bet]</a>
   <% end %>
- </br>
-contract: <%=@addr.is_contract ? "true" : "false" %> </br>
+</h4>
+----------------------------------------------------<br/>
 
+panbot: <%= @addr.is_panbot ? "true" : "false" %> </br>
+contract: <%=@addr.is_contract ? "true" : "false" %> </br>
 <%= form_with url: "/address/tag/#{@address}", method: :post do |form| %>
   tag: <%=@addr.tag ? @addr.tag : "(blank)"%>  | 
   <%= form.text_field :tag %>
   <%= form.submit "Update Tag" %>
 <% end %>
-
- </br>
+<a href="https://bscscan.com/address/<%= @address %>">[bnbscan]</a> </br>
+----------------------------------------------------<br/>
 <table>
 <tr>
   <td>#</td>
