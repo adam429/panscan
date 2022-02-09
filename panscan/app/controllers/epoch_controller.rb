@@ -26,8 +26,8 @@ class EpochController < ApplicationController
 
     def address
         @address = params[:id].downcase
-    
-        @tx = Tx.where('"from" = ?',@address).where("method_name=? or method_name=?",'betBull','betBear').order(:block_number)
+        @addr = Address.find_by_addr(@address)
+        @pagy, @tx = pagy(Tx.where('"from" = ?',@address).where("method_name=? or method_name=?",'betBull','betBear').order(:block_number))        
 
         @tx_map = {}
         Event.where(tx_hash:@tx.map {|x| x.tx_hash}).each {|event|
@@ -37,10 +37,8 @@ class EpochController < ApplicationController
                amount,
                event.block_number
            ]
-        }        
-        
+        }                
         @epoch_map = {}
-        
         tx_block_map = @tx.map {|x| [x.tx_hash,x.block_number]}.to_h
         block_epoch_map = Block.where(block_number:@tx.map {|x| x.block_number}).map {|x| [x.block_number,x.epoch]}.to_h
         epoch_ar_map = Epoch.where(epoch:block_epoch_map.to_a.map{|x| x[1]}).map {|x| [x.epoch,x]}.to_h

@@ -1,4 +1,9 @@
 class Transfer < ApplicationRecord
+    belongs_to :ar_from, primary_key: "addr", foreign_key: "from", class_name: "Address"
+    belongs_to :ar_to, primary_key: "addr", foreign_key: "to", class_name: "Address"
+    belongs_to :tx, primary_key: "tx_hash", foreign_key: "tx_hash"
+    belongs_to :block, primary_key: "block_number", foreign_key: "block_number"
+
     def self.top_address()
         top500 = Cache.get("Transfer-top_address")
         if top500==nil then
