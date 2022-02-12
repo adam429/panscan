@@ -24,7 +24,7 @@
 <% @address.each_with_index do |addr,index|%>
 <tr>
   <td><%=index%> </td>
-  <td> | <a href='/address/<%= addr.addr %>' ><%= addr.addr %></a></td>
+  <td> | <a href='/address/<%= addr.addr %>' ><%= addr.tag ? addr.tag : addr.addr %></a></td>
   <td> | <%= addr.bet_cnt %> </td>
   <td><%= (addr.invest_cnt.to_f / addr.bet_cnt).round(2)  %> </td>
   <td> | <%= addr.bet_bull_cnt %> </td>
