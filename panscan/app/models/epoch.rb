@@ -1,9 +1,4 @@
-class Epoch < ApplicationRecord
-    before_destroy :destroy_callback, prepend: true 
-    def destroy_callback
-      throws :abort 
-    end
-  
+class Epoch < ApplicationRecord  
     has_many :detail,  primary_key: "epoch", foreign_key: "epoch", class_name:"EpochDetail"
 
     def self.first_epoch

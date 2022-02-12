@@ -93,4 +93,7 @@ class EpochController < ApplicationController
         @pagy, @address = pagy(@address)        
 
     end
+
+    def index
+    end
 end

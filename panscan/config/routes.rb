@@ -4,6 +4,8 @@ Rails.application.routes.draw do
   # Defines the root path route ("/")
   # root "articles#index"
 
+  root "epoch#index"
+
   get "/console", to: "epoch#web_console"
 
   get "/stats", to: "epoch#stats"

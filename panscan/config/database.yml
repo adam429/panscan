@@ -27,7 +27,7 @@
 development:
   adapter: postgresql
   encoding: utf8
-  database: chaindb
+  database: <%= ENV.fetch('db_database') %>
   pool: 5
   username: <%= ENV.fetch('db_user') %>
   password: <%= ENV.fetch('db_pwd') %>
@@ -37,9 +37,10 @@ development:
 production:
   adapter: postgresql
   encoding: utf8
-  database: chaindb
+  database: <%= ENV.fetch('db_database') %>
   pool: 5
   username: <%= ENV.fetch('db_user') %>
   password: <%= ENV.fetch('db_pwd') %>
   host: <%= ENV.fetch('db_host') %>
   port: 5432  
+

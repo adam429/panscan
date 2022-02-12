@@ -1,9 +1,12 @@
 # PanScan
 
 
-## build
+## build & push
 
-`docker build -t adam429/pan-repo:panscan .`
+```
+ docker build -t adam429/pan-repo:panscan .
+ docker push adam429/pan-repo:panscan
+```
 
 ## run
 

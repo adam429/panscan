@@ -1,4 +1,9 @@
 class Address < ApplicationRecord
+    def delete
+      raise ActiveRecord::ReadOnlyRecord
+    end
+
+
     class << self
       attr_accessor :client,:get_abi,:decoder,:panbot_address
     end
