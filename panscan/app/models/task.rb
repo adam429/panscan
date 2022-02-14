@@ -13,6 +13,7 @@ class Task < ActiveRecord::Base
         task.status = "run"
         task.runner = runner
         task.output = ""
+        task.run_timestamp = Time.now
         task.save
     
         task.log("#{Time.now} runner #{runner} take task #{task.id} : #{task.name}\n")
@@ -33,8 +34,15 @@ class Task < ActiveRecord::Base
       def _log(str)
         @_task.log(str)
       end
+      def _before_hook()
+        ENV["RUNNER_NAME"]=@_task.name
+      end
+      def _after_hook()
+      end
       def _run(code)
+        _before_hook()
         eval(code,binding)
+        _after_hook()
       end
     end
     

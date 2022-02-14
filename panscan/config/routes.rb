@@ -19,6 +19,7 @@ Rails.application.routes.draw do
   post "/address/tag/:id", to: "epoch#address_tag"
 
   get "/transfer/top_contract", to: "epoch#top_contract"
+  get "/transfer/top_transfer", to: "epoch#top_transfer"
   get "/transfer/address/:id", to: "epoch#trans_addr"
   get "/transfer/:id", to: "epoch#transfer"
   get "/log", to: "epoch#log"

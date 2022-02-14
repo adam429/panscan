@@ -67,9 +67,15 @@ class EpochController < ApplicationController
     end
 
     def top_contract
-        @top500 = Transfer.top_address
+        @top500 = Transfer.top_transaction
         @top500 = @top500.filter {|x| Address.is_contract(x[0])}
     end
+
+    def top_transfer
+        @top500 = Transfer.top_transfer
+        @top500 = @top500.filter {|x| not Address.is_contract(x[0])}
+    end
+
 
     def address_top
         @name = params[:name]

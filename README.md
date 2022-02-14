@@ -12,6 +12,3 @@
 
 `docker container run -d -p 80:80  --env-file ~/.env --name panscan adam429/pan-repo:panscan`
 
-## push
-
-`docker push adam429/pan-repo:panscan`

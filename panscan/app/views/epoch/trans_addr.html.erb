@@ -27,6 +27,7 @@ contract: <%=@addr.is_contract ? "true" : "false" %> </br>
 <% @tx.each_with_index do |tx,index|
     from_addr = Address.find_by_addr(tx.from)
     to_addr = Address.find_by_addr(tx.to)
+    next if to_addr==nil
 %>
 <tr>
   <td><a href="https://bscscan.com/tx/<%= tx.tx_hash %>"><%=index%></a> </td>
