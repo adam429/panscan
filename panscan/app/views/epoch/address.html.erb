@@ -1,6 +1,8 @@
 <h1> Address View </h1>
 
 <h4>Address: <%= @address %>   <a href= "/transfer/address/<%= @address %>" >[transfer]</a> <br/></h4>
+
+<% if @addr then %>
 ----------------------------------------------------<br/>
 panbot: <%= @addr.is_panbot ? "true" : "false" %> </br>
 contract: <%=@addr.is_contract ? "true" : "false" %> </br>
@@ -38,7 +40,7 @@ total_roi: <%= (@addr.return_amt*100 / @addr.invest_amt).round(2)%>%
 <% end%>
 <br/>
 ----------------------------------------------------<br/>
-
+<% end %>
 <table>
 <td> | #</td>
 <td> | epoch</td>

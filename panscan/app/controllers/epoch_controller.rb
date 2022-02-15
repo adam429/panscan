@@ -27,6 +27,8 @@ class EpochController < ApplicationController
     def address
         @address = params[:id].downcase
         @addr = Address.find_by_addr(@address)
+
+
         @pagy, @tx = pagy(Tx.where('"from" = ?',@address).where("method_name=? or method_name=?",'betBull','betBear').order(:block_number))        
 
         @tx_map = {}

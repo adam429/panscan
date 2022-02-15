@@ -92,7 +92,7 @@ payout(bull/bear) <%= @epoch.get_bull_payout(last_block-1).round(2) %> <%= @epoc
   </td>
 
   <td>
-    <a href="/address/<%= tx.from %>"><%= tx.ar_from.tag ? tx.ar_from.tag  : tx.from %></a>
+    <a href="/address/<%= tx.from %>"><%= (tx.ar_from and tx.ar_from.tag) ? tx.ar_from.tag  : tx.from %></a>
   </td>
   
   <td> 
