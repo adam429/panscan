@@ -1,0 +1,18 @@
+<h1>Top Group</h1>
+
+<table>
+<tr>
+  <td>#</td>
+  <td> | group tag</td>
+  <td> | count </td>
+</tr>
+<% @group.each_with_index do |item,i| %>
+<tr>
+  <td><%= i %></td>
+  <td> | <a href="/address/group/<%= item[0] %>"><%= item[0] %></a></td>
+  <td> | <%= item[1] %> </td>
+</tr>
+
+<% end %>
+
+</table>

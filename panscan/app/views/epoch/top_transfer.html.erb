@@ -5,18 +5,26 @@
   <td>#</td>
   <td> | address</td>
   <td> | tag</td>
+  <td> | panbot</td>
   <td> | count </td>
+  <td> | out_cnt </td>
+  <td> | in_cnt </td>
 </tr>
 <% @top500.each_with_index do |x,index|
     address = x[0]
     count = x[1]
+    out_cnt = x[2]
+    in_cnt = x[3]
     addr = Address.find_by_addr(address)
 %>
 <tr>
   <td><%=index%> </td>
   <td> | <a href='/transfer/address/<%= address %>' ><%= address %></a></td>
   <td> | <%= addr.tag %></td>
+  <td> | <%= addr.is_panbot ? "[P]" : "" %></td>
   <td> | <%= count %></td>
+  <td> | <%= out_cnt %></td>
+  <td> | <%= in_cnt %></td>
 </tr>
 <% end %>
 </table>

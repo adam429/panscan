@@ -7,6 +7,7 @@
 <table>
 <tr>
   <td>#</td>
+  <td> | group</td>
   <td> | address</td>
   <td> | <a href="/address/top?name=bet_cnt&prev=<%= @prev %>&prev_order=<%= @prev_order%>&where=<%= @where%>">bet_cnt</a></td>
   <td>success</td>
@@ -24,7 +25,14 @@
 <% @address.each_with_index do |addr,index|%>
 <tr>
   <td><%=index%> </td>
-  <td> | <a href='/address/<%= addr.addr %>' ><%= addr.tag ? addr.tag : addr.addr %></a></td>
+  <td> | 
+  <% if addr.tag then
+       group = addr.tag.split(" ")[0]
+  %>
+    <a href='/address/group/<%= group %>' ><%= group %></a>
+  <% end %>
+  <td> | 
+  <a href='/address/<%= addr.addr %>' ><%= addr.tag ? addr.tag : addr.addr %></a></td>
   <td> | <%= addr.bet_cnt %> </td>
   <td><%= (addr.invest_cnt.to_f / addr.bet_cnt).round(2)  %> </td>
   <td> | <%= addr.bet_bull_cnt %> </td>
