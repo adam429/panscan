@@ -102,6 +102,15 @@ class EpochController < ApplicationController
 
     end
 
+    def address_group_graph
+        @group_name = params[:group]
+        @min_amount = (params[:min_amount] or 10).to_i
+        @max_connect = (params[:max_connect] or 100).to_i
+
+        group = Address.where("tag LIKE ?","#{@group_name}%").map {|x| {"input"=>x.addr}}
+        @graph = Address.to_graph(group,group,@min_amount,@max_connect,true) 
+    end
+
     def address_group
         @name = params[:name]
         @prev = params[:prev]
@@ -123,6 +132,17 @@ class EpochController < ApplicationController
         @group_name = params[:group]
         
         @group = Address.where("tag LIKE ?","#{@group_name}%").where(params[:where]).where(is_panbot:true).order("#{@prev} #{@prev_order}").order(:id)
+
+        @bet_epoch_cnt = @group.sum(:bet_epoch_cnt)
+        @invest_cnt = @group.sum(:invest_cnt)
+        @bet_cnt = @group.sum(:bet_cnt)
+        @bet_bull_cnt = @group.sum(:bet_bull_cnt)
+        @bet_bear_cnt = @group.sum(:bet_bear_cnt)
+
+        @avg_last_block_order = @group.map {|x| x.avg_last_block_order * x.invest_cnt }.sum / @invest_cnt
+        @avg_bet_amt = @group.map {|x| x.avg_bet_amt * x.invest_cnt }.sum /  @invest_cnt
+        @right_bet_ratio = @group.map {|x| x.right_bet_ratio * x.bet_cnt }.sum / @bet_cnt
+        @win_bet_ratio = @group.map {|x| x.win_bet_ratio * x.bet_cnt }.sum /  @bet_cnt
 
         @return_amt = @group.sum(:return_amt)
         @invest_amt = @group.sum(:invest_amt)

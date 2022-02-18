@@ -1,5 +1,7 @@
 <h1>Top Address</h1>
 
+<a href="/address/group/graph/<%= @group_name %>">graph view</a>  <br/> <br/>
+
 <a href="/address/group/<%= @group_name %>?name=<%= @prev %>&prev=<%= @prev %>&prev_order=<%=  @prev_order=="desc" ? "asc" : "desc" %>&where=">bet_cnt>=0</a> | 
 <a href="/address/group/<%= @group_name %>?name=<%= @prev %>&prev=<%= @prev %>&prev_order=<%=  @prev_order=="desc" ? "asc" : "desc" %>&where=bet_cnt>=100">bet_cnt>=100</a> | 
 <a href="/address/group/<%= @group_name %>?name=<%= @prev %>&prev=<%= @prev %>&prev_order=<%=  @prev_order=="desc" ? "asc" : "desc" %>&where=bet_cnt>=1000">bet_cnt>=1000</a> 
@@ -66,18 +68,18 @@
 </tr>
 <tr>
   <td> total </td>
-  <td> | 
+  <td> | <%= @group_name %> </td>
   <td> | </td>
-  <td> | </td>
-  <td> </td>
-  <td> | </td>
-  <td> </td>
-  <td> | </td>
-  <td> </td>
-  <td> |  </td>
-  <td> |  </td>
-  <td> |  </td>
-  <td> |  </td>
+  <td> | <%= @bet_cnt %></td>
+  <td>  <%= (@invest_cnt.to_f/@bet_cnt).round(2) %> </td>
+  <td> | <%= @bet_bull_cnt %></td>
+  <td> <%= (@bet_bull_cnt.to_f/@bet_cnt).round(2) %></td>
+  <td> | <%= @bet_bear_cnt %></td>
+  <td> <%= (@bet_bear_cnt.to_f/@bet_cnt).round(2) %></td>
+  <td> | <%= @avg_bet_amt.round(4) %> </td>
+  <td> | <%= @avg_last_block_order.round(4) %> </td>
+  <td> | <%= @right_bet_ratio.round(4) %> </td>
+  <td> | <%= @win_bet_ratio.round(4) %> </td>
   <td> | <%= @invest_amt.round(4) %> </td>
   <td> | <%= @return_amt.round(4) %> </td>
 </tr>

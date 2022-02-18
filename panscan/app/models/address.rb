@@ -1,4 +1,60 @@
-class Address < ApplicationRecord
+class Address < ApplicationRecord   
+    def self.to_graph(addr,level_addr,min_amount=0, max_connect=100,contract=true)
+
+      def self.unify_cex(addr)
+        return "CEX Money" if addr.tag=~/Hot Wallet/ 
+        return "Bridge" if addr.tag=~/Bridge/ 
+        return [addr.tag,addr.addr[-4,4]].join(' @')
+      end
+          
+      addr_list = addr.map {|x| x.to_a[0][1]}.uniq
+      level_addr = level_addr.map {|addr| addr.map {|x| x.to_a[0][1]}.uniq}
+    
+      addr_map = {}
+      level_addr.each_with_index {|obj,i|
+        cur_map = (obj.map {|x| [x,i] }.to_h)
+        addr_map.merge!(cur_map ) {|key, oldval, newval| oldval }
+      }
+    
+      exclude_addr = addr_list.map { |addr|
+          [addr, Transfer.where(from:addr).count, Transfer.where(to:addr).count, Transfer.where(from:addr).sum(:amount)/1e18, Transfer.where(to:addr).sum(:amount)/1e18]
+      }.filter{ |x| x[2]>max_connect and x[1]>max_connect}
+    
+      addr_list = addr_list.filter {|x| not exclude_addr.map{|x| x[0]}.include?(x) }
+    
+      graph = "digraph {\n" +  
+        %Q( node [colorscheme=ylgn9] ) + ";\n" +
+        exclude_addr.map {|addr| 
+          x=Address.find_by_addr(addr[0]);  
+          %Q( "#{x.tag ? x.tag + ' @'+x.addr[-4,4] : x.addr }" [shape=doubleoctagon style=filled] ) + ";\n" + 
+          %Q( "group @#{x.addr[-4,4]} trans #{addr[1]+addr[2]}"[style=filled] ) + ";\n" +
+          %Q( "#{x.tag ? x.tag + ' @'+x.addr[-4,4] : x.addr }" -> "group @#{x.addr[-4,4]} trans #{addr[1]+addr[2]}" [label="#{addr[3].round(2)}"]) + ";\n" +
+          %Q( "group @#{x.addr[-4,4]} trans #{addr[1]+addr[2]}" -> "#{x.tag ? x.tag + ' @'+x.addr[-4,4] : x.addr }" [label="#{addr[4].round(2)}"]) + ";\n"
+        }.join("") + 
+        Transfer.where(from:addr_list).where('"to"<>\'0x18b2a687610328590bc8f2e5fedde3b582a49cda\'').where(contract ? "" : "method_name='Transfer'").where("amount > ?",min_amount * 1e18).map {|x|
+          %Q( "#{x.ar_from.tag ? unify_cex(x.ar_from)  : x.from }" -> "#{ x.ar_to.tag ? x.ar_to.tag + ' @'+x.to[-4,4] : x.to}" [label="#{x.method_name == "Transfer" ? (x.amount/1e18).round(2) : ""}#{x.method_name[0,2]=="0x" ? "call" : x.method_name == "Transfer" ? "" : x.method_name }"]) +";\n" +
+          %Q( "#{x.ar_from.tag ? unify_cex(x.ar_from) : x.from }" [style=filled color=#{addr_map[x.from] ? addr_map[x.from]+1 : 1}])  +";\n" +
+          %Q( "#{ x.ar_to.tag ? unify_cex(x.ar_to)  : x.to}" [style=filled color=#{addr_map[x.to] ? addr_map[x.to]+1 : 1}])  +";\n" 
+        }.join("") + 
+        Transfer.where(to:addr_list).where('"from"<>\'0x18b2a687610328590bc8f2e5fedde3b582a49cda\'').where(contract ? "" : "method_name='Transfer'").where("amount > ?",min_amount * 1e18).map {|x|
+          %Q( "#{x.ar_from.tag ? unify_cex(x.ar_from) : x.from }" -> "#{ x.ar_to.tag ? x.ar_to.tag + ' @'+x.to[-4,4] : x.to}" [label="#{x.method_name == "Transfer" ? (x.amount/1e18).round(2) : ""}#{x.method_name[0,2]=="0x" ? "call" : x.method_name == "Transfer" ? "" : x.method_name }"]) +";\n" +
+          %Q( "#{x.ar_from.tag ? unify_cex(x.ar_from) : x.from }" [style=filled color=#{addr_map[x.from] ? addr_map[x.from]+1 : 1}])  +";\n" +
+          %Q( "#{ x.ar_to.tag ? unify_cex(x.ar_to)  : x.to}" [style=filled color=#{addr_map[x.to] ? addr_map[x.to]+1 : 1}])  +";\n" 
+        }.join("") + "\n}" 
+    
+        graph =graph.split("\n").uniq.join("\n")
+        # graph = graph.split("\n")
+        # graph = graph[1,graph.size-2].uniq
+        # graph_node = graph.filter {|x| not x=~/label=/}
+        # graph_edge = graph.filter {|x| x=~/label=/}
+        # graph_edge = graph_edge.map { |x| x.split("=") }
+        # graph = (graph_node+graph_edge.map {|x| x.join("-") }).join("\n")
+        # puts graph
+      url = "https://quickchart.io/graphviz?graph=#{graph.gsub(/\n/,"")}"
+      body = Faraday.get(url).body
+    end
+  
+
     class << self
       attr_accessor :client,:get_abi,:decoder,:panbot_address
     end
