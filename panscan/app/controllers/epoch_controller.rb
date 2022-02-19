@@ -130,22 +130,48 @@ class EpochController < ApplicationController
         end
 
         @group_name = params[:group]
-        
         @group = Address.where("tag LIKE ?","#{@group_name}%").where(params[:where]).where(is_panbot:true).order("#{@prev} #{@prev_order}").order(:id)
 
-        @bet_epoch_cnt = @group.sum(:bet_epoch_cnt)
-        @invest_cnt = @group.sum(:invest_cnt)
-        @bet_cnt = @group.sum(:bet_cnt)
-        @bet_bull_cnt = @group.sum(:bet_bull_cnt)
-        @bet_bear_cnt = @group.sum(:bet_bear_cnt)
+        data = Cache.get("Group-#{@group_name}-stats")
+        if data then
+            @bet_epoch_cnt = data["bet_epoch_cnt"]
+            @invest_cnt = data["invest_cnt"]
+            @bet_cnt = data["bet_cnt"]
+            @bet_bull_cnt = data["bet_bull_cnt"]
+            @bet_bear_cnt = data["bet_bear_cnt"]
+            @avg_last_block_order = data["avg_last_block_order"]
+            @avg_bet_amt = data["avg_bet_amt"]
+            @right_bet_ratio = data["right_bet_ratio"]
+            @win_bet_ratio = data["win_bet_ratio"]
+            @return_amt = data["return_amt"]
+            @invest_amt = data["invest_amt"]
+            @first_tx_time = data["first_tx_time"]
+            @last_tx_time = data["last_tx_time"]
+        else
+            @bet_epoch_cnt = @group.sum(:bet_epoch_cnt)
+            @invest_cnt = @group.sum(:invest_cnt)
+            @bet_cnt = @group.sum(:bet_cnt)
+            @bet_bull_cnt = @group.sum(:bet_bull_cnt)
+            @bet_bear_cnt = @group.sum(:bet_bear_cnt)
 
-        @avg_last_block_order = @group.map {|x| x.avg_last_block_order * x.invest_cnt }.sum / @invest_cnt
-        @avg_bet_amt = @group.map {|x| x.avg_bet_amt * x.invest_cnt }.sum /  @invest_cnt
-        @right_bet_ratio = @group.map {|x| x.right_bet_ratio * x.bet_cnt }.sum / @bet_cnt
-        @win_bet_ratio = @group.map {|x| x.win_bet_ratio * x.bet_cnt }.sum /  @bet_cnt
+            @avg_last_block_order = @group.filter{|x| not x.avg_last_block_order.nan? }.map {|x| x.avg_last_block_order * x.invest_cnt }.sum / @invest_cnt
+            @avg_bet_amt = @group.filter{|x| not x.avg_bet_amt.nan? }.map {|x| x.avg_bet_amt * x.invest_cnt }.sum /  @invest_cnt
+            @right_bet_ratio = @group.filter{|x| not x.right_bet_ratio.nan? }.map {|x| x.right_bet_ratio * x.bet_cnt }.sum / @bet_cnt
+            @win_bet_ratio = @group.filter{|x| not x.win_bet_ratio.nan? }.map {|x| x.win_bet_ratio * x.bet_cnt }.sum /  @bet_cnt
 
-        @return_amt = @group.sum(:return_amt)
-        @invest_amt = @group.sum(:invest_amt)
+            @return_amt = @group.sum(:return_amt)
+            @invest_amt = @group.sum(:invest_amt)
+            @first_tx_time = Tx.where(from:@group.map {|x| x.addr}).order(:block_time).first.block_time.to_formatted_s(:db)
+            @last_tx_time = Tx.where(from:@group.map {|x| x.addr}).order(:block_time).last.block_time.to_formatted_s(:db)
+
+            data={bet_epoch_cnt:@bet_epoch_cnt, invest_cnt:@invest_cnt,
+                bet_cnt:@bet_cnt,bet_bull_cnt:@bet_bull_cnt,bet_bear_cnt:@bet_bear_cnt,avg_last_block_order:@avg_last_block_order,
+                avg_bet_amt:@avg_bet_amt,right_bet_ratio:@right_bet_ratio,win_bet_ratio:@win_bet_ratio,
+                return_amt:@return_amt,invest_amt:@invest_amt,first_tx_time:@first_tx_time,last_tx_time:@last_tx_time
+            }
+            Cache.set("Group-#{@group_name}-stats",data)
+        end
+
         
         @group = @group.where("#{@prev} <> ?",Float::NAN) if @prev=="avg_bet_amt" or @prev=="avg_last_block_order" or @prev=="right_bet_ratio" or @prev=="win_bet_ratio"
         @pagy, @address = pagy(@group)        

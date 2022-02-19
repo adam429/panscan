@@ -7,6 +7,7 @@ Rails.application.routes.draw do
   root "epoch#index"
 
   get "/console", to: "epoch#web_console"
+  get "/log", to: "epoch#log"
 
   get "/stats", to: "epoch#stats"
   post "/stats/clean_cache", to: "epoch#stats_clean_cache"
@@ -26,6 +27,7 @@ Rails.application.routes.draw do
   get "/transfer/top_transfer", to: "epoch#top_transfer"
   get "/transfer/address/:id", to: "epoch#trans_addr"
   get "/transfer/:id", to: "epoch#transfer"
-  get "/log", to: "epoch#log"
 
+  get "task/worker", to: "task#worker"
+  get "task/task", to: "task#task"
 end

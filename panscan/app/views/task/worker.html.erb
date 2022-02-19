@@ -1,0 +1,35 @@
+<h1> Workers </h1>
+
+add server: <a href="#">2</a> <a href="#">5</a> <a href="#">10</a></br></br>
+
+
+== ping pong worker == </br>
+<% @pingpong.each do |x|
+    split = x.split("-")
+    docker_id = split.pop
+    server_id = split.join("-")
+
+    task = Task.where(status:"close").order(:id).where(runner:x).last
+%>
+  <%= server_id %> [<a href="#">delete</a> <a href="#">reboot</a> <a href="#">start_worker</a>] | 
+  <%= docker_id %> [<a href="#">remove</a> <a href="#">restart</a>]|
+  <%= task.name %> | 
+  <%= ActiveSupport::Duration.build(Time.now - task.updated_at).parts.map do |key, value|  [value.to_i, key].join end.join(' ') %> <br/>
+<% end %>
+<br/>
+
+== running worker == </br>
+<% @running.each do |x| 
+    split = x.split("-")
+    docker_id = split.pop
+    server_id = split.join("-")
+
+    task = Task.where(status:"run").where(runner:x).first
+%>
+  <%= server_id %> [<a href="#">delete</a> <a href="#">reboot</a> <a href="#">start_worker</a>] | 
+  <%= docker_id %> [<a href="#">remove</a> <a href="#">restart</a>]|
+  <%= task.name %> | 
+  <%= ActiveSupport::Duration.build(Time.now - task.run_timestamp).parts.map do |key, value|  [value.to_i, key].join end.join(' ') %> <br/>
+
+<% end %>
+

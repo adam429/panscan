@@ -4,13 +4,45 @@
 <tr>
   <td>#</td>
   <td> | group tag</td>
-  <td> | count </td>
+  <td> | addr_cnt </td>
+  <td> | bet_cnt </td>
+  <td> success </td>
+  <td> | bet_bull	 </td>
+  <td></td>
+  <td> | bet_bear	 </td>
+  <td></td>
+  <td> | bet_amt	 </td>
+  <td> | last_block	 </td>
+  <td> | right_bet </td>
+  <td> | win_bet	 </td>
+  <td> | invest	 </td>
+  <td> | return </td>
+  <td> | bet first timestamp	 </td>
+  <td> | bet last timestamp </td>
+
 </tr>
-<% @group.each_with_index do |item,i| %>
+<% @group.each_with_index do |item,i| 
+    data = Cache.get("Group-#{item[0]}-stats") 
+    data = {} if data==nil
+%>
 <tr>
   <td><%= i %></td>
   <td> | <a href="/address/group/<%= item[0] %>"><%= item[0] %></a></td>
   <td> | <%= item[1] %> </td>
+  <td> | <%= data["bet_cnt"] or "" %> </td>
+  <td> <%= data!={} ? (data["invest_cnt"] /data["bet_cnt"].to_f).round(2) : "" %> </td>
+  <td> | <%= data["bet_bull_cnt"] or "" %> </td>
+  <td> <%= data!={} ? (data["bet_bull_cnt"] /data["bet_cnt"].to_f).round(2) : ""  %> </td>
+  <td> | <%= data["bet_bear_cnt"] or "" %> </td>
+  <td> <%= data!={} ? (data["bet_bear_cnt"] /data["bet_cnt"].to_f).round(2) : ""  %> </td>
+  <td> | <%= (data["avg_bet_amt"] or 0).round(4) %> </td>
+  <td> | <%= (data["avg_last_block_order"] or 0).round(4) or "" %> </td>
+  <td> | <%= (data["right_bet_ratio"] or 0).round(4) %> </td>
+  <td> | <%= (data["win_bet_ratio"] or 0).round(4) %> </td>
+  <td> | <%= (data["invest_amt"] or 0).round(4) %> </td>
+  <td> | <%= (data["return_amt"] or 0).round(4) %> </td>
+  <td> | <%= data["first_tx_time"] or "" %> </td>
+  <td> | <%= data["last_tx_time"] or "" %> </td>
 </tr>
 
 <% end %>

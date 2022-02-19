@@ -24,5 +24,8 @@ module Panscan
     config.web_console.permissions = '0.0.0.0/0'
     config.web_console.whitelisted_ips = ['0.0.0.0/0']
 
+    config.after_initialize do 
+      PingWorkerJob.perform_later
+    end
   end
 end
