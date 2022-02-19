@@ -35,7 +35,6 @@ class Task < ActiveRecord::Base
         @_task.log(str)
       end
       def _before_hook()
-        ENV["RUNNER_NAME"]=@_task.runner
       end
       def _after_hook()
       end
