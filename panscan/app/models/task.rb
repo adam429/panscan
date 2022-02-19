@@ -8,15 +8,16 @@ class Task < ActiveRecord::Base
     end
     
     def self.take_task(runner)
-      task = Task.where(status:"open").first
-      if task then
-        task.status = "run"
-        task.runner = runner
-        task.output = ""
-        task.run_timestamp = Time.now
-        task.save
-    
-        task.log("#{Time.now} runner #{runner} take task #{task.id} : #{task.name}\n")
+      task = nil
+      Task.transaction do
+        task = Task.lock.where(status:"open").first
+        if task then
+          task.status = "run"
+          task.runner = runner
+           task.output = "#{Time.now} runner #{runner} take task #{task.id} : #{task.name}\n"
+          task.run_timestamp = Time.now
+          task.save      
+        end
       end
       return task
     end
@@ -34,14 +35,8 @@ class Task < ActiveRecord::Base
       def _log(str)
         @_task.log(str)
       end
-      def _before_hook()
-      end
-      def _after_hook()
-      end
       def _run(code)
-        _before_hook()
         eval(code,binding)
-        _after_hook()
       end
     end
     
@@ -68,7 +63,7 @@ class Task < ActiveRecord::Base
         loop do
             task = Task.take_task(runner) 
             task.run if task
-            sleep(rand(10))
+            sleep(1)
         end
     end
   end

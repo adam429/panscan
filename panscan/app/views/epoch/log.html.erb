@@ -1,4 +1,4 @@
 <h1>Logs</h1>
 <% Log.all.each do |log| %>
-  <%= log.pid %> <%= log.runner %> | <%= log.created_at.to_formatted_s(:db) %>  | <%= log.log %><br/>
+  <%= log.worker %> <%= log.pid %> | <%= log.ip_addr %> <%= log.hostname %> | <%= log.created_at.to_formatted_s(:db) %>  | <%= log.log %><br/>
 <% end %>
