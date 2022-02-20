@@ -1,0 +1,53 @@
+<style type="text/css" media="screen">
+.ace_editor {
+    border: 4px solid lightgray;
+    margin: auto;
+    height: 800px;
+    width: 80%;
+}
+
+.scrollmargin {
+    height: 40px;
+    text-align: center;
+}
+</style>
+
+<h1> Task View </h1>
+task uid = <span id="tid"><%= @task.tid or "(new)" %></span>
+<br/><br/>
+cmd: <a id="save" href="#">Save</a> <a href="javascript:save();">Run</a>    
+<div class="scrollmargin"></div>
+<h3>Task Code</h3>
+<pre id="editor"><%= @task.code %></pre>
+<h3>Task Params</h3>
+<div id="Params">
+</div>
+
+<h3>Task Runner</h3>
+<div id="runner">
+</div>
+
+<h3>Task Return</h3>
+<div id="return">
+</div>
+<h3>Task Output</h3>
+<div id="output">
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/ace.js" integrity="sha512-6ts6Fu561/yzWvD6uwQp3XVYwiWNpWnZ0hdeQrETqtnQiGjTfOS06W76aUDnq51hl1SxXtJaqy7IsZ3oP/uZEg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+
+
+<script>
+    var editor = ace.edit("editor", {
+       autoScrollEditorIntoView: true,
+       maxLines: 30 ,
+       fontSize: 14
+    });
+    editor.setTheme("ace/theme/one_dark");
+    editor.session.setMode("ace/mode/ruby");
+</script>
+
+
+
+<script src="/assets/task_new.js"></script>

@@ -11,6 +11,10 @@ gem 'goldiloader'
 gem 'faraday'
 gem 'parallel'
 gem 'method_source'
+gem 'opal'
+gem 'opal-rails'
+gem 'opal-browser'
+gem 'reduce'
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 7.0.1"

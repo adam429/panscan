@@ -28,6 +28,9 @@ Rails.application.routes.draw do
   get "/transfer/address/:id", to: "epoch#trans_addr"
   get "/transfer/:id", to: "epoch#transfer"
 
-  get "task/worker", to: "task#worker"
-  get "task/task", to: "task#task"
+  get "/task/worker", to: "task#worker"
+  get "/task/task", to: "task#task"
+  get "/task/:tid", to: "task#task_view"
+
+  post "/task/save", to: "task#task_save"
 end
