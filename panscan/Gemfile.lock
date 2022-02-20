@@ -237,6 +237,7 @@ DEPENDENCIES
   goldiloader
   importmap-rails
   jbuilder
+  method_source
   pagy (~> 5.9)
   parallel
   pg

@@ -36,7 +36,7 @@ class Task < ActiveRecord::Base
         @_task.log(str)
       end
       def _run(code)
-        eval(code,binding)
+        eval(code + "\n main()",binding)
       end
     end
     
@@ -44,7 +44,7 @@ class Task < ActiveRecord::Base
       runner = Runner.new(self)
       self.log("#{Time.now} == begin run ==\n")
       begin
-        runner._run(self.code)
+        ret = runner._run(self.code)
       rescue => error
         self.log "Exception Class: #{ error.class.name }\n"
         self.log "Exception Message: #{ error.message }\n"
@@ -53,6 +53,7 @@ class Task < ActiveRecord::Base
         self.status = "abort"
         self.save
       else
+        self.return = ret
         self.log("#{Time.now} == end run ==\n")
         self.status = "close"
         self.save      
