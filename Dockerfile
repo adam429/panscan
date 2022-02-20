@@ -2,7 +2,8 @@ FROM ruby:2.7
 
 RUN apt-get update && \
     apt-get install -y \
-        libpq-dev
+        libpq-dev \
+        awscli
         #  default-mysql-client \
         #  default-libmysqlclient-dev \
 
