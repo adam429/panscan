@@ -57,7 +57,7 @@ class Task < ActiveRecord::Base
       runner = Runner.new(self)
       self.log("#{Time.now} == begin run ==\n")
       begin
-        ret = runner._run(param_code(self.code))
+        ret = runner._run(param_code)
       rescue => error
         self.log "Exception Class: #{ error.class.name }\n"
         self.log "Exception Message: #{ error.message }\n"
