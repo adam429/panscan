@@ -41,13 +41,13 @@ class Task < ActiveRecord::Base
       def _log(str)
         @_task.log(str)
       end
-      def _run(code)
-        eval(code + "\n main()",binding)
+      def _run(param_code)
+        eval(param_code + "\n main()",binding)
       end
     end
     
     def param_code
-      code = self.code
+      code = self.code.clone
       params = JSON.parse(self.params)
       params.each {|k,v| code.gsub!(/__#{k}__/,v) }
       return code
