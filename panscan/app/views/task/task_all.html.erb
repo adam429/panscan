@@ -1,0 +1,24 @@
+<h1>Task All</h1>
+
+<table>
+<tr>
+  <td>| #</td>
+  <td>| tid</td>
+  <td>| name</td>
+  <td>| status</td>
+  <td>| runner</td>
+  <td>| created_at</td>
+  <td>| updated_at</td>
+</tr>
+<% @task.each_with_index do |t,i| %>
+<tr>
+  <td>| <%= i %></td>
+  <td>| <a href="/task/<%= t.tid %>"><%= t.tid %></a></td>
+  <td>| <%= t.tid == t.name ? "" :t.name %></td>
+  <td>| <%= t.status %></td>
+  <td>| <%= t.runner %></td>
+  <td>| <%= t.created_at.to_formatted_s(:db) %></td>
+  <td>| <%= t.updated_at.to_formatted_s(:db) %></td>
+</tr>
+<% end %>
+</table>

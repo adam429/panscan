@@ -29,8 +29,12 @@ Rails.application.routes.draw do
   get "/transfer/:id", to: "epoch#transfer"
 
   get "/task/worker", to: "task#worker"
-  get "/task/task", to: "task#task"
+  get "/task/wiki", to: "task#wiki"
+  get "/task/all", to: "task#task_all"
   get "/task/:tid", to: "task#task_view"
+  get "/task/json/:tid", to: "task#task_json"
 
   post "/task/save", to: "task#task_save"
+  post "/task/fork", to: "task#task_fork"
+  post "/task/run", to: "task#task_run"
 end

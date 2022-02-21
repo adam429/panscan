@@ -10,25 +10,115 @@ class TaskController < ApplicationController
         tid = params[:tid]
         if tid.downcase == 'new' then
             @task = Task.new
-            @task.code = '''
+            i = "#"+"{i}"
+            time = "#"+"{time}"
+            @task.code = <<~'CODE'
+__TASK_NAME__ = "hello-task"
+
 def main()
-    _log ("hello world\n")
-    return "value"
+    time = Time.now()
+
+    10.times do |i|
+        _log ("the #{i} run\n")
+        sleep(1)
+    end
+    time = Time.now()-time
+
+    return "takes <span style='color:red'>#{time}</span> seconds"
 end
-'''
+CODE
             @new_task = true
         else 
             @task = Task.find_by_tid(tid)
             @new_task = false
         end
+        @runner = @task.runner
+        @output = @task.output
+        @return = @task.return
+        @params = @task.params
     end
 
-    def task
+    def task_all
+        @task = Task.all.order(updated_at: :desc)
+    end
+
+    def wiki
+    end
+
+
+    def task_run
+        if params[:tid]=="(new)" then
+            task = Task.new
+            task.name = task.tid = SecureRandom.hex(8)
+            task.code = params[:code]
+            task.status = "open"
+            task.params = json_params(params)
+            task.save
+            render :json => {:action=> "message", :message => "task is pending to run"}
+        else
+            task = Task.find_by_tid(params[:tid])
+            task.code = params[:code]
+            task.status = "open"
+            task.runner = nil
+            task.output = nil
+            task.return = nil
+            task.params = json_params(params)
+            task.save            
+            render :json => {:action=> "message", :message => "task is pending to run"}
+        end
+    end
+
+    def task_fork
+        task = Task.new
+        task.tid = SecureRandom.hex(8)
+        task.code = params[:code]
+        task.status = "edit"
+        task.runner = nil
+        task.output = nil
+        task.return = nil
+        task.params = json_params(params)
+        task.save
+        render :json => {:action=> "redirect", :to => "/task/#{task.tid}"}
     end
 
     def task_save
-        puts param[:tid]
-        # puts params.to_s
-        # render json: [1,2,3]
+
+        if params[:tid]=="(new)" then
+            task = Task.new
+            task.tid = SecureRandom.hex(8)
+            task.code = params[:code]
+            task.status = "edit"
+            task.update_name
+            task.params = json_params(params)
+            task.save
+            render :json => {:action=> "redirect", :to => "/task/#{task.tid}"}
+        else
+            task = Task.find_by_tid(params[:tid])
+            task.code = params[:code]
+            cur_status = task.status
+            task.status = "edit"
+            task.runner = nil
+            task.output = nil
+            task.return = nil
+            task.params = json_params(params)
+            task.update_name
+            task.save  
+            render :json => {:action=> "message", :message => "Save Success"} if cur_status == "edit" 
+            render :json => {:action=> "redirect", :to => "/task/#{task.tid}"} if cur_status != "edit" 
+        end
+    end
+
+    def json_params(params)
+        params_hash = []
+        params[:params].each do |k,v|
+            params_hash << [k,v]
+        end
+        params_hash=params_hash.to_h
+        JSON.dump(params_hash)
+    end
+
+    def task_json
+        task = Task.find_by_tid(params[:tid])
+        render :json => task.attributes
     end
 end

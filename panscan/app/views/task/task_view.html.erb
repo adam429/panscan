@@ -13,25 +13,47 @@
 </style>
 
 <h1> Task View </h1>
-task uid = <span id="tid"><%= @task.tid or "(new)" %></span>
+task uid = <span id="tid"><%= @task.tid or "(new)" %></span> (<%= @task.name %>)  [<a id="fork" href="#">Fork</a>]
+ <span id="message"></span>
+<br/>
+task status = <span id="status"><%= @task.status or "edit" %></span><br/>
+task last_run = <span id="run_timestamp"><%= @task.run_timestamp ? @task.run_timestamp.to_formatted_s(:db) : "" %></span><br/>
+task last_update = <span id="updated_at"><%= @task.updated_at ? @task.updated_at.to_formatted_s(:db) : "" %></span><br/>
+
+<div id="params_box" style="display:none">
+<h3>Task Params</h3>
+<div style="border: 4px solid lightgray; width: 80%; margin: auto;">
+<br/>
+<pre id="params" style="width: 80%; margin: auto;"></pre>
+<br/>
+</div>
+</div>
+<div id="init_params" style="display:none"><%= @params %></div>
+
 <br/><br/>
-cmd: <a id="save" href="#">Save</a> <a href="javascript:save();">Run</a>    
+cmd: 
+  [<a id="save" href="#">Save</a>]
+  [<a id="run" href="#">Run</a>]
+  <br/><br/>
+
 <div class="scrollmargin"></div>
 <h3>Task Code</h3>
 <pre id="editor"><%= @task.code %></pre>
-<h3>Task Params</h3>
-<div id="Params">
-</div>
 
 <h3>Task Runner</h3>
-<div id="runner">
+<div id="runner"style="border: 4px solid lightgray; width: 80%; margin: auto;">
+<pre></pre>
+<%= @runner%>
 </div>
 
 <h3>Task Return</h3>
-<div id="return">
+<div id="return" style="border: 4px solid lightgray; width: 80%; margin: auto;">
+<pre></pre>
+<%= raw @return%>
 </div>
 <h3>Task Output</h3>
-<div id="output">
+<div style="border: 4px solid lightgray; width: 80%; margin: auto;">
+<pre id="output"><%= @output%></pre>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/ace.js" integrity="sha512-6ts6Fu561/yzWvD6uwQp3XVYwiWNpWnZ0hdeQrETqtnQiGjTfOS06W76aUDnq51hl1SxXtJaqy7IsZ3oP/uZEg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>

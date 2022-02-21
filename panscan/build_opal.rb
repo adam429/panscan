@@ -22,10 +22,13 @@ loop do
         if dest_time-source_time < 1 then
             puts "source #{file} changed | source_time #{source_time} dest_time #{dest_time}"
             builder = Opal::Builder.new
-            builder.build_str(open(source_file).read, '(inline)')
-            File.write dest_file, builder.to_s           
-            # reduced_data = Reduce.reduce(dest_file)
-            # File.write dest_file, reduced_data
+            begin
+                builder.build_str(open(source_file).read, '(inline)')
+                File.write dest_file, builder.to_s           
+            rescue
+                puts "==error build=="
+                File.write dest_file, "error build"           
+            end
         end
     end
     sleep(1)

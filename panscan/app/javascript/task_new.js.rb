@@ -3,19 +3,142 @@ require 'native'
 require 'promise'
 require 'browser/setup/full'
 
-$document.ready do    
-    $document.at_css("#save").on(:click) do
+def take_action(json)
+    if json[:action] == "redirect" then
+        $$.location.href = json[:to]
+    end
+   
+    if json[:action] == "message" then
+        $document.at_css("#message").inner_html = " | Message: "+json[:message]
+        $$[:setTimeout].call(->{ $document.at_css("#message").inner_html="" },5000)
+    end
+end
 
-        tid = $document.at_css("#tid").inner_html
-        code = Native(`editor.getValue()`)
+def get_page
+    tid = $document.at_css("#tid").inner_html
+    status = $document.at_css("#status").inner_html
+    code = Native(`editor.getValue()`)
+    json = {status:status, tid:tid, code:code, params:get_params}
+end
 
-        json = {tid:tid,code:code}
+def update_page(json)
+    $document.at_css("#tid").inner_html = json[:tid]
+    $document.at_css("#run_timestamp").inner_html = json[:run_timestamp]
+    $document.at_css("#updated_at").inner_html = json[:updated_at]
+    $document.at_css("#status").inner_html = json[:status]
+    $document.at_css("#runner").inner_html = json[:runner]
+    $document.at_css("#output").inner_html = json[:output]
+    $document.at_css("#return").inner_html = json[:return]
+end
 
-        Browser::HTTP.post "/task/save",json do
+def get_server_task(tid)
+    Browser::HTTP.get "/task/json/#{tid}" do
+        on :success do |res|
+            yield(res.json)
+        end        
+    end
+end
+
+def update_task_run
+    json = get_page
+    if (json[:status]=="run" || json[:status]=="open") then
+        get_server_task(json[:tid]) do |task|
+            update_page(task)
+            $$[:setTimeout].call(->{ update_task_run },1000)
+        end
+    end    
+end
+
+def do_run
+    json = get_page
+    
+    if (json[:status]=="run" || json[:status]=="open") then
+        take_action({action:"message",message:"task is waiting for run"})
+    else
+        json["return"] = ""
+        json["runner"] = ""
+        json["output"] = ""
+        json["status"] = "open"
+        update_page(json)
+    
+        Browser::HTTP.post "/task/run", json do
             on :success do |res|
-                alert res.json.inspect
+                take_action(res.json)
+                $$[:setTimeout].call(->{ update_task_run },1000)
             end        
         end
-
     end
+end
+
+def do_save
+    Browser::HTTP.post "/task/save", get_page do
+        on :success do |res|
+            take_action(res.json)
+        end        
+    end
+end
+
+def do_fork
+    Browser::HTTP.post "/task/fork", get_page do
+        on :success do |res|
+            take_action(res.json)
+        end        
+    end
+end
+
+
+def get_params
+    ret = {}
+    $params.each do |param| 
+        ret[param] = $document.at_css("#"+param).value
+    end
+    return ret
+end
+
+def update_params(init_params=nil)
+    json = get_page
+    param_json = json[:params]
+    if init_params then
+        param_json = init_params
+    end
+
+    code = json[:code]
+    params = code.scan(/(__[a-zA-Z0-9_]+__)/).flatten
+    params = params.filter {|x| x!='__TASK_NAME__'}.map {|x| x.gsub(/^__/,"").gsub(/__$/,"") }
+    if params.size>0 then
+        $document.at_css("#params_box").show
+    else
+        $document.at_css("#params_box").hide
+    end
+    if params!=$params then
+        params_html = params.map { |param|
+            "<tr><td>#{param}</td><td> = </td><td><input id='#{param}' type='text' name='#{param}' value='#{param_json[param]}' ></td></tr>"
+        }.join("\n")
+        params_html = "<table>#{params_html}</table>"
+
+        $document.at_css("#params").inner_html = params_html
+        $params = params
+    end
+end
+
+
+$document.ready do    
+    $document.at_css("#save").on(:click) do
+        do_save
+    end
+
+    $document.at_css("#run").on(:click) do
+        do_run
+    end
+
+    $document.at_css("#fork").on(:click) do
+        do_fork
+    end
+    $params = {}
+
+    ## init params from page div to input value
+    init_params = $document.at_css("#init_params").inner_html
+    update_params(JSON.parse(init_params))
+
+    $$[:setInterval].call(->{ update_params },1000)    
 end

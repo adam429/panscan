@@ -14,7 +14,8 @@ gem 'method_source'
 gem 'opal'
 gem 'opal-rails'
 gem 'opal-browser'
-gem 'reduce'
+gem 'parser'
+gem 'unparser'
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 7.0.1"
