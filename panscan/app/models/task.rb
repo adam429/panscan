@@ -1,3 +1,6 @@
+require 'parser/current'
+require 'unparser'
+
 class Task < ActiveRecord::Base
     def self.create_task(name,code)
       task = Task.new
