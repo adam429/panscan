@@ -22,11 +22,50 @@ class Task < ActiveRecord::Base
       return task
     end
 
+    def self.run_loop(runner)
+      loop do
+          task = Task.take_task(runner) 
+          task.run if task
+          sleep(1)
+      end
+    end
+
+    def self.load(address,binding)
+      addr, code = address.split("/")
+      code="*" if code==nil
+      code=code.to_sym
+
+      task = nil
+      if addr =~ /^[0-9a-f]{16}$/ then
+        task = Task.find_by_tid(addr)
+      else
+        task = Task.where(name:addr).order(save_timestamp: :desc).first
+      end
+
+      ast = Parser::CurrentRuby.parse(task.code)
+      match = ast.children.filter {|x| not (x.type==:lvasgn and x.children.first==:__TASK_NAME__) and not (x.type==:def and x.children.first==:main) }
+      if code!=:* then
+        match = match.filter {|x| 
+          (x.children and x.children.first==code) or
+          (x.children and x.children.first.class==Parser::AST::Node and x.children.first.type==:const and x.children.first.children[1]==code )
+        }
+      end
+      select_code = match.map do |m|
+        Unparser.unparse(m)
+      end.join("\n")
+      binding.eval(select_code)
+
+      return select_code
+    end
+
     def update_name()    
-      ast = Parser::CurrentRuby.parse(self.code)
-      match = ast.children.filter {|x| x.type==:lvasgn and x.children.first==:__TASK_NAME__ }
-      task_name = eval(Unparser.unparse(match.last.children.last))
-      self.name = task_name
+      begin
+        ast = Parser::CurrentRuby.parse(self.code)
+        match = ast.children.filter {|x| x.type==:lvasgn and x.children.first==:__TASK_NAME__ }
+        task_name = eval(Unparser.unparse(match.last.children.last))
+        self.name = task_name
+      rescue 
+      end
     end
     
     def log(str)
@@ -37,7 +76,7 @@ class Task < ActiveRecord::Base
     
     def param_code
       code = self.code.clone
-      params = JSON.parse(self.params)
+      params = self.params == nil ? [] : JSON.parse(self.params)
       params.each {|k,v| code.gsub!(/__#{k}__/,v) }
       return code
     end
@@ -79,11 +118,4 @@ CODE
       end
     end
 
-    def self.run_loop(runner)
-        loop do
-            task = Task.take_task(runner) 
-            task.run if task
-            sleep(1)
-        end
-    end
   end

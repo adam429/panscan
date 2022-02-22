@@ -26,9 +26,9 @@ module Panscan
 
 
         
-    # config.after_initialize do 
-    #   PingWorkerJob.perform_later
-    # end
+    config.after_initialize do 
+      PingWorkerJob.perform_later
+    end
 
   end
 end

@@ -131,6 +131,10 @@ end
 
 
 $document.ready do    
+    $params = {}
+    $meta_down = false
+    $shift_down = false
+
     $document.at_css("#save").on(:click) do
         do_save
     end
@@ -142,7 +146,6 @@ $document.ready do
     $document.at_css("#fork").on(:click) do
         do_fork
     end
-    $params = {}
 
     ## init params from page div to input value
     init_params = $document.at_css("#init_params").inner_html
@@ -151,6 +154,27 @@ $document.ready do
     json = get_page()
     update_params(JSON.parse(init_params=="" ? "{}" : init_params))
     update_task_run
-    
+
     $$[:setInterval].call(->{ update_params },1000)    
+
+    $document.body.on (:keydown) do |e|
+        $meta_down = true if e.meta?
+        $shift_down = true if e.shift?
+        if e.meta? and e.char=="S" then
+            puts "save task"
+            do_save
+            e.prevent
+        end
+        if e.shift? and e.key=="Enter" then
+            puts "run task"
+            do_run
+            e.prevent
+        end
+    end
+    $document.body.on (:keyup) do |e|
+        $meta_down = false if e.meta?
+        $shift_down = false if e.shift?
+    end
+
 end
+
