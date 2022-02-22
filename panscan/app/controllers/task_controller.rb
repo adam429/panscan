@@ -53,8 +53,9 @@ CODE
             task.code = params[:code]
             task.status = "open"
             task.params = json_params(params)
+            task.save_timestamp = Time.now
             task.save
-            render :json => {:action=> "message", :message => "task is pending to run"}
+            render :json => {:action=> "redirect", :to => "/task/#{task.tid}"}
         else
             task = Task.find_by_tid(params[:tid])
             task.code = params[:code]
@@ -63,6 +64,7 @@ CODE
             task.output = nil
             task.return = nil
             task.params = json_params(params)
+            task.save_timestamp = Time.now
             task.save            
             render :json => {:action=> "message", :message => "task is pending to run"}
         end
@@ -77,6 +79,7 @@ CODE
         task.output = nil
         task.return = nil
         task.params = json_params(params)
+        task.save_timestamp = Time.now
         task.save
         render :json => {:action=> "redirect", :to => "/task/#{task.tid}"}
     end
@@ -90,6 +93,7 @@ CODE
             task.status = "edit"
             task.update_name
             task.params = json_params(params)
+            task.save_timestamp = Time.now
             task.save
             render :json => {:action=> "redirect", :to => "/task/#{task.tid}"}
         else
@@ -102,6 +106,7 @@ CODE
             task.return = nil
             task.params = json_params(params)
             task.update_name
+            task.save_timestamp = Time.now
             task.save  
             render :json => {:action=> "message", :message => "Save Success"} if cur_status == "edit" 
             render :json => {:action=> "redirect", :to => "/task/#{task.tid}"} if cur_status != "edit" 
@@ -110,8 +115,10 @@ CODE
 
     def json_params(params)
         params_hash = []
-        params[:params].each do |k,v|
-            params_hash << [k,v]
+        if params[:params] then 
+            params[:params].each do |k,v|
+                params_hash << [k,v]
+            end
         end
         params_hash=params_hash.to_h
         JSON.dump(params_hash)
@@ -119,6 +126,10 @@ CODE
 
     def task_json
         task = Task.find_by_tid(params[:tid])
-        render :json => task.attributes
+        if task then
+            render :json => task.attributes
+        else
+            render :json => {}
+        end
     end
 end

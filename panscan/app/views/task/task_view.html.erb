@@ -18,6 +18,7 @@ task uid = <span id="tid"><%= @task.tid or "(new)" %></span> (<%= @task.name %>)
 <br/>
 task status = <span id="status"><%= @task.status or "edit" %></span><br/>
 task last_run = <span id="run_timestamp"><%= @task.run_timestamp ? @task.run_timestamp.to_formatted_s(:db) : "" %></span><br/>
+task last_save = <span id="save_timestamp"><%= @task.save_timestamp ? @task.save_timestamp.to_formatted_s(:db) : "" %></span><br/>
 task last_update = <span id="updated_at"><%= @task.updated_at ? @task.updated_at.to_formatted_s(:db) : "" %></span><br/>
 
 <div id="params_box" style="display:none">
@@ -72,4 +73,5 @@ cmd:
 
 
 
+<script src="/assets/opal_lib.js"></script>
 <script src="/assets/task_new.js"></script>

@@ -9,7 +9,7 @@
   <td>| params</td>
   <td>| runner</td>
   <td>| created_at</td>
-  <td>| updated_at</td>
+  <td>| last_save</td>
 </tr>
 <% @task.each_with_index do |t,i| %>
 <tr>
@@ -20,7 +20,7 @@
   <td>| <%= t.params %></td>
   <td>| <%= t.runner %></td>
   <td>| <%= t.created_at.to_formatted_s(:db) %></td>
-  <td>| <%= t.updated_at.to_formatted_s(:db) %></td>
+  <td>| <%= t.save_timestamp ? t.save_timestamp.to_formatted_s(:db) : "" %></td>
 </tr>
 <% end %>
 </table>

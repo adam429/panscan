@@ -33,18 +33,7 @@ class Task < ActiveRecord::Base
       self.output = self.output + str
       self.save
     end
-    
-    class Runner
-      def initialize(task)
-        @_task = task
-      end
-      def _log(str)
-        @_task.log(str)
-      end
-      def _run(param_code)
-        eval(param_code + "\n main()",binding)
-      end
-    end
+
     
     def param_code
       code = self.code.clone
@@ -54,6 +43,23 @@ class Task < ActiveRecord::Base
     end
 
     def run
+      # reset runner class binding everytime
+      Task.send(:remove_const, :Runner) if Task.constants.include?(:Runner)
+      code = <<~CODE
+class Runner
+  def initialize(task)
+    @_task = task
+  end
+  def _log(str)
+    @_task.log(str)
+  end
+  def _run(param_code)
+    eval(param_code + "\n main()",binding)
+  end
+end
+CODE
+      eval(code)
+
       runner = Runner.new(self)
       self.log("#{Time.now} == begin run ==\n")
       begin

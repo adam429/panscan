@@ -1,7 +1,3 @@
-require 'opal'
-require 'native'
-require 'promise'
-require 'browser/setup/full'
 
 def take_action(json)
     if json[:action] == "redirect" then
@@ -11,6 +7,7 @@ def take_action(json)
     if json[:action] == "message" then
         $document.at_css("#message").inner_html = " | Message: "+json[:message]
         $$[:setTimeout].call(->{ $document.at_css("#message").inner_html="" },5000)
+        do_update_page
     end
 end
 
@@ -21,9 +18,17 @@ def get_page
     json = {status:status, tid:tid, code:code, params:get_params}
 end
 
+def do_update_page()
+    json = get_page
+    get_server_task(json[:tid]) do |task|
+        update_page(task)
+    end
+end
+
 def update_page(json)
     $document.at_css("#tid").inner_html = json[:tid]
     $document.at_css("#run_timestamp").inner_html = json[:run_timestamp]
+    $document.at_css("#save_timestamp").inner_html = json[:save_timestamp]
     $document.at_css("#updated_at").inner_html = json[:updated_at]
     $document.at_css("#status").inner_html = json[:status]
     $document.at_css("#runner").inner_html = json[:runner]
@@ -38,6 +43,8 @@ def get_server_task(tid)
         end        
     end
 end
+
+
 
 def update_task_run
     json = get_page
@@ -69,6 +76,7 @@ def do_run
         end
     end
 end
+
 
 def do_save
     Browser::HTTP.post "/task/save", get_page do
@@ -138,7 +146,11 @@ $document.ready do
 
     ## init params from page div to input value
     init_params = $document.at_css("#init_params").inner_html
-    update_params(JSON.parse(init_params))
 
+
+    json = get_page()
+    update_params(JSON.parse(init_params=="" ? "{}" : init_params))
+    update_task_run
+    
     $$[:setInterval].call(->{ update_params },1000)    
 end
