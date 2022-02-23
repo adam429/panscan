@@ -1,5 +1,6 @@
 require 'parser/current'
 require 'unparser'
+require 'erb'
 
 class Task < ActiveRecord::Base
     def self.create_task(name,code)
@@ -71,8 +72,8 @@ class Task < ActiveRecord::Base
       end
     end
     
-    def log(str)
-      self.output = self.output + str
+    def log(obj)
+      self.output = self.output + obj.to_s
       self.save
     end
 
@@ -96,7 +97,20 @@ class Runner
     @_task.log(str)
   end
   def _run(param_code)
-    eval(param_code + "\n main()",binding)
+    before_code = "def self.task; if @task then return @task end; @task=Task.find(#{id}); end\n"
+    after_code = '''
+      def __main()
+        @raw_ret = main()
+        html = @raw_ret.to_s
+        if defined?(render_html)=="method" then
+            html=ERB.new(render_html()).result(binding)
+        end
+        return {raw_ret:@raw_ret,html:html}
+      end
+      __main()
+    '''
+    code = before_code + param_code + after_code
+    eval(code,binding)
   end
 end
 CODE
@@ -114,7 +128,7 @@ CODE
         self.status = "abort"
         self.save
       else
-        self.return = ret
+        self.return = JSON.dump(ret)
         self.log("#{Time.now} == end run ==\n")
         self.status = "close"
         self.save      

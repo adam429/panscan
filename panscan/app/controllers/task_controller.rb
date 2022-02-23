@@ -6,7 +6,7 @@ class TaskController < ApplicationController
         @running = Task.where(status:"run").select(:runner).distinct(:runner).order(:runner).map {|x| x.runner}
     end
 
-    def task_view
+    def task_view    
         tid = params[:tid]
         if tid.downcase == 'new' then
             @task = Task.new
@@ -29,12 +29,20 @@ end
 CODE
             @new_task = true
         else 
-            @task = Task.find_by_tid(tid)
+            if tid =~ /^[0-9a-f]{16}$/ then
+                @task = Task.find_by_tid(tid)
+              else
+                @task = Task.where(name:tid).order(save_timestamp: :desc).first
+              end
             @new_task = false
         end
         @runner = @task.runner
+        begin
+            @return = JSON.parse(@task.return)["html"]
+        rescue
+            @return = @task.return
+        end
         @output = @task.output
-        @return = @task.return
         @params = @task.params
     end
 
