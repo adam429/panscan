@@ -47,7 +47,8 @@ CODE
     end
 
     def task_all
-        @task = Task.all.order(updated_at: :desc)
+        @task = Task.order(updated_at: :desc).where("tid is not null")
+        @pagy, @epoch = pagy(@task)        
     end
 
 
@@ -127,6 +128,17 @@ CODE
         end
         params_hash=params_hash.to_h
         JSON.dump(params_hash)
+    end
+
+    def task_return_view
+        task = nil
+        if params[:tid] =~ /^[0-9a-f]{16}$/ then
+            task = Task.find_by_tid(params[:tid])
+        else
+            task = Task.where(name:params[:tid]).where("tid is not null").order(save_timestamp: :desc).first
+        end
+
+        render :inline => task.html
     end
 
     def task_json

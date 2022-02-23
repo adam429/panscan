@@ -32,6 +32,7 @@ Rails.application.routes.draw do
   get "/task/wiki", to: "task#wiki"
   get "/task/all", to: "task#task_all"
   get "/task/:tid", to: "task#task_view"
+  get "/task/view/:tid", to: "task#task_return_view"
   get "/task/json/:tid", to: "task#task_json"
 
   post "/task/save", to: "task#task_save"

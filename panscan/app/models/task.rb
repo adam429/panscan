@@ -182,7 +182,7 @@ CODE
       self.log("#{Time.now} == begin run ==\n")
       begin
         ret = runner._run(param_code)
-      rescue => error
+      rescue ScriptError, StandardError => error
         if error.message == "panbot::task::cmd::shutdown" then
           self.log "Exception Class: #{ error.class.name }\n"
           self.log "Exception Message: #{ error.message }\n"

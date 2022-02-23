@@ -26,7 +26,7 @@ loop do
 
                 File.write dest_file,  "#{builder.to_s}\n//# sourceMappingURL=#{file}.map"
                 File.write dest_file+".map", JSON.dump(builder.source_map.to_h)
-            rescue => error
+            rescue  ScriptError, StandardError => error
                 puts "Exception Class: #{ error.class.name }\n"
                 puts "Exception Message: #{ error.message }\n"
                 puts "Exception Backtrace:\n#{ error.backtrace.join("\n") }\n"
