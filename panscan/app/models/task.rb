@@ -116,6 +116,14 @@ class Task < ActiveRecord::Base
       end
     end
 
+    def raw_ret()
+      JSON.parse(self.return)["raw_ret"]
+    end
+
+    def html()
+      JSON.parse(self.return)["html"]
+    end
+
     def update_name()    
       begin
         ast = Parser::CurrentRuby.parse(self.code)
