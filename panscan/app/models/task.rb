@@ -65,6 +65,7 @@ class Task < ActiveRecord::Base
     end
 
     def self.run_remote(address,params={})
+      params = params.map {|k,v| [k,v.to_s]}.to_h
       task = nil
       if address =~ /^[0-9a-f]{16}$/ then
         task = Task.find_by_tid(address)
@@ -174,6 +175,15 @@ CODE
       begin
         ret = runner._run(param_code)
       rescue => error
+        if error.message == "panbot::task::cmd::shutdown" then
+          self.log "Exception Class: #{ error.class.name }\n"
+          self.log "Exception Message: #{ error.message }\n"
+          self.log "Exception Backtrace:\n#{ error.backtrace.join("\n") }\n"
+          self.log("#{Time.now} == shutdown ==\n")
+          self.status = "close"
+          self.save  
+          raise error
+        end
         self.log "Exception Class: #{ error.class.name }\n"
         self.log "Exception Message: #{ error.message }\n"
         self.log "Exception Backtrace:\n#{ error.backtrace.join("\n") }\n"
