@@ -11,6 +11,7 @@ class Task < ActiveRecord::Base
       task.save
     end
     
+    ## for worker
     def self.take_task(runner)
       task = nil
       Task.transaction do
@@ -26,7 +27,7 @@ class Task < ActiveRecord::Base
       return task
     end
 
-    def self.run_loop(runner)
+    def self.run_loop(runner="local_runner")
       loop do
           task = Task.take_task(runner) 
           task.run if task
@@ -34,6 +35,7 @@ class Task < ActiveRecord::Base
       end
     end
 
+    ## for task editor
     def self.load(address,binding)
       addr, code = address.split("/")
       code="*" if code==nil
@@ -43,7 +45,7 @@ class Task < ActiveRecord::Base
       if addr =~ /^[0-9a-f]{16}$/ then
         task = Task.find_by_tid(addr)
       else
-        task = Task.where(name:addr).order(save_timestamp: :desc).first
+        task = Task.where(name:addr).where("tid is not null").order(save_timestamp: :desc).first
       end
 
       ast = Parser::CurrentRuby.parse(task.code)
@@ -60,6 +62,57 @@ class Task < ActiveRecord::Base
       binding.eval(select_code)
 
       return select_code
+    end
+
+    def self.run_remote(address,params={})
+      task = nil
+      if address =~ /^[0-9a-f]{16}$/ then
+        task = Task.find_by_tid(address)
+      else
+        task = Task.where(name:address).where("tid is not null").order(save_timestamp: :desc).first
+      end
+      new_task = Task.new(task.attributes)  
+      new_task.id = nil    
+      new_task.tid = nil
+      new_task.params = JSON.dump(params)
+      new_task.status = "open"
+      new_task.save
+      return new_task
+    end
+
+    def self.is_pending(task)
+      Task.find(task.id).status == "open"
+    end
+    def self.is_running(task)
+      Task.find(task.id).status == "run"
+    end
+    def self.is_done(task)
+      status = Task.find(task.id).status
+      return (status == "close" or status == "abort")
+    end
+    def self.wait_until_running(task)
+      loop do
+        update_task = Task.find(task.id)
+        return update_task if update_task.status=="run"
+        sleep(1)
+      end
+    end
+    def self.wait_until_done(task)
+      if task.class==Array then
+        loop do
+          update_task = task.map do |t|
+            Task.find(t.id)
+          end
+          return update_task if update_task.filter {|t| t.status == "close" or t.status == "abort" }.size==update_task.size
+          sleep(1)          
+        end        
+      else
+        loop do
+          update_task = Task.find(task.id)
+          return update_task if (update_task.status == "close" or update_task.status == "abort")
+          sleep(1)
+        end
+      end
     end
 
     def update_name()    
@@ -97,7 +150,7 @@ class Runner
     @_task.log(str)
   end
   def _run(param_code)
-    before_code = "def self.task; if @task then return @task end; @task=Task.find(#{id}); end\n"
+    before_code = "def self.__task; if @__task then return @__task end; @__task=Task.find(#{id}); end\n"
     after_code = '''
       def __main()
         @raw_ret = main()

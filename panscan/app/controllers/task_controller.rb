@@ -32,7 +32,7 @@ CODE
             if tid =~ /^[0-9a-f]{16}$/ then
                 @task = Task.find_by_tid(tid)
               else
-                @task = Task.where(name:tid).order(save_timestamp: :desc).first
+                @task = Task.where(name:tid).where("tid is not null").order(save_timestamp: :desc).first
               end
             @new_task = false
         end
@@ -48,9 +48,6 @@ CODE
 
     def task_all
         @task = Task.all.order(updated_at: :desc)
-    end
-
-    def wiki
     end
 
 
@@ -135,7 +132,16 @@ CODE
     def task_json
         task = Task.find_by_tid(params[:tid])
         if task then
-            render :json => task.attributes
+            json = task.attributes
+            ret = ""
+            begin
+                ret = JSON.parse(task.return)["html"]
+            rescue
+                ret = task.return
+            end
+            json["return"] = ret
+
+            render :json => json
         else
             render :json => {}
         end
