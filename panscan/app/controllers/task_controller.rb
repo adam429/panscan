@@ -37,11 +37,7 @@ CODE
             @new_task = false
         end
         @runner = @task.runner
-        begin
-            @return = JSON.parse(@task.return)["html"]
-        rescue
-            @return = @task.return
-        end
+        @return = @task.html
         @output = @task.output
         @params = @task.params
     end
