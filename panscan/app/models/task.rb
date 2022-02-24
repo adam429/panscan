@@ -117,11 +117,11 @@ class Task < ActiveRecord::Base
     end
 
     def raw_ret()
-      JSON.parse(self.return)["raw_ret"]
+      JSON.parse(self.return, {allow_nan: true})["raw_ret"]
     end
 
     def html()
-      JSON.parse(self.return)["html"]
+      JSON.parse(self.return, {allow_nan: true})["html"]
     end
 
     def update_name()    

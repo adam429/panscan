@@ -56,7 +56,7 @@ class EpochController < ApplicationController
     end
 
     def stats_clean_cache
-        Cache.destroy_all
+        Cache.where("key like ?","%-count").map {|x| x.delete}
         
         redirect_to "/stats"
     end
