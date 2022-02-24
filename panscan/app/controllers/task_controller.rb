@@ -31,6 +31,10 @@ CODE
         else 
             if tid =~ /^[0-9a-f]{16}$/ then
                 @task = Task.find_by_tid(tid)
+
+                # tid -> name -> tid (url show name)
+                Task.where(name:@task.name).where("tid is not null").order(save_timestamp: :desc).first.tid == tid
+                redirect_to "/task/#{@task.name}"
               else
                 @task = Task.where(name:tid).where("tid is not null").order(save_timestamp: :desc).first
               end
@@ -130,6 +134,11 @@ CODE
         task = nil
         if params[:tid] =~ /^[0-9a-f]{16}$/ then
             task = Task.find_by_tid(params[:tid])
+
+            # tid -> name -> tid (url show name)
+            Task.where(name:task.name).where("tid is not null").order(save_timestamp: :desc).first.tid == params[:tid]
+            redirect_to "/task/view/#{task.name}"
+            return
         else
             task = Task.where(name:params[:tid]).where("tid is not null").order(save_timestamp: :desc).first
         end

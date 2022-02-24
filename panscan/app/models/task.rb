@@ -36,7 +36,7 @@ class Task < ActiveRecord::Base
     end
 
     ## for task editor
-    def self.load(address,binding)
+    def self.load(address)
       addr, code = address.split("/")
       code="*" if code==nil
       code=code.to_sym
@@ -48,7 +48,13 @@ class Task < ActiveRecord::Base
         task = Task.where(name:addr).where("tid is not null").order(save_timestamp: :desc).first
       end
 
-      ast = Parser::CurrentRuby.parse(task.code)
+      raise "Task.load() cannot find script #{addr}" if task==nil
+
+      begin
+        ast = Parser::CurrentRuby.parse(task.code)
+      rescue =>e
+        raise "Task.load() find error in script #{addr}. Parser error: #{e.message}"
+      end
       match = ast.children.filter {|x| not (x.type==:lvasgn and x.children.first==:__TASK_NAME__) and not (x.type==:def and x.children.first==:main) }
       if code!=:* then
         match = match.filter {|x| 
@@ -59,9 +65,9 @@ class Task < ActiveRecord::Base
       select_code = match.map do |m|
         Unparser.unparse(m)
       end.join("\n")
-      binding.eval(select_code)
 
-      return select_code
+      File.write "#{addr}.rb", select_code
+      return "#{addr}.rb"
     end
 
     def self.run_remote(address,params={})
@@ -117,11 +123,17 @@ class Task < ActiveRecord::Base
     end
 
     def raw_ret()
-      JSON.parse(self.return, {allow_nan: true})["raw_ret"]
+      begin
+        JSON.parse(self.return, {allow_nan: true})["raw_ret"] if self.return
+      rescue
+      end
     end
 
     def html()
-      JSON.parse(self.return, {allow_nan: true})["html"]
+      begin
+        JSON.parse(self.return, {allow_nan: true})["html"] if self.return
+      rescue
+      end
     end
 
     def update_name()    
@@ -192,9 +204,19 @@ CODE
           self.save  
           raise error
         end
-        self.log "Exception Class: #{ error.class.name }\n"
-        self.log "Exception Message: #{ error.message }\n"
-        self.log "Exception Backtrace:\n#{ error.backtrace.join("\n") }\n"
+    
+        self.log("Exception Class: #{ error.class.name }\n")
+        self.log("Exception Message: #{ error.message }\n")
+
+        file,line =  error.backtrace[0].split(":")
+        if file!="(irb)" and file!="(eval)"
+            line = line.to_i
+            src = File.readlines(file)
+            self.log("Exception Source: #{file}:#{line}\n")
+            self.log (src[[line-6,0].max,11].map.with_index {|x,i| (i==(line>5 ? 5 : line-1) ? "--> " : "    ") + x }.join()+"\n")
+        end
+
+        self.log("Exception Backtrace:\n#{ error.backtrace.join("\n") }\n")
         self.log("#{Time.now} == abort run ==\n")
         self.status = "abort"
         self.save
