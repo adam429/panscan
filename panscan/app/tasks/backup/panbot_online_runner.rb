@@ -1,5 +1,7 @@
 __TASK_NAME__ = "panbot_online_runner"
 
+require 'ethereum.rb'
+require 'eth'
 
 load(Task.load("panbot_runner"))
 
@@ -81,4 +83,6 @@ def main
     runner = OnlineRunner.new()
     bot = bot_class.new(runner,config)
     runner.run
+    
+    Log.log("log from bot")
 end
