@@ -52,6 +52,11 @@ CODE
         @task = Task.order(updated_at: :desc).where("tid is not null")
     end
 
+    def task_kill
+        task = Task.find_by_tid(params[:tid])
+        task.status="kill"
+        task.save
+    end
 
     def task_run
         if params[:tid]=="(new)" then
