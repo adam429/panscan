@@ -56,10 +56,6 @@ class OnlineRunner < PanRunner
         ret = @contract.call.current_epoch
         time = Time.now()-time
 
-        time = Time.now()
-        ret = @contract.call.current_epoch
-        time = Time.now()-time
-
         output ret.to_s+"\n"
         output time.to_s+"\n"
     end
@@ -110,7 +106,7 @@ def main
     $output = lambda do |str| _log(str) end
     
     database_init()
-
+    
     min_amount = __min_amount__
     min_payout = __min_payout__
     bet_amount_factor = __bet_amount_factor__
@@ -120,7 +116,5 @@ def main
 
     runner = OnlineRunner.new()
     bot = bot_class.new(runner,config)
-    runner.run
-    
-    Log.log("log from bot")
+    runner.run   
 end
