@@ -46,14 +46,18 @@ class OnlineRunner < PanRunner
     def log(str)
         @logs.push str
     end
+    
+    def _log(str)
+        $_log.call (str)
+    end
 
     def run
         time = Time.now()
         ret = @contract.call.current_epoch
         time = Time.now()-time
 
-        $_log ret.to_s+"\n"
-        $_log time.to_s+"\n"
+        _log ret.to_s+"\n"
+        _log time.to_s+"\n"
     end
 
     def getEpoch
