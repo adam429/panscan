@@ -52,34 +52,47 @@ class OnlineRunner < PanRunner
     
     def run
         new_epoch
+        _get_round()
+        print_short_stats()
 
+        dynamic_interval( -> {
+            @interval=30
+            @interval=10 if @epoch[:lock_countdown] < 50 
+            @interval=1 if @epoch[:lock_countdown] < 20
+            @interval=0.01 if @epoch[:lock_countdown] < 10    
+        }) do
+            @tick = @tick+1
+            _get_round()
+
+            raise "stop bot" @epoch[:lock_countdown] < 0 
+
+            # if @epoch[:lock_countdown] < 0 then
+            #     # wait for next epoch begin
+            #     @current_epoch = get_current_epoch()
+            #     @run_bot ==false
+            #     next
+            # else
+            #     if @run_bot ==false then
+            #         new_epoch()
+            #         @run_bot = true
+            #     end
+            # end    
+            print_short_stats()
+
+            # bot_action() if @run_bot
+        end
+    end
+
+    def dynamic_interval(dynamic_interval_adj)
         clock = Time.now()
+        dynamic_interval_adj.call
         while true do
             if Time.now()-clock > @interval  then
                 clock = Time.now()  
-                @tick = @tick+1
+                
+                yield
 
-                _get_round()
-
-
-                break if @epoch[:lock_countdown] < 0 
-
-                # if @epoch[:lock_countdown] < 0 then
-                #     # wait for next epoch begin
-                #     @current_epoch = get_current_epoch()
-                #     @run_bot ==false
-                #     next
-                # else
-                #     if @run_bot ==false then
-                #         new_epoch()
-                #         @run_bot = true
-                #     end
-                # end    
-
-                dynamic_interval_adj()
-                print_short_stats()
-
-                # bot_action() if @run_bot
+                dynamic_interval_adj.call
             end
         end
     end
@@ -155,15 +168,7 @@ class OnlineRunner < PanRunner
         _get_current_epoch()
 
         @tick = 0
-        @interval = 0.5
         @meet_align_time = false
-    end
-
-    def dynamic_interval_adj()
-        @interval=30
-        @interval=10 if @epoch[:lock_countdown] < 50 
-        @interval=1 if @epoch[:lock_countdown] < 20
-        @interval=0.01 if @epoch[:lock_countdown] < 10
     end
 
 
