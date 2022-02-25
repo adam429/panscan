@@ -17,10 +17,8 @@
   <td>| <a href="/task/<%= t.tid %>"><%= t.tid %></a></td>
   <td>| <%= t.tid == t.name ? "" :t.name %></td>
   <td>| <%= t.status %></td>
-  <td>| <%= t.params.to_s.size > 30 ? t.params.to_s[0,30]+"..." : t.params %></td>
   <td>| <%= t.runner %></td>
-  <td>| <%= t.created_at.to_formatted_s(:db) %></td>
-  <td>| <%= t.save_timestamp ? t.save_timestamp.to_formatted_s(:db) : "" %></td>
+  <td>| <%= t.run_timestamp ? t.run_timestamp.to_formatted_s(:db) : "" %></td>
 </tr>
 <% end %>
 </table>
