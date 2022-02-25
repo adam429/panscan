@@ -54,7 +54,7 @@ class OnlineRunner < PanRunner
         
     def bot_action
         # only run once bot decision 
-        if @epoch[:lock_countdown] < 8 then
+        if @epoch[:lock_countdown] < __trigger_second__ then
             log "=== Bot Logic start at #{Time.now.to_fs(:db)} ==="
             @bot.each do |b|
                 b.mainLoop
