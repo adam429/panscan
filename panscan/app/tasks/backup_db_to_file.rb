@@ -5,3 +5,7 @@ names.each do |name|
     task = Task.where(name:name).where("tid is not null").order(save_timestamp: :desc).first
     File.write "#{dest_path}/#{name}.rb", task.code
 end
+
+`git add *`
+`git commit -m 'task backup'`
+`git push`

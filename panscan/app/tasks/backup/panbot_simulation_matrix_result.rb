@@ -1,12 +1,12 @@
 __TASK_NAME__ = "panbot_simulation_matrix_result"
 
-Task.load("database",binding)
+load(Task.load("database"))
 
 def main()
-    task = Task.where(name:"panbot_simluation_matrix").order(updated_at: :desc).where("tid is not null").first
+    task = Task.where(name:"panbot_simulation_matrix").order(updated_at: :desc).where("tid is not null").first
     result = task.raw_ret.map {|x| Task.find(x) }
     result = result.map {|x| json = JSON.parse(x.params)
-       ["#{json["min_amount"]}-#{json["min_payout"]}",x.raw_ret]
+      ["#{json["min_amount"]}-#{json["min_payout"]}",x.raw_ret]
     }    
     result = result.sort! {|x,y| x[0]<=>y[0] }.to_h
     json = JSON.parse(task.params)
