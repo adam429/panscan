@@ -38,7 +38,7 @@ class OnlineRunner < PanRunner
         # create key from private_key
         @bot_key = Eth::Key.new priv: @bot_prviate_key
         @bot_address = @bot_key.address
-        contract.key = @bot_key
+        @contract.key = @bot_key
 
         super
     end 
