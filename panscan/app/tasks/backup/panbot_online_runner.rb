@@ -67,6 +67,7 @@ class OnlineRunner < PanRunner
     end 
 
     def log(str)
+        str = str +"\n"
         @logs.push(str)
         $output.call (str)
         Log.log(str)
@@ -74,12 +75,37 @@ class OnlineRunner < PanRunner
         
     
     def run
-        _get_current_epoch
-        _get_round()
+        new_epoch
 
-        log(@epoch.to_s)
-        log(@rpc_record.record.to_s)
+        clock = Time.now()
+        while @tick>500 do
+            if Time.now()-clock > @interval  then
+                clock = Time.now()  
+                @tick = @tick+1
 
+                _get_round()
+
+
+                break if @epoch[:lock_countdown] < 0 
+
+                # if @epoch[:lock_countdown] < 0 then
+                #     # wait for next epoch begin
+                #     @current_epoch = get_current_epoch()
+                #     @run_bot ==false
+                #     next
+                # else
+                #     if @run_bot ==false then
+                #         new_epoch()
+                #         @run_bot = true
+                #     end
+                # end    
+
+                dynamic_interval_adj()
+                print_short_stats()
+
+                # bot_action() if @run_bot
+            end
+        end
     end
 
     def getEpoch
@@ -132,6 +158,39 @@ class OnlineRunner < PanRunner
     end
 
     private
+    def print_short_stats()
+        stats = ""
+        stats = stats + "epoch #{@current_epoch} | "
+        stats = stats + "tick #{@tick} | "
+        stats = stats + "now #{ Time.now.to_fs(:db) } | "
+        stats = stats + "lockAt #{ @epoch[:lockTimestamp].to_fs(:db) } | "
+        stats = stats + "countdown #{@epoch[:lock_countdown]} | "
+        stats = stats +  "pool #{@epoch[:totalAmount].round(2)} | "
+        stats = stats +  "bull #{@epoch[:bullPayout].round(2)} | "
+        stats = stats +  "bear #{@epoch[:bearPayout].round(2)} | "
+        stats = stats + "rpc #{(@rpc_record.avg.round(4)} | "
+        stats = stats + "interval #{@interval} "
+
+        log(stats)
+    end
+
+    def new_epoch()
+        # start a new epoch
+        _get_current_epoch()
+
+        @tick = 0
+        @interval = 0.5
+        @meet_align_time = false
+    end
+
+    def dynamic_interval_adj()
+        @interval=30
+        @interval=10 if @epoch[:lock_countdown] < 60 
+        @interval=1 if @epoch[:lock_countdown] < 30
+        @interval=0.01 if @epoch[:lock_countdown] < 10
+    end
+
+
     def bnb_decimal(amount)
         return (amount * 1e18).to_i
     end
