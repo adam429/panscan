@@ -47,8 +47,9 @@ CODE
     end
 
     def task_all
+        @running_task = Task.order(updated_at: :desc).where(status:"run").where("tid is not null")
+
         @task = Task.order(updated_at: :desc).where("tid is not null")
-        @pagy, @epoch = pagy(@task)        
     end
 
 
