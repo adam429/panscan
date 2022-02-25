@@ -66,6 +66,7 @@ CODE
         ip = public_ips[instance]
         cmd = "docker restart #{docker}"          
         `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
+        redirect_to '/task/all' 
     end
 
     def task_run
