@@ -1,8 +1,10 @@
 __TASK_NAME__ = "panbot_runner"
 
 load(Task.load("panbot_runner"))
+load(Task.load("panbot_payout_bot"))
 
-class OnlineRunner < PanRunner
+
+class PanbotRunner < PanRunner
     attr_accessor :block, :block_end, :epoch, :logs
 
     def initialize()
@@ -15,6 +17,7 @@ class OnlineRunner < PanRunner
     end
 
     def run
+        _log ("run")
     end
 
 
@@ -31,30 +34,48 @@ class OnlineRunner < PanRunner
     def lastBlockOrder
     end
 
-    def isLastBetable
+    def isLastBetable 
+        "code"
     end
 
     def getCurrentEpoch
+        "code"
     end
 
     def getCurrentBlock
+        "code"
     end
 
     def getCurrentPayout
+        "code"
     end
 
     def getCurrentAmount
+        "code"
     end
 
     def betBull(sender,amount)
+        "code"
     end
 
     def betBear(sender,amount)
-    end
-
-    def endRound()
+        "code"
     end
 end
 
 def main
+    bot_class = PayoutBot
+    
+    database_init()
+
+    min_amount = __min_amount__
+    min_payout = __min_payout__
+    bet_amount_factor = __bet_amount_factor__
+    bet_amount_value = __bet_amount_value__
+    
+    config = {:min_amount => min_amount, :min_payout=>min_payout, :bet_amount_factor=>bet_amount_factor, :bet_amount_value=>bet_amount_value}
+
+    runner = PanbotRunner.new()
+    bot = bot_class.new(runner,config)
+    runner.run
 end
