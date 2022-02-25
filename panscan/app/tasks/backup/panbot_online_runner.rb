@@ -64,7 +64,7 @@ class OnlineRunner < PanRunner
             @tick = @tick+1
             _get_round()
 
-            raise "stop bot" @epoch[:lock_countdown] < 0 
+            raise "stop bot" if @epoch[:lock_countdown] < 0 
 
             # if @epoch[:lock_countdown] < 0 then
             #     # wait for next epoch begin
