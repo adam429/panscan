@@ -21,7 +21,7 @@ class OnlineRunner < PanRunner
     end
 
     def run
-        $_log "run"
+        $_log.call "run"
     end
 
 
