@@ -63,7 +63,7 @@ CODE
         get_public_ip_str = "aws lightsail get-instances --no-cli-pager --region 'us-east-1' --query 'instances[].{name:name,publicIpAddress:publicIpAddress}'"
         data = `#{get_public_ip_str}`
         public_ips = JSON.parse(data).map {|x| [x["name"],x["publicIpAddress"]]}.to_h
-        ip = public_ips(instance)
+        ip = public_ips[instance]
         cmd = "docker restart #{docker}"          
         `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
     end
