@@ -37,6 +37,10 @@ class OnlineRunner < PanRunner
         @bot_key = Eth::Key.new priv: @bot_prviate_key
         @bot_address = @bot_key.address
         @contract.key = @bot_key
+        
+        log "=== Bot Address: #{@bot_address} ==="
+        
+        raise "here"
 
         _get_current_epoch
         super
