@@ -21,7 +21,7 @@ class OnlineRunner < PanRunner
     end
 
     def run
-        _log ("run")
+        $_log "run"
     end
 
 
@@ -69,6 +69,7 @@ end
 
 def main
     bot_class = PayoutBot
+    $log = _log
     
     _log ("db_init\n")
     database_init()
