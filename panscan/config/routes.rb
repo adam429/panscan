@@ -35,6 +35,8 @@ Rails.application.routes.draw do
   get "/task/view/:tid", to: "task#task_return_view"
   get "/task/json/:tid", to: "task#task_json"
 
+
+  get "/task/kill/:tid", to: "task#task_kill"
   post "/task/save", to: "task#task_save"
   post "/task/fork", to: "task#task_fork"
   post "/task/run", to: "task#task_run"
