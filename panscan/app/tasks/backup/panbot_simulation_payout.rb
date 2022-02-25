@@ -1,5 +1,6 @@
 __TASK_NAME__ = "panbot_simulation_payout"
 
+
 load(Task.load("database"))
 load(Task.load("panbot_simulation_runner"))
 load(Task.load("panbot_stats"))
