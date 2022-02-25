@@ -50,11 +50,14 @@ class OnlineRunner < PanRunner
     end
         
     def bot_action
+        # only run once bot decision 
         if @epoch[:lock_countdown] < 8 then
             log "=== Bot Logic start at #{Time.now.to_fs(:db)} ==="
             @bot.each do |b|
                 b.mainLoop
             end
+            log "=== Bot Logic end at #{Time.now.to_fs(:db)} ==="
+            sleep(10)
         end
     end
     
@@ -68,14 +71,14 @@ class OnlineRunner < PanRunner
             @interval=10 if @epoch[:lock_countdown] < 50 
             @interval=1 if @epoch[:lock_countdown] < 20
             @interval=0.01 if @epoch[:lock_countdown] < 10    
-            @interval=30 if @epoch[:lock_countdown] < 5
+            @interval=40 if @epoch[:lock_countdown] < 5
         }) do
             @tick = @tick+1
             _get_round()
 
             if @epoch[:lock_countdown] < 0 then
                 # next epoch begin
-                _get_current_epoch()
+                new_epoch
             else
                 bot_action() if @epoch[:lock_countdown] < 10 
             end    
@@ -167,7 +170,6 @@ class OnlineRunner < PanRunner
         _get_current_epoch()
 
         @tick = 0
-        @meet_align_time = false
     end
 
 
