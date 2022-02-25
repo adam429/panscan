@@ -16,7 +16,7 @@
   <td>| <%= t.tid == t.name ? "" :t.name %></td>
   <td>| <%= t.status %></td>
   <td>| <%= t.runner %></td>
-  <td>| <%= t.run_timestamp ? Time.now - t.run_timestamp : "" %></td>
+  <td>| <%= t.run_timestamp ? ActiveSupport::Duration.build(Time.now - t.run_timestamp).inspect  : "" %></td>
 </tr>
 <% end %>
 </table>
