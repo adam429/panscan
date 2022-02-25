@@ -24,10 +24,8 @@ class OnlineRunner < PanRunner
         $_log.call "run"
     end
 
-
     def getEpoch
     end
-
 
     def time_at_epoch(begin_epoch,end_epoch)
     end
@@ -71,9 +69,7 @@ def main
     bot_class = PayoutBot
     $_log = lambda do |str| _log(str) end
     
-    _log ("db_init\n")
     database_init()
-    _log ("db_init_done\n")
 
     min_amount = __min_amount__
     min_payout = __min_payout__
@@ -84,6 +80,8 @@ def main
 
     runner = OnlineRunner.new()
     bot = bot_class.new(runner,config)
-    _log ("run\n")
     runner.run
+    
+    loop do
+    end
 end
