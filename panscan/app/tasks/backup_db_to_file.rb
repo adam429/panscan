@@ -17,6 +17,6 @@ loop do
     end
 
     save_to_github()
-    puts "==time: #{Time.now.to_s(:db)}=="
+    puts "==time: #{Time.now.to_fs(:db)}=="
     sleep(60)
 end
