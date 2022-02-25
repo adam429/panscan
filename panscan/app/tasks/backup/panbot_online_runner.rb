@@ -81,7 +81,7 @@ def main
     
     config = {:min_amount => min_amount, :min_payout=>min_payout, :bet_amount_factor=>bet_amount_factor, :bet_amount_value=>bet_amount_value}
 
-    runner = PanbotRunner.new()
+    runner = OnlineRunner.new()
     bot = bot_class.new(runner,config)
     _log ("run\n")
     runner.run
