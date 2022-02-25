@@ -97,8 +97,8 @@ CODE
             task.tid = SecureRandom.hex(8)
             task.code = params[:code]
             task.status = "edit"
-            task.update_name
             task.params = json_params(params)
+            task.update_name
             task.save_timestamp = Time.now
             task.save
             render :json => {:action=> "redirect", :to => "/task/#{task.tid}"}
