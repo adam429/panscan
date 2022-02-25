@@ -1,4 +1,4 @@
-__TASK_NAME__ = "panbot_online_runner1"
+__TASK_NAME__ = "panbot_online_runner"
 
 
 load(Task.load("panbot_runner"))
