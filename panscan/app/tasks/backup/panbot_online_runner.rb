@@ -69,7 +69,7 @@ end
 
 def main
     bot_class = PayoutBot
-    $log = _log
+    $_log = lambda do |str| _log(str) end
     
     _log ("db_init\n")
     database_init()
