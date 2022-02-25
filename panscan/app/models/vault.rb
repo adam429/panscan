@@ -23,8 +23,8 @@ class Vault < ActiveRecord::Base
     end
     
     def self.set(key,value)
-      kv = Cache.find_by_key(key)
-      kv = Cache.new() if kv==nil
+      kv = Vault.find_by_key(key)
+      kv = Vault.new() if kv==nil
       kv.key = key
       kv.value = value
       kv.save
@@ -32,7 +32,7 @@ class Vault < ActiveRecord::Base
     end
     
     def self.get(key)
-      kv = Cache.find_by_key(key)
+      kv = Vault.find_by_key(key)
       return nil if kv==nil
       return kv.value
     end
