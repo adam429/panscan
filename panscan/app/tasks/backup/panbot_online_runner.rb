@@ -54,7 +54,7 @@ class OnlineRunner < PanRunner
         new_epoch
 
         clock = Time.now()
-        while @tick>500 do
+        while @tick<500 do
             if Time.now()-clock > @interval  then
                 clock = Time.now()  
                 @tick = @tick+1
@@ -141,10 +141,10 @@ class OnlineRunner < PanRunner
         stats = stats + "now #{ Time.now.to_fs(:db) } | "
         stats = stats + "lockAt #{ @epoch[:lockTimestamp].to_fs(:db) } | "
         stats = stats + "countdown #{@epoch[:lock_countdown]} | "
-        stats = stats +  "pool #{@epoch[:totalAmount].round(2)} | "
-        stats = stats +  "bull #{@epoch[:bullPayout].round(2)} | "
-        stats = stats +  "bear #{@epoch[:bearPayout].round(2)} | "
-        stats = stats + "rpc #{(@rpc_record.avg.round(4)} | "
+        stats = stats + "pool #{@epoch[:totalAmount].round(2)} | "
+        stats = stats + "bull #{@epoch[:bullPayout].round(2)} | "
+        stats = stats + "bear #{@epoch[:bearPayout].round(2)} | "
+        stats = stats + "rpc #{@rpc_record.avg.round(4)} | "
         stats = stats + "interval #{@interval} "
 
         log(stats)
