@@ -66,7 +66,9 @@ end
 def main
     bot_class = PayoutBot
     
+    _log ("db_init\n")
     database_init()
+    _log ("db_init_done\n")
 
     min_amount = __min_amount__
     min_payout = __min_payout__
@@ -77,5 +79,6 @@ def main
 
     runner = PanbotRunner.new()
     bot = bot_class.new(runner,config)
+    _log ("run\n")
     runner.run
 end
