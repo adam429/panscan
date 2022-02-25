@@ -208,12 +208,15 @@ CODE
         self.log("Exception Class: #{ error.class.name }\n")
         self.log("Exception Message: #{ error.message }\n")
 
-        file,line =  error.backtrace[0].split(":")
-        if file!="(irb)" and file!="(eval)"
-            line = line.to_i
-            src = File.readlines(file)
-            self.log("Exception Source: #{file}:#{line}\n")
-            self.log (src[[line-6,0].max,11].map.with_index {|x,i| (i==(line>5 ? 5 : line-1) ? "--> " : "    ") + x }.join()+"\n")
+        begin
+          file,line =  error.backtrace[0].split(":")
+          if file!="(irb)" and file!="(eval)"
+              line = line.to_i
+              src = File.readlines(file)
+              self.log("Exception Source: #{file}:#{line}\n")
+              self.log (src[[line-6,0].max,11].map.with_index {|x,i| (i==(line>5 ? 5 : line-1) ? "--> " : "    ") + x }.join()+"\n")
+          end
+        rescue
         end
 
         self.log("Exception Backtrace:\n#{ error.backtrace.join("\n") }\n")
