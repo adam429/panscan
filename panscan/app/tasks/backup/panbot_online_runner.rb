@@ -47,8 +47,8 @@ class OnlineRunner < PanRunner
         @logs.push str
     end
     
-    def _log(str)
-        $_log.call (str)
+    def output(str)
+        $output.call (str)
     end
 
     def run
@@ -56,8 +56,8 @@ class OnlineRunner < PanRunner
         ret = @contract.call.current_epoch
         time = Time.now()-time
 
-        _log ret.to_s+"\n"
-        _log time.to_s+"\n"
+        output ret.to_s+"\n"
+        output time.to_s+"\n"
     end
 
     def getEpoch
@@ -103,7 +103,7 @@ end
 
 def main
     bot_class = PayoutBot
-    $_log = lambda do |str| _log(str) end
+    $output = lambda do |str| _log(str) end
     
     database_init()
 
