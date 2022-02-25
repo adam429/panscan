@@ -56,6 +56,10 @@ class OnlineRunner < PanRunner
         ret = @contract.call.current_epoch
         time = Time.now()-time
 
+        time = Time.now()
+        ret = @contract.call.current_epoch
+        time = Time.now()-time
+
         output ret.to_s+"\n"
         output time.to_s+"\n"
     end
