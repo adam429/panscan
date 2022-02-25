@@ -52,12 +52,6 @@ class OnlineRunner < PanRunner
     end
 
     def run
-        time = Time.now()
-        ret = @contract.call.current_epoch
-        time = Time.now()-time
-
-        output ret.to_s+"\n"
-        output time.to_s+"\n"
     end
 
     def getEpoch
@@ -92,13 +86,17 @@ class OnlineRunner < PanRunner
         "code"
     end
 
+
     def betBull(sender,amount)
-        "code"
+        log "===betBull #{amount}==="
+        sender.epoch_bet = ["bull",amount,lastBlockOrder-2] if sender.epoch_bet==nil
     end
 
     def betBear(sender,amount)
-        "code"
+        log "===betBear #{amount}==="
+        sender.epoch_bet = ["bear",amount,lastBlockOrder-2] if sender.epoch_bet==nil
     end
+
 end
 
 def main
@@ -106,7 +104,7 @@ def main
     $output = lambda do |str| _log(str) end
     
     database_init()
-    
+
     min_amount = __min_amount__
     min_payout = __min_payout__
     bet_amount_factor = __bet_amount_factor__
