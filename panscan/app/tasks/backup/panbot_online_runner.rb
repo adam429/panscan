@@ -9,17 +9,39 @@ load(Task.load("panbot_runner"))
 load(Task.load("database"))
 load(Task.load("panbot_payout_bot"))
 
+class WindowArray
+    attr_accessor :record,:limit
+
+    def initialize(limit=0)
+        @record = []
+        @limit = limit
+    end
+
+    def push(obj)
+        @record.push(obj)
+        @record.shift if (@record.size>@limit) and (@limit>0)
+    end
+
+    def sum
+        @record.sum
+    end
+
+    def count
+        @record.size
+    end
+
+    def avg
+        sum.to_f / count
+    end
+end
 
 class OnlineRunner < PanRunner
-    attr_accessor :block, :block_end, :epoch, :logs
-
     def initialize()
         @logs = []
-
+        @rpc_record = WindowArray.new(60)
         @gas_premium = 2
 
         @client = Ethereum::HttpClient.new(Vault.get("bsc_endpoint"))
-
         @contract = Ethereum::Contract.create(
             client: @client, 
             name: "pancake_prediction_v2", 
@@ -40,18 +62,24 @@ class OnlineRunner < PanRunner
         @bot_address = @bot_key.address
         @contract.key = @bot_key
 
+        _get_current_epoch
         super
     end 
 
     def log(str)
-        @logs.push str
-    end
-    
-    def output(str)
+        @logs.push(str)
         $output.call (str)
+        Log.log(str)
     end
-
+        
+    
     def run
+        _get_current_epoch
+        _get_round()
+
+        log(@epoch.to_s)
+        log(@rpc_record.record.to_s)
+
     end
 
     def getEpoch
@@ -89,13 +117,98 @@ class OnlineRunner < PanRunner
 
     def betBull(sender,amount)
         log "===betBull #{amount}==="
-        sender.epoch_bet = ["bull",amount,lastBlockOrder-2] if sender.epoch_bet==nil
+
+        function_name = "betBull"
+        function_args = [@current_epoch]
+        sign_transcat(function_name, function_args, bnb_decimal(amount))    
     end
 
     def betBear(sender,amount)
         log "===betBear #{amount}==="
-        sender.epoch_bet = ["bear",amount,lastBlockOrder-2] if sender.epoch_bet==nil
+
+        function_name = "betBear"
+        function_args = [@current_epoch]
+        sign_transcat(function_name, function_args, bnb_decimal(amount))    
     end
+
+    private
+    def bnb_decimal(amount)
+        return (amount * 1e18).to_i
+    end
+
+    def _get_current_epoch()
+        time = Time.now()
+        @current_epoch = @contract.call.current_epoch
+        time = Time.now()-time
+        @rpc_record.push(time)
+
+        return @current_epoch
+    end
+
+
+    def _get_round()
+        time = Time.now()
+        current_round = contract.call.rounds(@current_epoch)
+        time = Time.now()-time
+        @rpc_record.push(time)
+        
+        startTimestamp = Time.at(current_round[1])
+        lockTimestamp = Time.at(current_round[2])
+        closeTimestamp = Time.at(current_round[3])
+        lock_countdown = (lockTimestamp-Time.now()).round(3)
+        lockPrice = current_round[4]/1e8.to_f
+        closePrice = current_round[5]/1e8.to_f
+        totalAmount = current_round[8]/1e18.to_f
+        bullAmount = current_round[9]/1e18.to_f
+        bearAmount = current_round[10]/1e18.to_f
+        rewardBaseCalAmount = current_round[11]/1e18.to_f
+        rewardAmount = current_round[12]/1e18.to_f
+        bullPayout = totalAmount/bullAmount
+        bearPayout = totalAmount/bearAmount    
+
+        @epoch = {startTimestamp:startTimestamp,lockTimestamp:lockTimestamp,closeTimestamp:closeTimestamp,lock_countdown:lock_countdown,
+                  lockPrice:lockPrice,closePrice:closePrice,totalAmount:totalAmount,bullAmount:bullAmount,
+                  bearAmount:bearAmount,rewardBaseCalAmount:rewardBaseCalAmount,
+                  rewardAmount:rewardAmount,bullPayout:bullPayout,bearPayout:bearPayout}
+    end        
+
+    # sign trans
+    def sign_transcat(function_name, function_args, value=0)
+        # client - Ethereum.rb client
+        # contract - Ethereum.rb contract
+        # function_name (string) - name of solidity payable method we want to call (camel case)
+        # function_args (array) - arguments desired to use in method
+        # key - Eth::Key used to sign transaction
+
+        key = @contract.key
+
+        function = @contract.parent.functions.find { |f| f.name == function_name }
+        abi = @contract.abi.find { |abi| abi['name'] == function_name }
+
+        encoder = Ethereum::Encoder.new
+        inputs = abi['inputs'].map { |input| OpenStruct.new(input) }
+        input = encoder.encode_arguments(inputs, function_args)
+        data = encoder.ensure_prefix(function.signature + input)
+
+        tx_args = {
+            from: key.address,
+            to: @contract.address,
+            data: data,
+            value: value,
+            nonce: @client.get_nonce(key.address),
+            gas_limit: @client.gas_limit,
+            gas_price: @client.gas_price
+        }
+        tx = Eth::Tx.new(tx_args)
+        tx.sign(key)
+
+        time = Time.now()
+        tx = @client.eth_send_raw_transaction(tx.hex)["result"]
+        time = Time.now()-time        
+        @rpc_record.push(time)
+        return tx
+    end
+
 
 end
 
