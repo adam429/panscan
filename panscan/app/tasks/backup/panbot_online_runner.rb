@@ -50,7 +50,12 @@ class OnlineRunner < PanRunner
     end
         
     def bot_action
-        log ("==bot action==")
+        if @epoch[:lock_countdown] < 8 then
+            log "=== Bot Logic start at #{Time.now.to_fs(:db)} ==="
+            @bot.each do |b|
+                b.mainLoop
+            end
+        end
     end
     
     def run
@@ -69,8 +74,8 @@ class OnlineRunner < PanRunner
             _get_round()
 
             if @epoch[:lock_countdown] < 0 then
-                # wait for next epoch begin
-                @current_epoch = get_current_epoch()
+                # next epoch begin
+                _get_current_epoch()
             else
                 bot_action() if @epoch[:lock_countdown] < 10 
             end    
@@ -105,28 +110,27 @@ class OnlineRunner < PanRunner
     end
 
     def isLastBetable 
-        "code"
+        6<@epoch[:lock_countdown] and @epoch[:lock_countdown]<9
     end
 
     def getCurrentEpoch
-        "code"
+        @current_epoch
     end
 
     def getCurrentBlock
-        "code"
     end
 
     def getCurrentPayout
-        "code"
+        return @epoch[:bullPayout],@epoch[:bearPayout]
     end
 
     def getCurrentAmount
-        "code"
+        return @epoch[:totalAmount]
     end
 
 
     def betBull(sender,amount)
-        log "===betBull #{amount}==="
+        log "=== Bot betBull #{amount} at #{Time.now.to_fs(:db)}==="
 
         function_name = "betBull"
         function_args = [@current_epoch]
@@ -134,7 +138,7 @@ class OnlineRunner < PanRunner
     end
 
     def betBear(sender,amount)
-        log "===betBear #{amount}==="
+        log "=== Bot betBear #{amount} at #{Time.now.to_fs(:db)}==="
 
         function_name = "betBear"
         function_args = [@current_epoch]
@@ -169,6 +173,15 @@ class OnlineRunner < PanRunner
 
     def bnb_decimal(amount)
         return (amount * 1e18).to_i
+    end
+
+    def _get_last_block()
+        time = Time.now()
+        last_block = @client.eth_get_block_by_number('latest', false) # get latest block details
+        time = Time.now()-time
+        @rpc_record.push(time)
+        @last_block_time = Time.at(last_block["result"]["timestamp"].to_i(16))
+        @last_block_number = last_block["result"]["number"].to_i(16)
     end
 
     def _get_current_epoch()
@@ -209,6 +222,7 @@ class OnlineRunner < PanRunner
 
     # sign trans
     def sign_transcat(function_name, function_args, value=0)
+        return
         # client - Ethereum.rb client
         # contract - Ethereum.rb contract
         # function_name (string) - name of solidity payable method we want to call (camel case)
