@@ -15,6 +15,7 @@ class OnlineRunner < PanRunner
     def initialize()
         @logs = []
         @rpc_record = WindowArray.new(60)
+        @bot_private_key = Vault.get("bot_private_key")
         @gas_premium = 2
 
         @client = Ethereum::HttpClient.new(Vault.get("bsc_endpoint"))
@@ -34,16 +35,12 @@ class OnlineRunner < PanRunner
         @contract.gas_price = ((gas_price / 1e9 * @gas_premium).round()*1e9).to_i
 
         # create key from private_key
-        @bot_key = Eth::Key.new priv: @bot_prviate_key
+        @bot_key = Eth::Key.new priv: @bot_private_key
         @bot_address = @bot_key.address
         @contract.key = @bot_key
         
-        log "=== #{@bot_prviate_key} ==="
         log "=== Bot Address: #{@bot_address} - #{get_balance(@bot_address)} BNB ==="
         
-
-        raise "here"
-
         _get_current_epoch
         super
     end 
