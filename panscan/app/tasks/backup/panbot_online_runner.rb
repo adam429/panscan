@@ -38,8 +38,10 @@ class OnlineRunner < PanRunner
         @bot_address = @bot_key.address
         @contract.key = @bot_key
         
-        log "=== Bot Address: #{@bot_address} ==="
+        log "=== #{@bot_prviate_key} ==="
+        log "=== Bot Address: #{@bot_address} - #{get_balance(@bot_address)} BNB ==="
         
+
         raise "here"
 
         _get_current_epoch
@@ -261,6 +263,15 @@ class OnlineRunner < PanRunner
         time = Time.now()-time        
         @rpc_record.push(time)
         return tx
+    end
+
+    def get_balance(address)
+        time = Time.now()
+        ret = @client.eth_get_balance(address)["result"].to_i(16) / 1e18.to_f
+        time = Time.now()-time
+
+        @rpc_record.push(time)
+        return ret
     end
 
 
