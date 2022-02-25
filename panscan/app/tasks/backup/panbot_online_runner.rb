@@ -161,8 +161,8 @@ class OnlineRunner < PanRunner
 
     def dynamic_interval_adj()
         @interval=30
-        @interval=10 if @epoch[:lock_countdown] < 60 
-        @interval=1 if @epoch[:lock_countdown] < 30
+        @interval=10 if @epoch[:lock_countdown] < 50 
+        @interval=1 if @epoch[:lock_countdown] < 20
         @interval=0.01 if @epoch[:lock_countdown] < 10
     end
 
