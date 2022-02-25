@@ -15,6 +15,31 @@ class OnlineRunner < PanRunner
 
     def initialize()
         @logs = []
+
+        @gas_premium = 2
+
+        @client = Ethereum::HttpClient.new(Vault.get("bsc_endpoint"))
+
+        @contract = Ethereum::Contract.create(
+            client: @client, 
+            name: "pancake_prediction_v2", 
+            address: Vault.get("pancake_prediction_v2"), 
+            abi: Vault.get("pancake_prediction_v2.abi")
+        )
+
+        ## config chain_id for EIP-155
+        Eth.configure { |c| c.chain_id = @client.net_version["result"].to_i }
+
+        # update gas prices with gas_premium
+        gas_price = @client.eth_gas_price["result"].to_i(16)
+        @client.gas_price = ((gas_price / 1e9 * @gas_premium).round()*1e9).to_i
+        @contract.gas_price = ((gas_price / 1e9 * @gas_premium).round()*1e9).to_i
+
+        # create key from private_key
+        @bot_key = Eth::Key.new priv: @bot_prviate_key
+        @bot_address = @bot_key.address
+        contract.key = @bot_key
+
         super
     end 
 
@@ -23,7 +48,12 @@ class OnlineRunner < PanRunner
     end
 
     def run
-        $_log.call "run"
+        time = Time.now()
+        ret = @contract.call.current_epoch
+        time = Time.now()-time
+
+        $_log ret.to_s+"\n"
+        $_log time.to_s+"\n"
     end
 
     def getEpoch
