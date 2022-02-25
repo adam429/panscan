@@ -81,7 +81,4 @@ def main
     runner = OnlineRunner.new()
     bot = bot_class.new(runner,config)
     runner.run
-    
-    loop do
-    end
 end
