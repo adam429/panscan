@@ -17,7 +17,7 @@
   <td>| <%= t.status %></td>
   <td>| <%= t.runner %></td>
   <td>| <%= t.run_timestamp ? ActiveSupport::Duration.build(Time.now - t.run_timestamp).parts.map do |key, value|  [value.to_i, key].join(' ') end.join(' ')  : "" %></td>
-  <td>| <a href='#'></a></td>
+  <td>| <a href='#'>kill</a></td>
 </tr>
 <% end %>
 </table>
