@@ -2,7 +2,7 @@ __TASK_NAME__ = "panbot_runner"
 
 load(Task.load("panbot_runner"))
 
-class SimulationRunner < PanRunner
+class OnlineRunner < PanRunner
     attr_accessor :block, :block_end, :epoch, :logs
 
     def initialize()
@@ -14,11 +14,13 @@ class SimulationRunner < PanRunner
         @logs.push str
     end
 
+    def run
+    end
+
+
     def getEpoch
     end
 
-    def run
-    end
 
     def time_at_epoch(begin_epoch,end_epoch)
     end
