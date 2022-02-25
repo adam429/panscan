@@ -60,6 +60,7 @@ CODE
             task.status = "open"
             task.params = json_params(params)
             task.save_timestamp = Time.now
+            task.update_name
             task.save
             render :json => {:action=> "redirect", :to => "/task/#{task.tid}"}
         else
@@ -70,6 +71,7 @@ CODE
             task.output = nil
             task.return = nil
             task.params = json_params(params)
+            task.update_name
             task.save_timestamp = Time.now
             task.save            
             render :json => {:action=> "message", :message => "task is pending to run"}
@@ -85,6 +87,7 @@ CODE
         task.output = nil
         task.return = nil
         task.params = json_params(params)
+        task.update_name
         task.save_timestamp = Time.now
         task.save
         render :json => {:action=> "redirect", :to => "/task/#{task.tid}"}
