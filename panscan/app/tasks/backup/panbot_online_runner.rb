@@ -224,7 +224,6 @@ class OnlineRunner < PanRunner
 
     # sign trans
     def sign_transcat(function_name, function_args, value=0)
-        return
         # client - Ethereum.rb client
         # contract - Ethereum.rb contract
         # function_name (string) - name of solidity payable method we want to call (camel case)
