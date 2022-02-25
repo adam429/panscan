@@ -1,10 +1,10 @@
-__TASK_NAME__ = "panbot_runner"
+__TASK_NAME__ = "panbot_online_runner"
 
 load(Task.load("panbot_runner"))
 load(Task.load("panbot_payout_bot"))
 
 
-class PanbotRunner < PanRunner
+class OnlineRunner < PanRunner
     attr_accessor :block, :block_end, :epoch, :logs
 
     def initialize()
@@ -79,6 +79,6 @@ def main
 
     runner = PanbotRunner.new()
     bot = bot_class.new(runner,config)
-    _log ("run\n")
+    _log ("run"\n)
     runner.run
 end
