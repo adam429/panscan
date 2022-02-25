@@ -49,6 +49,9 @@ class OnlineRunner < PanRunner
         Log.log(str)
     end
         
+    def bot_action
+        log ("==bot action==")
+    end
     
     def run
         new_epoch
@@ -60,26 +63,18 @@ class OnlineRunner < PanRunner
             @interval=10 if @epoch[:lock_countdown] < 50 
             @interval=1 if @epoch[:lock_countdown] < 20
             @interval=0.01 if @epoch[:lock_countdown] < 10    
+            @interval=30 if @epoch[:lock_countdown] < 5
         }) do
             @tick = @tick+1
             _get_round()
 
-            raise "stop bot" if @epoch[:lock_countdown] < 0 
-
-            # if @epoch[:lock_countdown] < 0 then
-            #     # wait for next epoch begin
-            #     @current_epoch = get_current_epoch()
-            #     @run_bot ==false
-            #     next
-            # else
-            #     if @run_bot ==false then
-            #         new_epoch()
-            #         @run_bot = true
-            #     end
-            # end    
+            if @epoch[:lock_countdown] < 0 then
+                # wait for next epoch begin
+                @current_epoch = get_current_epoch()
+            else
+                bot_action() if @epoch[:lock_countdown] < 10 
+            end    
             print_short_stats()
-
-            # bot_action() if @run_bot
         end
     end
 
