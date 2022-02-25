@@ -148,7 +148,7 @@ class OnlineRunner < PanRunner
 
     def _get_round()
         time = Time.now()
-        current_round = contract.call.rounds(@current_epoch)
+        current_round = @contract.call.rounds(@current_epoch)
         time = Time.now()-time
         @rpc_record.push(time)
         
