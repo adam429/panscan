@@ -54,7 +54,7 @@ class OnlineRunner < PanRunner
         new_epoch
 
         clock = Time.now()
-        while @tick<500 do
+        while true do
             if Time.now()-clock > @interval  then
                 clock = Time.now()  
                 @tick = @tick+1
