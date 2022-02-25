@@ -1,3 +1,12 @@
+
+def save_to_github
+    puts `git add *`
+    puts `git commit -m 'task backup'`
+    puts `git push`
+end
+
+save_to_github()
+
 loop do
     dest_path = "./app/tasks/backup"
     names = Task.where("name is not null").where("tid is not null").where(" now() - save_timestamp < ? ","1 minutes").map {|x| x.name }.uniq
@@ -7,10 +16,7 @@ loop do
         File.write "#{dest_path}/#{name}.rb", task.code
     end
 
-    puts `git add *`
-    puts `git commit -m 'task backup'`
-    puts `git push`
-
-    puts "==time: #{time.now.to_s(:db)}=="
+    save_to_github()
+    puts "==time: #{Time.now.to_s(:db)}=="
     sleep(60)
 end
