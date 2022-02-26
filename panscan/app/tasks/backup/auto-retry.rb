@@ -21,5 +21,5 @@ end
 
 def main
     Object.include AutoRetry
-    auto_retry(lambda {|x| _log(x.to_s+"\n")},12,Net::OpenTimeout) { raise Net::OpenTimeout }
+    auto_retry(lambda {|x| _log(x.to_s+"\n")},12,[Net::OpenTimeout,OpenSSL::SSL::SSLError]) { raise Net::OpenTimeout }
 end
