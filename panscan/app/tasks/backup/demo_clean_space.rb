@@ -5,16 +5,15 @@ __TASK_NAME__ = "demo_clean_space"
     saved_class_variables = Object.class_variables
     saved_instance_variables = Object.instance_variables
     saved_instance_methods = Object.instance_methods
+    
+    _log(saved_methods.to_s+"\n")
 
-    A=1
+    CONST=1
 
-    Object.constants.filter {|x| not saved_constants.include?(x) }.map {|x| Object.send(:remove_const, x)}
-    Object.send(:remove_const, :A)
+    Object.constants.filter {|x| not saved_constants.include?(x) }.map {|x| Object.send(:remove_const, x); _log x.to_s+"\n"}
 
 def main()
     
     # const
-    
-
-    _log A.to_s+"\n" # error
+    _log CONST.to_s+"\n" # error
 end
