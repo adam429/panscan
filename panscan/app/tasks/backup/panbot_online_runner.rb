@@ -9,14 +9,18 @@ load(Task.load("panbot_runner"))
 load(Task.load("database"))
 load(Task.load("window_array"))
 load(Task.load("panbot_payout_bot"))
-
+load(Task.load("auto_retry"))
+load(Task.load("pancake_prediction_read"))
+load(Task.load("pancake_prediction_read"))
 
 class OnlineRunner < PanRunner
+    include AutoRetry
     def initialize()
         @logs = []
         @rpc_record = WindowArray.new(60)
         @bot_private_key = Vault.get("bot_private_key")
         @gas_premium = 2
+        @logger = lambda do |str| self.log(str) end
 
         @client = Ethereum::HttpClient.new(Vault.get("bsc_endpoint"))
         @contract = Ethereum::Contract.create(
@@ -46,10 +50,12 @@ class OnlineRunner < PanRunner
     end 
 
     def log(str)
-        str = str +"\n"
-        @logs.push(str)
-        $output.call (str)
-        Log.log(str)
+        Thread.new {
+            str = str +"\n"
+            # @logs.push(str)
+            $output.call (str)
+            Log.log(str)    
+        }
     end
         
     def bot_action
@@ -182,7 +188,7 @@ class OnlineRunner < PanRunner
 
     def _get_last_block()
         time = Time.now()
-        last_block = @client.eth_get_block_by_number('latest', false) # get latest block details
+        last_block = auto_retry(@logger) { @client.eth_get_block_by_number('latest', false) } # get latest block details 
         time = Time.now()-time
         @rpc_record.push(time)
         @last_block_time = Time.at(last_block["result"]["timestamp"].to_i(16))
@@ -191,7 +197,7 @@ class OnlineRunner < PanRunner
 
     def _get_current_epoch()
         time = Time.now()
-        @current_epoch = @contract.call.current_epoch
+        @current_epoch = auto_retry(@logger) { @contract.call.current_epoch }
         time = Time.now()-time
         @rpc_record.push(time)
 
@@ -201,7 +207,7 @@ class OnlineRunner < PanRunner
 
     def _get_round()
         time = Time.now()
-        current_round = @contract.call.rounds(@current_epoch)
+        current_round = auto_retry(@logger) { @contract.call.rounds(@current_epoch) }
         time = Time.now()-time
         @rpc_record.push(time)
         
@@ -248,7 +254,7 @@ class OnlineRunner < PanRunner
             to: @contract.address,
             data: data,
             value: value,
-            nonce: @client.get_nonce(key.address),
+            nonce: auto_retry(@logger) { @client.get_nonce(key.address) },
             gas_limit: @client.gas_limit,
             gas_price: @client.gas_price
         }
@@ -256,7 +262,7 @@ class OnlineRunner < PanRunner
         tx.sign(key)
 
         time = Time.now()
-        tx = @client.eth_send_raw_transaction(tx.hex)["result"]
+        tx = auto_retry(@logger) { @client.eth_send_raw_transaction(tx.hex)["result"] }
         time = Time.now()-time        
         @rpc_record.push(time)
         return tx
@@ -264,7 +270,7 @@ class OnlineRunner < PanRunner
 
     def get_balance(address)
         time = Time.now()
-        ret = @client.eth_get_balance(address)["result"].to_i(16) / 1e18.to_f
+        ret = auto_retry(@logger) { @client.eth_get_balance(address)["result"].to_i(16) / 1e18.to_f }
         time = Time.now()-time
 
         @rpc_record.push(time)
