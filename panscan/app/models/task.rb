@@ -162,7 +162,7 @@ class Task < ActiveRecord::Base
     def run
       # reset runner class binding everytime
       Task.send(:remove_const, :Runner) if Task.constants.include?(:Runner)
-      code = <<~CODE
+      code = <<~'CODE'
 class Runner
   def initialize(task)
     @_task = task
@@ -181,12 +181,6 @@ class Runner
         end
         return {raw_ret:@raw_ret,html:html}
       end
-      $__saved_constants = self.class.constants
-      $__saved_methods = self.class.methods
-      $__saved_class_variables = self.class.class_variables
-      $__saved_instance_variables = self.instance_variables
-      $__saved_instance_methods = self.class.instance_methods
-      $__saved_global_variables = self.global_variables
       
       __main()
 
@@ -196,6 +190,23 @@ class Runner
   end
 end
 CODE
+
+# $__saved_constants = self.class.constants
+# $__saved_methods = self.class.methods
+# $__saved_class_variables = self.class.class_variables
+# $__saved_instance_variables = self.instance_variables
+# $__saved_instance_methods = self.class.instance_methods
+# $__saved_global_variables = self.global_variables
+
+
+# self.class.constants.filter {|x| not $__saved_constants.include?(x) }.map {|x| self.class.send(:remove_const, x); }
+# self.class.methods.filter {|x| not $__saved_methods.include?(x) }.map {|x| eval("class <<#{self.class}\n remove_method :#{x}\n end") }
+# self.class.class_variables.filter {|x| not $__saved_class_variables.include?(x) }.map {|x| self.class.remove_class_variable(x); }
+# self.instance_variables.filter {|x| not $__saved_instance_variables.include?(x) }.map {|x| remove_instance_variable(x); }
+# self.class.instance_methods.filter {|x| not $__saved_instance_methods.include?(x) }.map {|x| eval("undef #{x}"); }
+# self.global_variables.filter {|x| not $__saved_global_variables.include?(x) }.map {|x| eval("#{x}=nil"); }
+
+
       code=code.gsub(/__task.id__/,id.to_s)
       eval(code)
 
