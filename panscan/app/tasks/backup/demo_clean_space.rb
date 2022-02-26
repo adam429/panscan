@@ -27,6 +27,9 @@ __TASK_NAME__ = "demo_clean_space"
     class #{self.class}
       def a
       end
+      
+      def self.b
+      end
     end
     """)
     
@@ -49,5 +52,6 @@ def main()
     #_log B.class.to_s+"\n" # error
     #_log CONST.to_s+"\n" # error
     #_log foo #error
-    _log @var1.to_s
+    #_log @var1.to_s # nil
+    
 end
