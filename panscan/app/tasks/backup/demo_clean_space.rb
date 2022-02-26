@@ -21,14 +21,13 @@ __TASK_NAME__ = "demo_clean_space"
     
     @var1 = 1
     @@var2 = 2
+    $var = 3
+    
     
     
     eval("""
     class #{self.class}
       def a
-      end
-      
-      def self.b
       end
     end
     """)
