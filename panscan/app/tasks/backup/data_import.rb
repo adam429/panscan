@@ -190,6 +190,8 @@ end
 
 
 def main()
+    database_init
+    
     block_numbers = __block_begin__..__block_end__
     
     pan_call = PancakePrediction.new

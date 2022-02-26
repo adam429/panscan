@@ -55,6 +55,8 @@ class PancakePrediction
 end
 
 def main()
+    database_init
+     
     pan_action = PancakePrediction.new()
     _log pan_action.contract.call.current_epoch.to_s + "\n"
 
