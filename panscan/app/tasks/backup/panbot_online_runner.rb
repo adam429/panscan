@@ -8,40 +8,43 @@ load(Task.load("panbot_runner"))
 
 load(Task.load("database"))
 load(Task.load("window_array"))
+load(Task.load("auto-retry"))
+
 load(Task.load("panbot_payout_bot"))
-load(Task.load("auto_retry"))
-load(Task.load("pancake_prediction_read"))
-load(Task.load("pancake_prediction_read"))
+load(Task.load("pancake_prediction"))
 
 class OnlineRunner < PanRunner
     include AutoRetry
     def initialize()
         @logs = []
         @rpc_record = WindowArray.new(60)
-        @bot_private_key = Vault.get("bot_private_key")
-        @gas_premium = 2
         @logger = lambda do |str| self.log(str) end
+        @gas_premium = 2
+        
+        @pan_action = PancakePrediction.new(@gas_premium)
+        @client = @pan_action.client
+        @contract = @pan_action.contract
+        @bot_address = @pan_action.bot_address
+        # @client = Ethereum::HttpClient.new(Vault.get("bsc_endpoint"))
+        # @contract = Ethereum::Contract.create(
+        #     client: @client, 
+        #     name: "pancake_prediction_v2", 
+        #     address: Vault.get("pancake_prediction_v2"), 
+        #     abi: Vault.get("pancake_prediction_v2.abi")
+        # )
 
-        @client = Ethereum::HttpClient.new(Vault.get("bsc_endpoint"))
-        @contract = Ethereum::Contract.create(
-            client: @client, 
-            name: "pancake_prediction_v2", 
-            address: Vault.get("pancake_prediction_v2"), 
-            abi: Vault.get("pancake_prediction_v2.abi")
-        )
+        # ## config chain_id for EIP-155
+        # Eth.configure { |c| c.chain_id = @client.net_version["result"].to_i }
 
-        ## config chain_id for EIP-155
-        Eth.configure { |c| c.chain_id = @client.net_version["result"].to_i }
+        # # update gas prices with gas_premium
+        # gas_price = @client.eth_gas_price["result"].to_i(16)
+        # @client.gas_price = ((gas_price / 1e9 * @gas_premium).round()*1e9).to_i
+        # @contract.gas_price = ((gas_price / 1e9 * @gas_premium).round()*1e9).to_i
 
-        # update gas prices with gas_premium
-        gas_price = @client.eth_gas_price["result"].to_i(16)
-        @client.gas_price = ((gas_price / 1e9 * @gas_premium).round()*1e9).to_i
-        @contract.gas_price = ((gas_price / 1e9 * @gas_premium).round()*1e9).to_i
-
-        # create key from private_key
-        @bot_key = Eth::Key.new priv: @bot_private_key
-        @bot_address = @bot_key.address
-        @contract.key = @bot_key
+        # # create key from private_key
+        # @bot_key = Eth::Key.new priv: @bot_private_key
+        # @bot_address = @bot_key.address
+        # @contract.key = @bot_key
         
         log "=== Bot Address: #{@bot_address} - #{get_balance(@bot_address)} BNB ==="
         
