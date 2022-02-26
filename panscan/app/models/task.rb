@@ -162,7 +162,7 @@ class Task < ActiveRecord::Base
     def run
       # reset runner class binding everytime
       Task.send(:remove_const, :Runner) if Task.constants.include?(:Runner)
-      code = <<~CODE
+      code = <<~'CODE'
 class Runner
   def initialize(task)
     @_task = task
