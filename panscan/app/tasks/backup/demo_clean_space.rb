@@ -16,24 +16,24 @@ __TASK_NAME__ = "demo_clean_space"
     end
 
     def foo
-        'foo\n'
+        "foo\n"
     end
     
-    @var1 = '1\n'
-    @@var2 = '2\n'
-    $var = '3\n'
+    @var1 = "1\n"
+    @@var2 = "2\n"
+    $var = "3\n"
     
     
-    eval("""
+    eval('''
     class #{self.class}
       def a
-        'a\n'
+        "a\n"
       end
       def self.b
-        'b\n'
+        "b\n"
       end
     end
-    """)
+    ''')
     
     
     # _log("==clean up environment==\n")
