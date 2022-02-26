@@ -15,5 +15,5 @@ def main()
     # const
     
 
-    puts A # error
+    _log A.to_s+"\n" # error
 end
