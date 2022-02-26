@@ -7,7 +7,7 @@ __TASK_NAME__ = "demo_clean_space"
     # $__saved_instance_methods = self.class.instance_methods
     # $__saved_global_variables = self.global_variables
 
-    CONST=1
+    CONST= "const\n"
     
     class A
     end
@@ -16,21 +16,21 @@ __TASK_NAME__ = "demo_clean_space"
     end
 
     def foo
-        'foo'
+        'foo\n'
     end
     
-    @var1 = '1'
-    @@var2 = '2'
-    $var = '3'
+    @var1 = '1\n'
+    @@var2 = '2\n'
+    $var = '3\n'
     
     
     eval("""
     class #{self.class}
       def a
-        'a'
+        'a\n'
       end
       def self.b
-        'b'
+        'b\n'
       end
     end
     """)
@@ -54,7 +54,7 @@ def main()
     
     _log A.class.to_s+"\n" # error
     _log B.class.to_s+"\n" # error
-    _log CONST.to_s+"\n" # error
+    _log CONST # error
     _log foo #error
     _log @var1.to_s # nil
     _log @@var2.to_s # nil
