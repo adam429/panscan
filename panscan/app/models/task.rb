@@ -171,7 +171,7 @@ class Runner
     @_task.log(str)
   end
   def _run(param_code)
-    before_code = "def self.__task; if @__task then return @__task end; @__task=Task.find(#{id}); end\n"
+    before_code = "def self.__task; if @__task then return @__task end; @__task=Task.find(__task.id__); end\n"
     after_code = '''
       def __main()
         @raw_ret = main()
@@ -209,6 +209,7 @@ class Runner
   end
 end
 CODE
+      code=code.gsub(/__task.id__/,id.to_s)
       eval(code)
 
       runner = Runner.new(self)
