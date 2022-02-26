@@ -236,8 +236,8 @@ CODE
           raise error
         end
 
+#        self.class.constants.filter {|x| not $__saved_constants.include?(x) }.map {|x| self.class.send(:remove_const, x); }
         code = '''
-        self.class.constants.filter {|x| not $__saved_constants.include?(x) }.map {|x| self.class.send(:remove_const, x); }
         self.class.methods.filter {|x| not $__saved_methods.include?(x) }.map {|x| eval("class <<#{self.class}\n remove_method :#{x}\n end") }
         self.class.class_variables.filter {|x| not $__saved_class_variables.include?(x) }.map {|x| self.class.remove_class_variable(x); }
         self.instance_variables.filter {|x| not $__saved_instance_variables.include?(x) }.map {|x| remove_instance_variable(x); }
