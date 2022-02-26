@@ -49,5 +49,5 @@ def main()
     #_log B.class.to_s+"\n" # error
     #_log CONST.to_s+"\n" # error
     #_log foo #error
-    @var1
+    _log @var1.to_s
 end
