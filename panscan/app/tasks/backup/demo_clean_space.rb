@@ -6,12 +6,13 @@ __TASK_NAME__ = "demo_clean_space"
     saved_instance_variables = self.class.instance_variables
     saved_instance_methods = self.class.instance_methods
     
-    _log(saved_constants.to_s+"\n")
 
     CONST=1
+    
     class A
-        def b
-        end
+    end
+    
+    module B
     end
 
     _log(self.class.constants.to_s+"\n")
@@ -22,5 +23,8 @@ __TASK_NAME__ = "demo_clean_space"
 def main()
     
     # const
+    _log A.class.to_s+"\n" # error
+    _log B.class.to_s+"\n" # error
+
     _log CONST.to_s+"\n" # error
 end
