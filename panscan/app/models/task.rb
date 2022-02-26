@@ -179,6 +179,8 @@ class Runner
       $__saved_instance_methods = self.class.instance_methods
       $__saved_global_variables = self.global_variables
     
+      begin
+        
       def self.__task
         if @__task then 
           return @__task 
@@ -194,19 +196,20 @@ class Runner
         if defined?(render_html)=="method" then
             html=ERB.new(render_html()).result(binding)
         end
+        
+        return {raw_ret:@raw_ret,html:html}
+      end
+      
+      __main()
 
+      ensure 
         self.class.constants.filter {|x| not $__saved_constants.include?(x) }.map {|x| self.class.send(:remove_const, x); }
         self.class.methods.filter {|x| not $__saved_methods.include?(x) }.map {|x| eval("class <<#{self.class}\n remove_method :#{x}\n end") }
         self.class.class_variables.filter {|x| not $__saved_class_variables.include?(x) }.map {|x| self.class.remove_class_variable(x); }
         self.instance_variables.filter {|x| not $__saved_instance_variables.include?(x) }.map {|x| remove_instance_variable(x); }
         self.class.instance_methods.filter {|x| not $__saved_instance_methods.include?(x) }.map {|x| eval("undef #{x}"); }
         self.global_variables.filter {|x| not $__saved_global_variables.include?(x) }.map {|x| eval("#{x}=nil"); }      
-        
-        return {raw_ret:@raw_ret,html:html}
       end
-      
-      __main()
-      
     '''
     code = before_code + param_code + after_code
     eval(code,binding)
@@ -236,15 +239,6 @@ CODE
           raise error
         end
 
-#        self.class.constants.filter {|x| not $__saved_constants.include?(x) }.map {|x| self.class.send(:remove_const, x); }
-        code = '''
-        self.class.methods.filter {|x| not $__saved_methods.include?(x) }.map {|x| eval("class <<#{self.class}\n remove_method :#{x}\n end") }
-        self.class.class_variables.filter {|x| not $__saved_class_variables.include?(x) }.map {|x| self.class.remove_class_variable(x); }
-        self.instance_variables.filter {|x| not $__saved_instance_variables.include?(x) }.map {|x| remove_instance_variable(x); }
-        self.class.instance_methods.filter {|x| not $__saved_instance_methods.include?(x) }.map {|x| eval("undef #{x}"); }
-        self.global_variables.filter {|x| not $__saved_global_variables.include?(x) }.map {|x| eval("#{x}=nil"); }
-        '''
-        eval(code)
 
         self.log("Exception Class: #{ error.class.name }\n")
         self.log("Exception Message: #{ error.message }\n")
