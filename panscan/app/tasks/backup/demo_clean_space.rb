@@ -12,6 +12,7 @@ __TASK_NAME__ = "demo_clean_space"
     class A
     end
     
+    
     module B
     end
 
