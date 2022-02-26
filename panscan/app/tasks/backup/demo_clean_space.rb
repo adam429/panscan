@@ -10,6 +10,9 @@ __TASK_NAME__ = "demo_clean_space"
 
     CONST=1
 
+    _log(Object.constants.to_s+"\n")
+
+
     Object.constants.filter {|x| not saved_constants.include?(x) }.map {|x| Object.send(:remove_const, x); _log x.to_s+"\n"}
 
 def main()
