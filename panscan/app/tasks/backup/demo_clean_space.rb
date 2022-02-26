@@ -7,35 +7,35 @@ __TASK_NAME__ = "demo_clean_space"
     # $__saved_instance_methods = self.class.instance_methods
     # $__saved_global_variables = self.global_variables
 
-    CONST= "const"
+    # CONST= "const"
     
-    class A
-    end
+    # class A
+    # end
     
     
-    module B
-    end
+    # module B
+    # end
 
-    def foo
-        "foo"
-    end
+    # def foo
+    #     "foo"
+    # end
     
-    @var1 = "1"
-    @@var2 = "2"
-    $var = "3"
+    # @var1 = "1"
+    # @@var2 = "2"
+    # $var = "3"
     
     
-    eval("""
-    class #{self.class}
-      def a
-        'a'
-      end
-      def self.b
-        'b'
-      end
-    end """)
+    # eval("""
+    # class #{self.class}
+    #   def a
+    #     'a'
+    #   end
+    #   def self.b
+    #     'b'
+    #   end
+    # end """)
     
-    raise "error"
+    # raise "error"
     
     
     # _log("==clean up environment==\n")
@@ -54,15 +54,15 @@ __TASK_NAME__ = "demo_clean_space"
 
 def main()
     
-    # _log A.class.to_s+"\n" # error
-    # _log B.class.to_s+"\n" # error
-    # _log CONST+"\n" # error
-    # _log foo+"\n" #error
-    # _log @var1.to_s+"\n" # nil
-    # _log @@var2.to_s+"\n" # nil
-    # _log $var+"\n"
-    # _log a+"\n"
-    # _log self.class.b+"\n"
+    _log A.class.to_s+"\n" # error
+    _log B.class.to_s+"\n" # error
+    _log CONST+"\n" # error
+    _log foo+"\n" #error
+    _log @var1.to_s+"\n" # nil
+    _log @@var2.to_s+"\n" # nil
+    _log $var+"\n"
+    _log a+"\n"
+    _log self.class.b+"\n"
     
     return "hello world!"
 end
