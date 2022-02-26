@@ -23,14 +23,21 @@ __TASK_NAME__ = "demo_clean_space"
     @@var2 = 2
     
     
-
+    eval("""
+    class #{self.class}
+      def a
+      end
+      def self.b
+      end
+    end
+    """)
     
 
-    self.class.constants.filter {|x| not saved_constants.include?(x) }.map {|x| self.class.send(:remove_const, x); _log x.to_s+"\n"}
-    self.class.methods.filter {|x| not saved_methods.include?(x) }.map {|x| self.class.remove_method(x); _log x.to_s+"\n"}
-    self.class.class_variables.filter {|x| not saved_class_variables.include?(x) }.map {|x| self.class.remove_class_variable(x); _log x.to_s+"\n"}
-    self.class.instance_variables.filter {|x| not saved_instance_variables.include?(x) }.map {|x| self.class.remove_instance_variables(x); _log x.to_s+"\n"}
-    self.class.instance_methods.filter {|x| not saved_instance_methods.include?(x) }.map {|x| eval("undef #{x}"); _log x.to_s+"\n"}
+    self.class.constants.filter {|x| not saved_constants.include?(x) }.map {|x| _log x.to_s+"\n"; self.class.send(:remove_const, x); }
+    self.class.methods.filter {|x| not saved_methods.include?(x) }.map {|x| _log x.to_s+"\n"; self.class.remove_method(x); }
+    self.class.class_variables.filter {|x| not saved_class_variables.include?(x) }.map {|x| _log x.to_s+"\n"; self.class.remove_class_variable(x); }
+    self.class.instance_variables.filter {|x| not saved_instance_variables.include?(x) }.map {|x| _log x.to_s+"\n"; self.class.remove_instance_variables(x); }
+    self.class.instance_methods.filter {|x| not saved_instance_methods.include?(x) }.map {|x| _log x.to_s+"\n"; eval("undef #{x}"); }
 
 def main()
     
