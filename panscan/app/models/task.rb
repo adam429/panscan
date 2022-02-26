@@ -181,7 +181,28 @@ class Runner
         end
         return {raw_ret:@raw_ret,html:html}
       end
+      $__saved_constants = self.class.constants
+      $__saved_methods = self.class.methods
+      $__saved_class_variables = self.class.class_variables
+      $__saved_instance_variables = self.instance_variables
+      $__saved_instance_methods = self.class.instance_methods
+      $__saved_global_variables = self.global_variables
+      
       __main()
+
+      _log("==clean up environment==\n")
+      _log("- constants\n")
+      self.class.constants.filter {|x| not $__saved_constants.include?(x) }.map {|x| _log x.to_s+"\n"; self.class.send(:remove_const, x); }
+      _log("- methods\n")
+      self.class.methods.filter {|x| not $__saved_methods.include?(x) }.map {|x| _log x.to_s+"\n"; eval("class <<#{self.class}\n remove_method :#{x}\n end") }
+      _log("- class_variables\n")
+      self.class.class_variables.filter {|x| not $__saved_class_variables.include?(x) }.map {|x| _log x.to_s+"\n"; self.class.remove_class_variable(x); }
+      _log("- instance_variables\n")
+      self.instance_variables.filter {|x| not $__saved_instance_variables.include?(x) }.map {|x| _log x.to_s+"\n"; remove_instance_variable(x); }
+      _log("- instance_methods\n")
+      self.class.instance_methods.filter {|x| not $__saved_instance_methods.include?(x) }.map {|x| _log x.to_s+"\n"; eval("undef #{x}"); }
+      _log("- global_variables\n")
+      self.global_variables.filter {|x| not $__saved_global_variables.include?(x) }.map {|x| _log x.to_s+"\n"; eval("#{x}=nil"); }
     '''
     code = before_code + param_code + after_code
     eval(code,binding)
@@ -194,7 +215,7 @@ CODE
       self.log("#{Time.now} == begin run ==\n")
       begin
         ret = runner._run(param_code)
-      rescue ScriptError, StandardError => error
+      rescue ScriptError, StandardError => error        
         if error.message == "panbot::task::cmd::shutdown" then
           self.log "Exception Class: #{ error.class.name }\n"
           self.log "Exception Message: #{ error.message }\n"
@@ -204,7 +225,23 @@ CODE
           self.save  
           raise error
         end
-    
+
+        code = '''
+        _log("==clean up environment==\n")
+        _log("- constants\n")
+        self.class.constants.filter {|x| not $__saved_constants.include?(x) }.map {|x| _log x.to_s+"\n"; self.class.send(:remove_const, x); }
+        _log("- methods\n")
+        self.class.methods.filter {|x| not $__saved_methods.include?(x) }.map {|x| _log x.to_s+"\n"; eval("class <<#{self.class}\n remove_method :#{x}\n end") }
+        _log("- class_variables\n")
+        self.class.class_variables.filter {|x| not $__saved_class_variables.include?(x) }.map {|x| _log x.to_s+"\n"; self.class.remove_class_variable(x); }
+        _log("- instance_variables\n")
+        self.instance_variables.filter {|x| not $__saved_instance_variables.include?(x) }.map {|x| _log x.to_s+"\n"; remove_instance_variable(x); }
+        _log("- instance_methods\n")
+        self.class.instance_methods.filter {|x| not $__saved_instance_methods.include?(x) }.map {|x| _log x.to_s+"\n"; eval("undef #{x}"); }
+        _log("- global_variables\n")
+        self.global_variables.filter {|x| not $__saved_global_variables.include?(x) }.map {|x| _log x.to_s+"\n"; eval("#{x}=nil"); }
+        '''
+        eval(code)
         self.log("Exception Class: #{ error.class.name }\n")
         self.log("Exception Message: #{ error.message }\n")
 
