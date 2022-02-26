@@ -190,7 +190,7 @@ end
 
 
 def main()
-    database_init
+    database_init(false) # allow to write
     
     block_numbers = __block_begin__..__block_end__
     
