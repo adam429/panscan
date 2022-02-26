@@ -62,4 +62,5 @@ def main()
     _log a+"\n"
     _log self.class.b+"\n"
     
+    
 end
