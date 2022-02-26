@@ -162,7 +162,7 @@ class Task < ActiveRecord::Base
     def run
       # reset runner class binding everytime
       Task.send(:remove_const, :Runner) if Task.constants.include?(:Runner)
-      code = <<~'CODE'
+      code = <<~CODE
 class Runner
   def initialize(task)
     @_task = task
@@ -171,7 +171,7 @@ class Runner
     @_task.log(str)
   end
   def _run(param_code)
-    before_code = "def self.__task; if @__task then return @__task end; @__task=Task.find(__task.id__); end; "
+    before_code = "def self.__task; if @__task then return @__task end; @__task=Task.find(__task.id__); end \n"
     after_code = '''
       def __main()
         @raw_ret = main()
