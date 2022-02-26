@@ -11,7 +11,7 @@ class PancakePrediction
     def initialize(gas_premium = 1)
         @gas_premium = gas_premium
         @bot_private_key = Vault.get("bot_private_key")
-        @address = Vault.get("pancake_prediction_v2"), 
+        @address = Vault.get("pancake_prediction_v2")
 
         @decoder = Ethereum::Decoder.new
         @encoder = Ethereum::Encoder.new
@@ -58,7 +58,7 @@ def main()
     pan_action = PancakePrediction.new()
     # _log pan_action.contract.call.current_epoch.to_s + "\n"
 
-        address = Vault.get("pancake_prediction_v2"), 
+        address = Vault.get("pancake_prediction_v2")
         abi = Vault.get("pancake_prediction_v2.abi")
 
         contract = Ethereum::Contract.create(
@@ -68,6 +68,7 @@ def main()
             abi: abi
         )
         
+        _log contract.call.call.current_epoch.to_s + "\n"
         _log address+"\n"
         _log abi+"\n"
     
