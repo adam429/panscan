@@ -22,8 +22,6 @@ __TASK_NAME__ = "demo_clean_space"
     @var1 = 1
     @@var2 = 2
     
-    class self
-    end
     
 
     
