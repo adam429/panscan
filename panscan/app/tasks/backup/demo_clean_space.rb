@@ -7,34 +7,34 @@ __TASK_NAME__ = "demo_clean_space"
     # $__saved_instance_methods = self.class.instance_methods
     # $__saved_global_variables = self.global_variables
 
-    # CONST= "const"
+    CONST= "const"
     
-    # class A
-    # end
+    class A
+    end
     
     
-    # module B
-    # end
+    module B
+    end
 
-    # def foo
-    #     "foo"
-    # end
+    def foo
+        "foo"
+    end
     
-    # @var1 = "1"
-    # @@var2 = "2"
-    # $var = "3"
+    @var1 = "1"
+    @@var2 = "2"
+    $var = "3"
     
     
-    # eval('''
-    # class #{self.class}
-    #   def a
-    #     "a"
-    #   end
-    #   def self.b
-    #     "b"
-    #   end
-    # end
-    # ''')
+    eval('''
+    class #{self.class}
+      def a
+        "a"
+      end
+      def self.b
+        "b"
+      end
+    end
+    ''')
     
     
     # _log("==clean up environment==\n")
