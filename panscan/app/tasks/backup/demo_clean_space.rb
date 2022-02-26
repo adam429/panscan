@@ -28,13 +28,10 @@ __TASK_NAME__ = "demo_clean_space"
     eval('''
     class #{self.class}
       def a
-        "a"
       end
       def self.b
-        "b"
       end
-    end
-    ''')
+    end ''')
     
     
     # _log("==clean up environment==\n")
