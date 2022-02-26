@@ -244,8 +244,8 @@ CODE
         self.class.instance_methods.filter {|x| not $__saved_instance_methods.include?(x) }.map {|x| eval("undef #{x}"); }
         self.global_variables.filter {|x| not $__saved_global_variables.include?(x) }.map {|x| eval("#{x}=nil"); }
         '''
-        eval(code)
-        
+        # eval(code)
+
         self.log("Exception Class: #{ error.class.name }\n")
         self.log("Exception Message: #{ error.message }\n")
 
