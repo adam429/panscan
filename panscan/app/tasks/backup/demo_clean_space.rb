@@ -55,12 +55,12 @@ def main()
     # _log A.class.to_s+"\n" # error
     # _log B.class.to_s+"\n" # error
     # _log CONST+"\n" # error
-    _log foo+"\n" #error
-    _log @var1.to_s+"\n" # nil
-    _log @@var2.to_s+"\n" # nil
-    _log $var+"\n"
-    _log a+"\n"
-    _log self.class.b+"\n"
+    # _log foo+"\n" #error
+    # _log @var1.to_s+"\n" # nil
+    # _log @@var2.to_s+"\n" # nil
+    # _log $var+"\n"
+    # _log a+"\n"
+    # _log self.class.b+"\n"
     
     return "hello world!"
 end
