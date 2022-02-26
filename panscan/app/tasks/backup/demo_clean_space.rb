@@ -16,19 +16,21 @@ __TASK_NAME__ = "demo_clean_space"
     end
 
     def foo
+        'foo'
     end
     
-    @var1 = 1
-    @@var2 = 2
-    $var = 3
-    
+    @var1 = '1'
+    @@var2 = '2'
+    $var = '3'
     
     
     eval("""
     class #{self.class}
       def a
+        'a'
       end
       def self.b
+        'b'
       end
     end
     """)
@@ -56,5 +58,9 @@ def main()
     _log CONST.to_s+"\n" # error
     _log foo #error
     _log @var1.to_s # nil
+    _log @@var2.to_s # nil
+    _log $var
+    _log a
+    _log self.class.b
     
 end
