@@ -52,7 +52,6 @@ __TASK_NAME__ = "demo_clean_space"
 
 def main()
     
-    const
     _log A.class.to_s+"\n" # error
     _log B.class.to_s+"\n" # error
     _log CONST.to_s+"\n" # error
