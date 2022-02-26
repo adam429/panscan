@@ -9,6 +9,7 @@ __TASK_NAME__ = "demo_clean_space"
     A=1
 
     Object.constants.filter {|x| not saved_constants.include?(x) }.map {|x| Object.send(:remove_const, x)}
+    Object.send(:remove_const, :A)
 
 def main()
     
