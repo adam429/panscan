@@ -171,7 +171,7 @@ class Runner
     @_task.log(str)
   end
   def _run(param_code)
-    before_code = "def self.__task; if @__task then return @__task end; @__task=Task.find(__task.id__); end\n"
+    before_code = "def self.__task; if @__task then return @__task end; @__task=Task.find(__task.id__); end"
     after_code = '''
       def __main()
         @raw_ret = main()
