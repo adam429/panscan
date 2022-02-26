@@ -38,7 +38,7 @@ __TASK_NAME__ = "demo_clean_space"
     _log("==class_variables==\n")
     self.class.class_variables.filter {|x| not saved_class_variables.include?(x) }.map {|x| _log x.to_s+"\n"; self.class.remove_class_variable(x); }
     _log("==instance_variables==\n")
-    self.instance_variables.filter {|x| not saved_instance_variables.include?(x) }.map {|x| _log x.to_s+"\n"; self.remove_instance_variables(x); }
+    self.instance_variables.filter {|x| not saved_instance_variables.include?(x) }.map {|x| _log x.to_s+"\n"; self.class.remove_instance_variable(x); }
     _log("==instance_methods==\n")
     self.class.instance_methods.filter {|x| not saved_instance_methods.include?(x) }.map {|x| _log x.to_s+"\n"; eval("undef #{x}"); }
 
