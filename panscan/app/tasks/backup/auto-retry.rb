@@ -20,6 +20,6 @@ module AutoRetry
 end
 
 def main
-    include AutoRetry
+    Object.include AutoRetry
     auto_retry(lambda {|x| _log(x.to_s+"\n")},12,Net::OpenTimeout) { raise Net::OpenTimeout }
 end
