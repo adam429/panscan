@@ -29,6 +29,8 @@ __TASK_NAME__ = "demo_clean_space"
     class #{self.class}
       def a
       end
+      def self.b
+      end
     end
     """)
     
