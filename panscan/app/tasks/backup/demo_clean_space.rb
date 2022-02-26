@@ -23,11 +23,6 @@ __TASK_NAME__ = "demo_clean_space"
     @@var2 = 2
     
     class self
-        def a
-        end
-        
-        def self.b
-        end
     end
     
 
