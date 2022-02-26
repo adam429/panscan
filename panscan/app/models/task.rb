@@ -171,7 +171,22 @@ class Runner
     @_task.log(str)
   end
   def _run(param_code)
-    before_code = "def self.__task; if @__task then return @__task end; @__task=Task.find(__task.id__); end \n"
+    before_code = '''
+      $__saved_constants = self.class.constants
+      $__saved_methods = self.class.methods
+      $__saved_class_variables = self.class.class_variables
+      $__saved_instance_variables = self.instance_variables
+      $__saved_instance_methods = self.class.instance_methods
+      $__saved_global_variables = self.global_variables
+    
+      def self.__task
+        if @__task then 
+          return @__task 
+        end
+        @__task=Task.find(__task.id__)
+       end 
+    '''
+
     after_code = '''
       def __main()
         @raw_ret = main()
@@ -191,12 +206,6 @@ class Runner
 end
 CODE
 
-# $__saved_constants = self.class.constants
-# $__saved_methods = self.class.methods
-# $__saved_class_variables = self.class.class_variables
-# $__saved_instance_variables = self.instance_variables
-# $__saved_instance_methods = self.class.instance_methods
-# $__saved_global_variables = self.global_variables
 
 
 # self.class.constants.filter {|x| not $__saved_constants.include?(x) }.map {|x| self.class.send(:remove_const, x); }
