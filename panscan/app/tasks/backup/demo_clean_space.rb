@@ -4,7 +4,6 @@ __TASK_NAME__ = "demo_clean_space"
     saved_methods = self.class.methods
     saved_class_variables = self.class.class_variables
     saved_instance_variables = self.instance_variables
-
     saved_instance_methods = self.class.instance_methods
     saved_global_variables = self.global_variables
 
