@@ -1,10 +1,10 @@
 __TASK_NAME__ = "auto-retry"
 
 module AutoRetry
-    def auto_retry(logger=nil,retry_cnt=12,exception=Net::OpenTimeout)
+    def auto_retry(logger=nil,retry_cnt=12)
         begin
             yield
-        rescue exception=>e
+        rescue Net::OpenTimeout,OpenSSL::SSL::SSLError=>e
             if (retry_cnt-=1) > 0 then
                 retry_number = 12-retry_cnt
                 
@@ -21,5 +21,5 @@ end
 
 def main
     Object.include AutoRetry
-    auto_retry(lambda {|x| _log(x.to_s+"\n")},12,[Net::OpenTimeout,OpenSSL::SSL::SSLError]) { raise Net::OpenTimeout }
+    auto_retry(lambda {|x| _log(x.to_s+"\n")},12) { raise Net::OpenTimeout }
 end
