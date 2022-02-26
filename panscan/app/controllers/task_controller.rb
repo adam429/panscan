@@ -34,6 +34,7 @@ CODE
 
                 # tid -> name -> tid (url show name)
                 Task.where(name:@task.name).where("tid is not null").order(save_timestamp: :desc).first.tid == tid
+                raise "here"
                 redirect_to "/task/#{@task.name}"
               else
                 @task = Task.where(name:tid).where("tid is not null").order(save_timestamp: :desc).first
