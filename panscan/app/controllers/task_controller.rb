@@ -61,6 +61,10 @@ CODE
 
         # todo: need a class to put together
         # todo: need dockerfile to let remote docker have pem file in the right path
+        # worker = "panworker-0_fe96"
+        # instance, _ = worker.split("_")
+        # docker = worker
+
         get_public_ip_str = "aws lightsail get-instances --no-cli-pager --region 'us-east-1' --query 'instances[].{name:name,publicIpAddress:publicIpAddress}'"
         data = `#{get_public_ip_str}`
         public_ips = JSON.parse(data).map {|x| [x["name"],x["publicIpAddress"]]}.to_h
