@@ -1,10 +1,12 @@
 __TASK_NAME__ = "auto-retry"
 
+require 'faraday'
+
 module AutoRetry
     def auto_retry(logger=nil,retry_cnt=12)
         begin
             yield
-        rescue Net::OpenTimeout,OpenSSL::SSL::SSLError=>e
+        rescue Faraday::TimeoutError,Net::OpenTimeout,OpenSSL::SSL::SSLError,JSON::ParserError=>e
             if (retry_cnt-=1) > 0 then
                 retry_number = 12-retry_cnt
                 
