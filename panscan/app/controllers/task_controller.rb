@@ -46,7 +46,7 @@ CODE
     end
 
     def task_all
-        @running_task = Task.order(updated_at: :desc).where(status:"run").where("tid is not null")
+        @running_task = Task.order(updated_at: :desc).where(status:"run").where("tid is not null").select(:id,:tid,:name,:status,:params:,:save_timestamp,:run_timestamp,:created_at,:updated_at)
 
         @task = Task.order(updated_at: :desc).where("tid is not null")
     end
