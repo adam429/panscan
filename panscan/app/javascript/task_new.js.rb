@@ -6,7 +6,7 @@ def take_action(json)
 
     if json[:action] == "open" then
         url = json[:to].to_s
-        `var win = window.open(" #{ url } ");`
+        %x{ var win = window.open(" #{ 1+2 } "); }
     end
     
 
