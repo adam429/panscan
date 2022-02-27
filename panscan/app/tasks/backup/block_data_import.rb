@@ -192,6 +192,7 @@ end
 def main()
     database_init(false) # allow to write
     
+    Object.include AutoRetry
     block_numbers = __block_begin__..__block_end__
     
     pan_call = PancakePrediction.new
