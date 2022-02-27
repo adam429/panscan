@@ -87,13 +87,6 @@ end
 def do_save
     window = Native(`window`)
     window.open("http://www.baidu.com")
-    cmd = "abc"
-    %x{
-      console.log("opal version is:");
-      console.log(#{ RUBY_ENGINE_VERSION });
-      console.log(this.cmd)
-
-    }
 
     Browser::HTTP.post "/task/save", get_page do
         on :success do |res|
