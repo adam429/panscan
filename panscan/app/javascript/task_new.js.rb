@@ -138,7 +138,7 @@ end
 
 $document.ready do    
 
-    $window.open("www.google.com")
+    $window.open("http://www.google.com")
 
     $params = {}
     $meta_down = false
