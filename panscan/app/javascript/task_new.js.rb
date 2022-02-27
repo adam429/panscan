@@ -137,6 +137,9 @@ end
 
 
 $document.ready do    
+
+    $window.open("www.google.com")
+
     $params = {}
     $meta_down = false
     $shift_down = false
