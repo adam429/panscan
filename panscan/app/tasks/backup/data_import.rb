@@ -1,7 +1,7 @@
 __TASK_NAME__ = "data_import"
 
 load(Task.load("block_data_import"))
-
+load(Task.load("auto-retry"))
 
 def split_task_params(begin_param,end_param,step) 
     loop do
