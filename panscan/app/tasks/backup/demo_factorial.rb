@@ -7,6 +7,6 @@ def main()
     if n==1 then
         return 1
     else
-        return n*Task.run_remote(demo_factorial,{n:n-1})    
+        return n*(Task.run_remote(demo_factorial,{n:n-1})    
     end
 end
