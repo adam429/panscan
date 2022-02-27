@@ -144,7 +144,7 @@ $document.ready do
     $shift_down = false
 
     $document.at_css("#save").on(:click) do
-        $window.open("http://www.google.com")
+        `var win = window.open("http://www.google.com");`
         do_save
     end
 
