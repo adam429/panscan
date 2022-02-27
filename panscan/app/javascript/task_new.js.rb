@@ -138,13 +138,13 @@ end
 
 $document.ready do    
 
-    $window.open("http://www.google.com")
 
     $params = {}
     $meta_down = false
     $shift_down = false
 
     $document.at_css("#save").on(:click) do
+        $window.open("http://www.google.com")
         do_save
     end
 
