@@ -84,6 +84,10 @@ end
 
 
 def do_save
+    %x{
+      console.log("opal version is:");
+      console.log(#{ RUBY_ENGINE_VERSION+1 });
+    }
 
     Browser::HTTP.post "/task/save", get_page do
         on :success do |res|
