@@ -2,6 +2,7 @@ __TASK_NAME__ = "data_import"
 
 load(Task.load("block_data_import"))
 load(Task.load("auto-retry"))
+Object.include AutoRetry
 
 def split_task_params(begin_param,end_param,step) 
     loop do
@@ -18,7 +19,6 @@ end
 def main()
     database_init(false) # allow to write
 
-    Object.include AutoRetry
     pan_call = PancakePrediction.new
 
 
