@@ -85,7 +85,7 @@ end
 
 
     def myalert(value)
-    `#@native.alert(value)`
+    `console.log(value)`
 
     value
   end
