@@ -16,6 +16,7 @@ gem 'opal-rails'
 gem 'opal-browser'
 gem 'parser'
 gem 'unparser'
+gem 'opal-optimizer'
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 7.0.1"

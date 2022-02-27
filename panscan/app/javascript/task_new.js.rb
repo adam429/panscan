@@ -5,9 +5,10 @@ def take_action(json)
     end
 
     if json[:action] == "open" then
+        url = json[:to]
+        `window.open(url)`
     end
     
-
     if json[:action] == "message" then
         $document.at_css("#message").inner_html = " | Message: "+json[:message]
         $$[:setTimeout].call(->{ $document.at_css("#message").inner_html="" },5000)
@@ -91,9 +92,6 @@ end
   end
 
   def do_save
-    window = Native(`window`)
-    # window.open("http://www.baidu.com")
-    myalert("123")
 
     Browser::HTTP.post "/task/save", get_page do
         on :success do |res|

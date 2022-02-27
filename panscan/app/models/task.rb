@@ -151,7 +151,7 @@ class Task < ActiveRecord::Base
     
     def log(obj)
       self.output = self.output + obj.to_s
-      self.output = self.output[-1_000_000,1_000_000]
+      self.output = self.output[-[1_000_000,self.output.size].min,[1_000_000,self.output.size].min]
 
       self.save
     end

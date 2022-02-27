@@ -1,6 +1,6 @@
 require 'opal'
 require 'opal-browser'
-
+require 'opal/optimizer/sprockets'
 
 source_path = "./app/javascript/"
 dest_path = "./app/assets/javascript/"
