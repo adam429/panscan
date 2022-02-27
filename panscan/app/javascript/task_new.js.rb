@@ -84,6 +84,12 @@ end
 
 
 def do_save
+    url = "123"
+    cmd = " var win = window.open('#{url}'); "
+    `console.log('123');`
+    Native(`console.log('#{cmd}');`)
+    # Native(`#{cmd}`)
+
     Browser::HTTP.post "/task/save", get_page do
         on :success do |res|
             take_action(res.json)
@@ -137,11 +143,6 @@ end
 
 $document.ready do    
 
-    url = "123"
-    cmd = " var win = window.open('#{url}'); "
-    `console.log('123');`
-    Native(`console.log('#{cmd}');`)
-    Native(`#{cmd}`)
 
     $params = {}
     $meta_down = false
