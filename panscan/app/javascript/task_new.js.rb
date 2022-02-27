@@ -7,7 +7,7 @@ def take_action(json)
     if json[:action] == "open" then
         url = "123"
         cmd = " var win = window.open('#{url}'); "
-        `#{cmd}`
+        `console.log('123');`
     end
     
 
