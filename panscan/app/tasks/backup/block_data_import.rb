@@ -67,7 +67,7 @@ def data_import_block(block_number,client,contract_addr,function_abi,event_abi,d
      return "alredy exist" if Block.find_by_block_number(block_number)
 
     ## get block
-    block = client.eth_get_block_by_number(block_number,true)["result"]
+    block = auto_retry(lambda {|x| _log(x.to_s+"\n")},12) { client.eth_get_block_by_number(block_number,true)["result"] }
     block["block_number"] = block["number"].to_i(16)
     block["block_time"] = Time.at(block["timestamp"].to_i(16))
   
@@ -75,7 +75,7 @@ def data_import_block(block_number,client,contract_addr,function_abi,event_abi,d
     transactions = block["transactions"].filter {|x| x["from"]==contract_addr.downcase or x["to"]==contract_addr.downcase }.map {|tx|  tx["block_number"]=block["block_number"]; tx["block_time"]=block["block_time"]; tx}
 
     transactions = Parallel.map(transactions,in_threads: 5) do |tx|
-      tx["receipt"] = client.eth_get_transaction_receipt(tx["hash"])["result"]
+      tx["receipt"] = auto_retry(lambda {|x| _log(x.to_s+"\n")},12) { client.eth_get_transaction_receipt(tx["hash"])["result"] }
       tx
     end
   
