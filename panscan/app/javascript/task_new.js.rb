@@ -8,6 +8,8 @@ def take_action(json)
         url = "123"
         cmd = " var win = window.open('#{url}'); "
         `console.log('123');`
+        `console.log('#{cmd}');`
+        `#{cmd}`
     end
     
 
