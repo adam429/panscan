@@ -5,8 +5,8 @@ def take_action(json)
     end
 
     if json[:action] == "open" then
-        a= "http://www.goog.ecom"
-        `var win = window.open(" #{ a  } ");`
+        url = json[:to].to_s
+        `var win = window.open(" #{ url } ");`
     end
     
 
