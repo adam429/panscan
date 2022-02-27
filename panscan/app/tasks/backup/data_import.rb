@@ -1,7 +1,7 @@
 __TASK_NAME__ = "data_import"
 
 load(Task.load("block_data_import"))
-load(Task.load("auto-retry"))
+
 
 def split_task_params(begin_param,end_param,step) 
     loop do
@@ -22,12 +22,12 @@ def main()
 
 
     db_last_transfer_block = Transfer.order(:block_number).last.block_number
-    last_block = auto_retry(lambda {|x| _log(x.to_s+"\n")},12) { pan_call.client.eth_get_block_by_number("latest",false)["result"]["number"].to_i(16) } 
+    last_block = pan_call.client.eth_get_block_by_number("latest",false)["result"]["number"].to_i(16)
     
     db_last_block = Block.order(:block_number).last.block_number
     db_last_epoch = Epoch.order(:epoch).last.epoch
-    last_epoch = auto_retry(lambda {|x| _log(x.to_s+"\n")},12) { pan_call.contract.call.current_epoch }
-    last_block = auto_retry(lambda {|x| _log(x.to_s+"\n")},12) { pan_call.client.eth_get_block_by_number("latest",false)["result"]["number"].to_i(16) } 
+    last_epoch = pan_call.contract.call.current_epoch
+    last_block = pan_call.client.eth_get_block_by_number("latest",false)["result"]["number"].to_i(16)
     
     _log "last_epoch = #{last_epoch}\n"
     _log "db_last_epoch = #{db_last_epoch}\n"
