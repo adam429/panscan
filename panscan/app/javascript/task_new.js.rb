@@ -5,7 +5,7 @@ def take_action(json)
     end
 
     if json[:action] == "open" then
-        $$.location.href = json[:to]
+        `var win = window.open("#{json[:to]}");`
     end
     
 
@@ -144,7 +144,6 @@ $document.ready do
     $shift_down = false
 
     $document.at_css("#save").on(:click) do
-        `var win = window.open("http://www.google.com");`
         do_save
     end
 
