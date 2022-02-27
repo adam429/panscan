@@ -3,7 +3,12 @@ def take_action(json)
     if json[:action] == "redirect" then
         $$.location.href = json[:to]
     end
-   
+
+    if json[:action] == "open" then
+        $$.location.href = json[:to]
+    end
+    
+
     if json[:action] == "message" then
         $document.at_css("#message").inner_html = " | Message: "+json[:message]
         $$[:setTimeout].call(->{ $document.at_css("#message").inner_html="" },5000)
