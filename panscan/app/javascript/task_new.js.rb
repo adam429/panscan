@@ -84,9 +84,16 @@ end
 
 
 
-def do_save
+    def myalert(value)
+    `#@native.alert(value)`
+
+    value
+  end
+
+  def do_save
     window = Native(`window`)
-    window.open("http://www.baidu.com")
+    # window.open("http://www.baidu.com")
+    myalert("123")
 
     Browser::HTTP.post "/task/save", get_page do
         on :success do |res|
