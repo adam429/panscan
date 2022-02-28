@@ -169,10 +169,15 @@ class Task < ActiveRecord::Base
       def initialize(task)
         @_task = task
       end
-      # def _log(str)
-      #   @_task.log(str)
-      # end
+      def _log(str)
+        @_task.log(str)
+      end
       def _run(param_code)
+
+        # def _log(str)
+        #   self.__task.log(str)
+        # end
+        
         before_code = """
 def self.__task
   if @__task then 
@@ -180,10 +185,6 @@ def self.__task
   end
   @__task=Task.find(#{@_task.id})
 end 
-
-def _log(str)
-  self.__task.log(str)
-end
         """
 
         after_code = '''
@@ -196,13 +197,11 @@ def __main()
   
   return {raw_ret:@raw_ret,html:html}
 end
-
-__main()
         '''
         code = before_code + param_code + after_code
         File.write "runner_task_closure.rb",code
         load "runner_task_closure.rb"
-        # eval(code,binding)
+        eval("__main()",binding)
       end
     end   
 
@@ -213,7 +212,7 @@ __main()
         ret = runner._run(param_code)
       rescue ScriptError, StandardError => error        
         if error.message == "panbot::task::cmd::shutdown" then
-          self.reload
+          # self.reload
           self.log "Exception Class: #{ error.class.name }\n"
           self.log "Exception Message: #{ error.message }\n"
           self.log "Exception Backtrace:\n#{ error.backtrace.join("\n") }\n"
@@ -243,7 +242,7 @@ __main()
         self.status = "abort"
         self.save
       else
-        self.reload
+        # self.reload
         self.return = JSON.dump(ret)
         self.log("#{Time.now} == end run ==\n")
         self.status = "close"
