@@ -179,6 +179,10 @@ class Task < ActiveRecord::Base
             end
             @__task=Task.find(#{@_task.id})
           end 
+
+          def _log(str)
+            self.__task.log(str)
+          end
         """
 
         after_code = '''
