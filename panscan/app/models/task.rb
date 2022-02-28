@@ -200,8 +200,8 @@ class Task < ActiveRecord::Base
         '''
         code = before_code + param_code + after_code
         File.write "runner_task_closure.rb",code
-        load "runner_task_closure.rb"
-        # eval(code,binding)
+        # load "runner_task_closure.rb"
+        eval(code,binding)
       end
     end   
 
