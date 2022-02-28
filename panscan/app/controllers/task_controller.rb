@@ -61,16 +61,28 @@ CODE
 
         # todo: need a class to put together
         # todo: need dockerfile to let remote docker have pem file in the right path
-        worker = "panworker-0_2ad2"
-        instance, _ = worker.split("_")
-        docker = worker
+        # worker = "panworker-0_2ad2"
 
+        require 'json'
         get_public_ip_str = "aws lightsail get-instances --no-cli-pager --region 'us-east-1' --query 'instances[].{name:name,publicIpAddress:publicIpAddress}'"
         data = `#{get_public_ip_str}`
         public_ips = JSON.parse(data).map {|x| [x["name"],x["publicIpAddress"]]}.to_h
         ip = public_ips[instance]
         cmd = "docker restart #{docker}"          
-        `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
+
+
+        cmd = "docker ps"          
+        ps = `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
+        runner = ps.split("\n")[1,9999].map {|x| (x.split " ")[10] }
+
+        runner.each do |worker|
+            instance, _ = worker.split("_")
+            docker = worker
+            ip = public_ips[instance]
+            cmd = "docker restart #{docker}"          
+            ps = `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
+        end
+
         redirect_to '/task/all' 
     end
 

@@ -190,10 +190,7 @@ class Task < ActiveRecord::Base
 # end 
 #         """
 
-        before_code = ""
-
-
-        after_code = '''
+        eval_code = '''
 def __main()
   @raw_ret = main()
   html = @raw_ret.to_s
@@ -203,12 +200,13 @@ def __main()
   
   return {raw_ret:@raw_ret,html:html}
 end
+
+__main()
         '''
         load_code =  param_code
         File.write "runner_task_closure.rb",load_code
         load "runner_task_closure.rb"
 
-        eval_code = before_code + "__main();" + after_code
         eval(eval_code,binding)
       end
     end   
