@@ -172,20 +172,25 @@ class Task < ActiveRecord::Base
       def _log(str)
         @_task.log(str)
       end
+      def _task
+        @_task
+      end
       def _run(param_code)
 
         # def _log(str)
         #   self.__task.log(str)
         # end
         
-        before_code = """
-def self.__task
-  if @__task then 
-    return @__task 
-  end
-  @__task=Task.find(#{@_task.id})
-end 
-        """
+#         before_code = """
+# def self.__task
+#   if @__task then 
+#     return @__task 
+#   end
+#   @__task=Task.find(#{@_task.id})
+# end 
+#         """
+
+        before_code = ""
 
 
         after_code = '''
