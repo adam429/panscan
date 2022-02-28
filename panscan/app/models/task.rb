@@ -187,6 +187,7 @@ def self.__task
 end 
         """
 
+
         after_code = '''
 def __main()
   @raw_ret = main()
@@ -198,10 +199,12 @@ def __main()
   return {raw_ret:@raw_ret,html:html}
 end
         '''
-        code = before_code + param_code + after_code
+        load_code =  param_code
         File.write "runner_task_closure.rb",code
         load "runner_task_closure.rb"
-        eval("__main()",binding)
+
+        eval_code = before_code + "__main();" + after_code
+        eval(eval_code,binding)
       end
     end   
 
