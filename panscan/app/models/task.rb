@@ -205,7 +205,7 @@ def __main()
 end
         '''
         load_code =  param_code
-        File.write "runner_task_closure.rb",code
+        File.write "runner_task_closure.rb",load_code
         load "runner_task_closure.rb"
 
         eval_code = before_code + "__main();" + after_code
