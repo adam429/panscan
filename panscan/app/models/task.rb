@@ -9,6 +9,7 @@ class Task < ActiveRecord::Base
       task.code = code
       task.name = name
       task.save
+      return task.id
     end
     
     ## for worker
