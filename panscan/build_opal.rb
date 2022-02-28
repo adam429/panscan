@@ -1,6 +1,5 @@
 require 'opal'
 require 'opal-browser'
-require 'opal/optimizer/sprockets'
 
 source_path = "./app/javascript/"
 dest_path = "./app/assets/javascript/"
@@ -22,7 +21,8 @@ loop do
         if dest_time-source_time < 0.01 then
             puts "source #{file} changed | source_time #{source_time} dest_time #{dest_time}"
             begin
-                builder = Opal::Builder.new.build(source_file)
+
+                builder = Opal::Builder.new.build(source_file)                
 
                 File.write dest_file,  "#{builder.to_s}\n//# sourceMappingURL=#{file}.map"
                 File.write dest_file+".map", JSON.dump(builder.source_map.to_h)

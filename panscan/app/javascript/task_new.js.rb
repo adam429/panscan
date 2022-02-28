@@ -1,4 +1,3 @@
-
 def take_action(json)
     if json[:action] == "redirect" then
         $$.location.href = json[:to]
@@ -193,4 +192,3 @@ $document.ready do
     end
 
 end
-
