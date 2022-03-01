@@ -1,6 +1,7 @@
 class TaskController < ApplicationController
     skip_before_action :verify_authenticity_token
 
+
     def worker
         @pingpong = Task.where("name like ?","ping task%").where(status:["run","close"]).where("created_at >= ?",Time.now()-300).select(:runner).distinct(:runner).order(:runner).map {|x| x.runner}
         @running = Task.where(status:"run").select(:runner).distinct(:runner).order(:runner).map {|x| x.runner}
@@ -63,24 +64,37 @@ CODE
         # todo: need dockerfile to let remote docker have pem file in the right path
         # worker = "panworker-0_2ad2"
 
+        worker = ["panworker-1","panworker-2"]
+
         require 'json'
         get_public_ip_str = "aws lightsail get-instances --no-cli-pager --region 'us-east-1' --query 'instances[].{name:name,publicIpAddress:publicIpAddress}'"
         data = `#{get_public_ip_str}`
         public_ips = JSON.parse(data).map {|x| [x["name"],x["publicIpAddress"]]}.to_h
-        ip = public_ips[instance]
-        cmd = "docker restart #{docker}"          
 
-
-        cmd = "docker ps"          
-        ps = `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
-        runner = ps.split("\n")[1,9999].map {|x| (x.split " ")[10] }
-
-        runner.each do |worker|
-            instance, _ = worker.split("_")
-            docker = worker
+        # docker ps
+        worker.each do |instance|
             ip = public_ips[instance]
-            cmd = "docker restart #{docker}"          
+            cmd = "docker ps"          
             ps = `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
+            puts ps
+        end
+        
+        # docker restart
+        worker.each do |instance|
+            ip = public_ips[instance]
+            cmd = "docker ps"          
+            ps = `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
+            puts ps
+
+            runner = ps.split("\n")[1,9999].map {|x| (x.split " ")[10] }
+
+            runner.each do |worker|
+                instance, _ = worker.split("_")
+                docker = worker
+                ip = public_ips[instance]
+                cmd = "docker restart #{docker}"          
+                ps = `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
+            end
         end
 
         redirect_to '/task/all' 

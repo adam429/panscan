@@ -116,6 +116,25 @@ def get_params
     return ret
 end
 
+def update_refs()
+    json = get_page
+    code = json[:code]
+
+    refs1 = code.scan(/Task.load\(([\"\'a-zA-Z0-9\-_\/]+)\)/).flatten
+    refs2 = code.scan(/Task.run_remote\(([\"\'a-zA-Z0-9\-_\/]+)\,/).flatten
+
+    refs = (refs1 + refs2).uniq.filter {|x| ['"',"'"].include?(x[0]) and ['"',"'"].include?(x[-1])}.map {|x| x[1,x.size-2]}
+    
+    refs_html = refs.map { |ref|
+        url,_ = ref.split("/")
+        "<li><a href='/task/#{url}'>#{ref}</a></li>"
+    }.join("\n")
+
+    $document.at_css("#refs").inner_html = refs_html
+
+end
+
+
 def update_params(init_params=nil)
     json = get_page
     param_json = json[:params]
@@ -170,7 +189,10 @@ $document.ready do
     update_params(JSON.parse(init_params=="" ? "{}" : init_params))
     update_task_run
 
-    $$[:setInterval].call(->{ update_params },1000)    
+    $$[:setInterval].call(->{ 
+        update_params
+        update_refs
+    },1000)    
 
     $document.body.on (:keydown) do |e|
         $meta_down = true if e.meta?

@@ -2,6 +2,12 @@ class EpochController < ApplicationController
     def foo
     end
 
+    def log
+        query = Log.order(:id)
+        query = query.where("worker like ? or log like ?",params[:q],"%#{params[:q]}%") if params[:q]
+        @pagy, @log = pagy(query)        
+    end
+
     def web_console
          console
     end

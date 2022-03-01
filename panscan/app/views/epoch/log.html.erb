@@ -1,4 +1,8 @@
 <h1>Logs</h1>
-<% Log.order(:id).all.each do |log| %>
+<% @log.each do |log| %>
   <%= log.worker %> <%= log.pid %> | <%= log.created_at.to_formatted_s(:db) %>  | <%= log.log %><br/>
 <% end %>
+
+------------------------------------------------------------------------------------<br/>
+
+ <%== pagy_nav(@pagy) %>
