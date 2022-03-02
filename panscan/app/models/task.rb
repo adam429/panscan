@@ -75,7 +75,7 @@ class Task < ActiveRecord::Base
       return "#{addr}.rb"
     end
 
-    def self.run_remote(address,params={})
+    def self.run_remote(address,params={},schedule_at=0)
       params = params.map {|k,v| [k,v.to_s]}.to_h
       task = nil
       if address =~ /^[0-9a-f]{16}$/ then
@@ -88,6 +88,7 @@ class Task < ActiveRecord::Base
       new_task.tid = nil
       new_task.params = JSON.dump(params)
       new_task.status = "open"
+      new_task.schedule_at = schedule_at
       new_task.save
       return new_task
     end
