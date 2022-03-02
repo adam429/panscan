@@ -36,6 +36,12 @@ class Worker
         get_public_ips
 
         instance, docker = worker.split("_")
+
+        Task.where(status:"run").where(runner:worker).map do |t|
+            t.status = "kill"
+            t.save
+        end
+
         stop_script = """docker stop #{worker}
         docker rm #{worker}"""
 
@@ -65,6 +71,12 @@ class Worker
 
     def delete_instances(instances)
         Parallel.map(instances,in_threads: 10) { |w| 
+
+        Task.where(status:"run").where("runner like ?","#{w}%").map do |t|
+            t.status = "kill"
+            t.save
+        end
+
         delete_worker = "aws lightsail delete-instance --no-cli-pager --instance-name #{w}" 
         puts delete_worker
         system(delete_worker)
@@ -79,13 +91,24 @@ class Worker
         get_public_ips
         workers.each do |worker|
             instance, docker = worker.split("_")
-
+        
             if docker!=nil then
                 cmd = "docker restart #{worker}"          
                 worker_run([instance],cmd)
+
+                Task.where(status:"run").where(runner:worker).map do |t|
+                    t.status = "kill"
+                    t.save
+                end    
             else
                 cmd = "docker restart $(docker ps -a -q)"          
                 worker_run([instance],cmd)
+
+                Task.where(status:"run").where("runner like ?","#{instance}%").map do |t|
+                    t.status = "kill"
+                    t.save
+                end
+    
             end
         end
 
@@ -162,7 +185,14 @@ class Worker
         }
 
         worker_run_script(worker,script3)
-        worker_run_script(worker,"docker run hello-world")
+        
+        check = worker_run_script(worker,"docker run hello-world")
+        check.map_with_index do |c,i|
+            if not c =~ /Hello from Docker!/ then
+                delete_instances([worker[i]])
+                start_ec2(worker[i])
+            end
+        end
 
         ## start dockers
         stop_script = """docker stop $(docker ps -a -q)
