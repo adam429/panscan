@@ -3,11 +3,12 @@ require 'unparser'
 require 'erb'
 
 class Task < ActiveRecord::Base
-    def self.create_task(name,code)
+    def self.create_task(name,code,schedule_at = 0)
       task = Task.new
       task.status = "open"
       task.code = code
       task.name = name
+      task.schedule_at = schedule_at
       task.save
       return task.id
     end
