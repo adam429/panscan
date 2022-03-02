@@ -17,7 +17,7 @@ class Task < ActiveRecord::Base
     def self.take_task(runner)
       task = nil
       Task.transaction do
-        task = Task.lock.where(status:"open").order(:updated_at).where("schedule_at > ?",Time.now).first
+        task = Task.lock.where(status:"open").order(:updated_at).where("schedule_at is null or schedule_at > ?",Time.now).first
         if task then
           task.status = "run"
           task.runner = runner

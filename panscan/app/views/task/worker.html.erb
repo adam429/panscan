@@ -1,35 +1,16 @@
 <h1> Workers </h1>
 
-add server: <a href="#">+2</a> <a href="#">+5</a> <a href="#">+10</a></br></br>
+<h3> Instances </h3>
+start new instances <a href="/worker/create_workers/1">+1</a> <a href="/worker/create_workers/5">+5</a> <a href="/worker/create_workers/10">+10</a></br></br>
 
-
-== ping pong worker == </br>
-<% @pingpong.each do |x|
-    split = x.split("-")
-    docker_id = split.pop
-    server_id = split.join("-")
-
-    task = Task.where(status:"close").order(:id).where(runner:x).last
-%>
-  <%= server_id %> [<a href="#">delete</a> <a href="#">reboot</a> <a href="#">start_worker</a>] | 
-  <%= docker_id %> [<a href="#">remove</a> <a href="#">restart</a>]|
-  <%= task.name %> | 
-  <%= ActiveSupport::Duration.build(Time.now - task.updated_at).parts.map do |key, value|  [value.to_i, key].join end.join(' ') %> <br/>
-<% end %>
-<br/>
-
-== running worker == </br>
-<% @running.each do |x| 
-    split = x.split("-")
-    docker_id = split.pop
-    server_id = split.join("-")
-
-    task = Task.where(status:"run").where(runner:x).first
-%>
-  <%= server_id %> [<a href="#">delete</a> <a href="#">reboot</a> <a href="#">start_worker</a>] | 
-  <%= docker_id %> [<a href="#">remove</a> <a href="#">restart</a>]|
-  <%= task.name %> | 
-  <%= ActiveSupport::Duration.build(Time.now - task.run_timestamp).parts.map do |key, value|  [value.to_i, key].join end.join(' ') %> <br/>
-
+<% @workers.each do |k,v| %>
+   <li>[<a href="/worker/delete_instance/<%= k %>">delete</a>] [<a href="/worker/restart_worker/<%= k %>">restart docker</a>] <%= k %> (<%= v[:ip] %>)</li>
 <% end %>
 
+<h3> Workers </h3>
+<% @workers.each do |k,v| %>
+====<%= k %> [<a href="/worker/start_worker/<%= k %>">+1 docker</a>] ====</br>
+ <% v[:docker].each do |d| %>
+   <li>[<a href="/worker/restart_worker/<%= d[:worker] %>">restart</a>] [<a href="/worker/delete_worker/<%= d[:worker] %>">delete</a>] <%= d[:worker] %> | <%= d[:run_time]%> | <%= @task[d[:worker]]%>  </li>
+ <% end %>
+<% end %>

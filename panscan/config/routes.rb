@@ -35,6 +35,12 @@ Rails.application.routes.draw do
   get "/task/view/:tid", to: "task#task_return_view"
   get "/task/json/:tid", to: "task#task_json"
 
+  get "/worker/create_workers/:num", to: "task#create_workers"
+  get "/worker/delete_instance/:id", to: "task#delete_instance"
+  get "/worker/restart_worker/:id", to: "task#restart_worker"
+  get "/worker/delete_worker/:id", to: "task#delete_worker"
+  get "/worker/start_worker/:id", to: "task#start_worker"
+  
 
   get "/task/kill/:tid", to: "task#task_kill"
   post "/task/save", to: "task#task_save"
