@@ -3,9 +3,16 @@ FROM ruby:2.7
 RUN apt-get update && \
     apt-get install -y \
         libpq-dev \
-        awscli
+        unzip
         #  default-mysql-client \
         #  default-libmysqlclient-dev \
+
+WORKDIR /tmp
+
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+RUN unzip awscliv2.zip
+RUN sudo ./aws/install
+
 
 WORKDIR /panscan
 # COPY Gemfile /panscan/Gemfile
