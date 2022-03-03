@@ -88,15 +88,15 @@ CODE
     end
 
     def task_all
-        @prefix = params[:prefix] || "/"
-        
+        @prefix = params[:prefix] || ""
+
         @name_task = Task.where("tid is not null").group(:status).count
         @closure_task = Task.where("tid is null").group(:status).count
         
         @running_task = Task.order(updated_at: :desc).where(status:"run").where("tid is not null").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
         @schedule_task = Task.order(updated_at: :desc).where(status:"open").where("tid is not null").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
 
-        @task = Task.order(status: :asc,updated_at: :desc).where("tid is not null").where("status<>'run' and status<>'open'").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
+        @task = Task.where().order(status: :asc,updated_at: :desc).where("tid is not null").where("status<>'run' and status<>'open'").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
     end
 
     def task_kill
