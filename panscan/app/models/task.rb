@@ -89,6 +89,9 @@ class Task < ActiveRecord::Base
       else
         task = Task.where(name:address).where("tid is not null").order(save_timestamp: :desc).first
       end
+
+      raise "Task.load() cannot find script #{addr}" if task==nil
+
       new_task = Task.new(task.attributes)  
       new_task.id = nil    
       new_task.tid = nil
