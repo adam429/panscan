@@ -88,7 +88,8 @@ CODE
     end
 
     def task_all
-        raise params
+        @prefix = params[:prefix] || "/"
+        
         @name_task = Task.where("tid is not null").group(:status).count
         @closure_task = Task.where("tid is null").group(:status).count
         
