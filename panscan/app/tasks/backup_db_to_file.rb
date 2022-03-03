@@ -13,7 +13,14 @@ loop do
 
     names.each do |name|
         task = Task.where(name:name).where("tid is not null").order(save_timestamp: :desc).first
-        File.write "#{dest_path}/#{name}.rb", task.code
+
+        filename = "#{dest_path}/#{name}.rb"
+        dirname = File.dirname(filename)
+        unless File.directory?(dirname)
+          FileUtils.mkdir_p(dirname)
+        end
+  
+        File.write filename, task.code
     end
 
     save_to_github()

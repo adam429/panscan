@@ -71,8 +71,14 @@ class Task < ActiveRecord::Base
         Unparser.unparse(m)
       end.join("\n")
 
-      File.write "#{addr}.rb", select_code
-      return "#{addr}.rb"
+      filename = "#{addr}.rb"
+      dirname = File.dirname(filename)
+      unless File.directory?(dirname)
+        FileUtils.mkdir_p(dirname)
+      end
+
+      File.write filename, select_code
+      return filename
     end
 
     def self.run_remote(address,params={},schedule_at=0)
