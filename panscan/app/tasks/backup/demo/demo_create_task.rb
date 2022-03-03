@@ -2,7 +2,6 @@ __TASK_NAME__ = "demo/demo_create_task"
 
 load(Task.load("demo/demo_task"))
 
-task(2)
 
 def main()
     _log "run_task_local\n"
