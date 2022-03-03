@@ -3,7 +3,7 @@ require 'unparser'
 require 'erb'
 
 class Task < ActiveRecord::Base
-    def self.create_task(name,code,schedule_at = 0)
+    def self.create_task(name,code,schedule_at = Time.at(0))
       task = Task.new
       task.status = "open"
       task.code = code
@@ -81,7 +81,7 @@ class Task < ActiveRecord::Base
       return filename
     end
 
-    def self.run_remote(address,params={},schedule_at=0)
+    def self.run_remote(address,params={},schedule_at=Time.at(0))
       params = params.map {|k,v| [k,v.to_s]}.to_h
       task = nil
       if address =~ /^[0-9a-f]{16}$/ then
