@@ -206,6 +206,7 @@ end
 __main()
         '''
         load_code =  param_code
+        Dir.mkdir("tmp") unless File.exists?("tmp")
         File.write "tmp/runner_task_closure_#{@_task.id}.rb",load_code
         load "tmp/runner_task_closure_#{@_task.id}.rb"
 
