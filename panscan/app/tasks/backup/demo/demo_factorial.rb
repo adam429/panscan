@@ -8,7 +8,8 @@ def main()
         return 1
     else
       task =Task.run_remote(_task.name,{n:n-1})
-      update_task = Task.wait_until_done(task)
-      return update_task.raw_ret.to_i * n
+      return 1
+    #   update_task = Task.wait_until_done(task)
+    #   return update_task.raw_ret.to_i * n
     end
 end
