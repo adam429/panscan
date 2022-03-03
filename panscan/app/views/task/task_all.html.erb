@@ -6,7 +6,8 @@
   <td>| tid</td>
   <td>| name</td>
   <td>| status</td>
-  <td>| params</td>
+  <td>| schedule_at</td>
+  <td>| runner</td>
   <td>| running time</td>
   <td>| action</td>
 </tr>
@@ -16,9 +17,32 @@
   <td>| <a href="/task/<%= t.tid %>"><%= t.tid %></a></td>
   <td>| <%= t.tid == t.name ? "" :t.name %></td>
   <td>| <%= t.status %></td>
+  <td>| <%= t.schedule_at ? t.schedule_at.to_formatted_s(:db) : "" %></td>
   <td>| <%= t.runner %></td>
   <td>| <%= t.run_timestamp ? ActiveSupport::Duration.build(Time.now - t.run_timestamp).parts.map do |key, value|  [value.to_i, key].join(' ') end.join(' ')  : "" %></td>
   <td>| <a href='/task/kill/<%= t.tid %>'>kill</a></td>
+</tr>
+<% end %>
+</table>
+--------------------------------<br/>
+<h3>Schedule Tasks</h3>
+<table>
+<tr>
+  <td>| #</td>
+  <td>| tid</td>
+  <td>| name</td>
+  <td>| status</td>
+  <td>| schedule_at</td>
+  <td>| countdown time</td>
+</tr>
+<% @schedule_task.each_with_index do |t,i| %>
+<tr>
+  <td>| <%= i %></td>
+  <td>| <a href="/task/<%= t.tid %>"><%= t.tid %></a></td>
+  <td>| <%= t.tid == t.name ? "" :t.name %></td>
+  <td>| <%= t.status %></td>
+  <td>| <%= t.schedule_at ? t.schedule_at.to_formatted_s(:db) : "" %></td>
+  <td>| <%= t.schedule_at ? ActiveSupport::Duration.build(t.schedule_at - Time.now).parts.map do |key, value|  [value.to_i, key].join(' ') end.join(' ')  : "" %></td>
 </tr>
 <% end %>
 </table>
