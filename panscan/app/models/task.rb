@@ -42,7 +42,7 @@ class Task < ActiveRecord::Base
 
     ## for task editor
     def self.load(address)
-      addr, code = address.split("/")
+      addr, code = address.split("::")
       code="*" if code==nil
       code=code.to_sym
 

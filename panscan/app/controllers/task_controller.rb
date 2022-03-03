@@ -75,7 +75,7 @@ CODE
                 @task = Task.find_by_tid(tid)
 
                 # tid -> name -> tid (url show name)
-                redirect_to "/task/#{@task.name}" if Task.where(name:@task.name).where("tid is not null").order(save_timestamp: :desc).first.tid == tid
+                redirect_to "/task/#{URI.escape(@task.name,"/")}" if Task.where(name:@task.name).where("tid is not null").order(save_timestamp: :desc).first.tid == tid
               else
                 @task = Task.where(name:tid).where("tid is not null").order(save_timestamp: :desc).first
               end
@@ -96,55 +96,27 @@ CODE
         @running_task = Task.order(updated_at: :desc).where(status:"run").where("tid is not null").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
         @schedule_task = Task.order(updated_at: :desc).where(status:"open").where("tid is not null").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
 
-        @task = Task.where("name like ?","#{@prefix}%").order(status: :asc,updated_at: :desc).where("tid is not null").where("status<>'run' and status<>'open'").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
+        @task = Task.where("name like ?","#{@prefix}%").order(status: :asc,updated_at: :desc).where("tid is not null").where("status<>'run' and status<>'open'").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at).all
+
+        @path = []
+        @task = @task.filter {|t|
+            split = t.name.split("/")[@prefix.split("/").size,t.name.split("/").size]
+            prefix = split[0]
+            postfix = split[1] 
+        
+            puts "#{@prefix} - #{prefix} - #{postfix}"
+            @path.push (prefix) if postfix!=nil
+            postfix==nil
+        }
+
+        @path = @path.uniq.sort
     end
 
     def task_kill
-        # task = Task.find_by_tid(params[:tid])
-        # task.status="kill"
-        # task.save
-
-        # instance, _ = task.runner.split("_")
-        # docker = task.runner
-
-        # # todo: need a class to put together
-        # # todo: need dockerfile to let remote docker have pem file in the right path
-        # # worker = "panworker-0_2ad2"
-
-        # worker = ["panworker-1","panworker-2"]
-
-        # require 'json'
-        # get_public_ip_str = "aws lightsail get-instances --no-cli-pager --region 'us-east-1' --query 'instances[].{name:name,publicIpAddress:publicIpAddress}'"
-        # data = `#{get_public_ip_str}`
-        # public_ips = JSON.parse(data).map {|x| [x["name"],x["publicIpAddress"]]}.to_h
-
-        # # docker ps
-        # worker.each do |instance|
-        #     ip = public_ips[instance]
-        #     cmd = "docker ps"          
-        #     ps = `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
-        #     puts ps
-        # end
+        w = Worker.new
+        w.restart_worker([Task.find_by_tid(params[:id]).runner])
         
-        # # docker restart
-        # worker.each do |instance|
-        #     ip = public_ips[instance]
-        #     cmd = "docker ps"          
-        #     ps = `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
-        #     puts ps
-
-        #     runner = ps.split("\n")[1,9999].map {|x| (x.split " ")[10] }
-
-        #     runner.each do |worker|
-        #         instance, _ = worker.split("_")
-        #         docker = worker
-        #         ip = public_ips[instance]
-        #         cmd = "docker restart #{docker}"          
-        #         ps = `ssh -i ~/.ssh/LightsailDefaultKey-us-east-1.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'`
-        #     end
-        # end
-
-        # redirect_to '/task/all' 
+        redirect_to '/task/all' 
     end
 
     def task_run

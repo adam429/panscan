@@ -66,9 +66,21 @@ prefix: <%= @prefix %><br/><br/>
   <td>| created_at</td>
   <td>| last_save</td>
 </tr>
-<% @task.each_with_index do |t,i| %>
+<% @path.each_with_index do |p,i| %>
 <tr>
   <td>| <%= i %></td>
+  <td>| (directory)</td>
+  <td>| <a href="?prefix=<%= URI.escape([@prefix,p].join("/"),"/") %>"><%= p %></a></td>
+  <td>| </td>
+  <td>| </td>
+  <td>| </td>
+  <td>| </td>
+  <td>| </td>
+</tr>
+<% end%>
+<% @task.each_with_index do |t,i| %>
+<tr>
+  <td>| <%= i+@path.size %></td>
   <td>| <a href="/task/<%= t.tid %>"><%= t.tid %></a></td>
   <td>| <%= t.tid == t.name ? "" :t.name %></td>
   <td>| <%= t.status %></td>
