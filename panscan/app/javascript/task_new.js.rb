@@ -121,12 +121,13 @@ def update_refs()
     code = json[:code]
 
     refs1 = code.scan(/Task.load\(([\"\'a-zA-Z0-9\-_\/]+)\)/).flatten
-    refs2 = code.scan(/Task.run_remote\(([\"\'a-zA-Z0-9\-_\/]+)\,/).flatten
+    refs2 = code.scan(/Task.run_remote\(([\"\'a-zA-Z0-9\-_\/]+)/).flatten
 
     refs = (refs1 + refs2).uniq.filter {|x| ['"',"'"].include?(x[0]) and ['"',"'"].include?(x[-1])}.map {|x| x[1,x.size-2]}
     
     refs_html = refs.map { |ref|
-        url,_ = ref.split("/")
+        url,_ = ref.split("::")
+        url = url.gsub(/\//,"%2F")
         "<li><a href='/task/#{url}'>#{ref}</a></li>"
     }.join("\n")
 
