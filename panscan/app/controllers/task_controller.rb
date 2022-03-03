@@ -89,7 +89,7 @@ CODE
 
     def task_all
         @prefix = params[:prefix] || ""
-        @prefix.gsub!(/\//,"")
+        @prefix.gsub!(/^\//,"")
 
         @name_task = Task.where("tid is not null").group(:status).count
         @closure_task = Task.where("tid is null").group(:status).count
