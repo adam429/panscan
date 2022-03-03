@@ -114,7 +114,7 @@ CODE
 
     def task_kill
         w = Worker.new
-        w.restart_worker([Task.find_by_tid(params[:id]).runner])
+        w.restart_worker([Task.find_by_tid(params[:tid]).runner])
         
         redirect_to '/task/all' 
     end
