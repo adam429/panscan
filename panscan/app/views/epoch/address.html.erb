@@ -71,10 +71,10 @@ total_roi: <%= (@addr.return_amt*100 / @addr.invest_amt).round(2)%>%
       
       round_ret =  - bet_amt
       if tx.method_name=="betBear" and epoch.bet_result=="bear" then
-        round_ret = round_ret+ bet_amt * epoch.bear_payout
+        round_ret = round_ret+ bet_amt * epoch.bear_payout * 0.97
       end
       if tx.method_name=="betBull" and epoch.bet_result=="bull" then
-        round_ret = round_ret+bet_amt * epoch.bull_payout
+        round_ret = round_ret+bet_amt * epoch.bull_payout * 0.97
       end
     end
 %>
