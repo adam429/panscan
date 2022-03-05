@@ -208,7 +208,7 @@ CODE
 
             # tid -> name -> tid (url show name)
             Task.where(name:task.name).where("tid is not null").order(save_timestamp: :desc).first.tid == params[:tid]
-            redirect_to "/task/view/#{task.name}"
+            redirect_to "/task/view/#{URI.escape(task.name,"/")}" if Task.where(name:task.name).where("tid is not null").order(save_timestamp: :desc).first.tid == params[:tid]
             return
         else
             task = Task.where(name:params[:tid]).where("tid is not null").order(save_timestamp: :desc).first
