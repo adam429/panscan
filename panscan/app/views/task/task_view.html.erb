@@ -16,7 +16,11 @@
 task uid = <span id="tid"><%= @task.tid or "(new)" %></span> (<span id="name"><%= @task.name %></span>)  [<a id="fork" href="#">Fork</a>]
  <span id="message"></span>
 <br/>
-task status = <span id="status"><%= @task.status or "edit" %></span><br/>
+task status = <span id="status"><%= @task.status or "edit" %></span>
+ <% if @task.status == "abort" then %>
+    -> [<a href="/task/status/<%= @task.id %>/open">open</a>][<a href="/task/status/<%= @task.id %>/close">close</a>] 
+ <% end %>
+<br/>
 task last_run = <span id="run_timestamp"><%= @task.run_timestamp ? @task.run_timestamp.to_formatted_s(:db) : "" %></span><br/>
 task last_save = <span id="save_timestamp"><%= @task.save_timestamp ? @task.save_timestamp.to_formatted_s(:db) : "" %></span><br/>
 task last_update = <span id="updated_at"><%= @task.updated_at ? @task.updated_at.to_formatted_s(:db) : "" %></span><br/>

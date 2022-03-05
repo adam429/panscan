@@ -41,7 +41,7 @@ Rails.application.routes.draw do
   get "/worker/delete_worker/:id", to: "task#delete_worker"
   get "/worker/start_worker/:id", to: "task#start_worker"
   
-
+  get "/task/status/:id/:status", to: "task#task_change_status"
   get "/task/kill/:tid", to: "task#task_kill"
   post "/task/save", to: "task#task_save"
   post "/task/fork", to: "task#task_fork"

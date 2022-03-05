@@ -48,6 +48,13 @@ class TaskController < ApplicationController
         end
     end
 
+    def task_change_status
+        task = Task.find(params[:id])
+        task.status = params[:status]
+        task.save
+        redirect_to "/task/#{params[:id]}"
+    end
+
     def task_view    
         tid = params[:tid]
         if tid.downcase == 'new' then
@@ -81,6 +88,10 @@ CODE
               end
             @new_task = false
         end
+
+        # last trial for find task
+        @task =  Task.find(tid) if @task==nil
+
         @runner = @task.runner
         @return = @task.html
         @output = @task.output
