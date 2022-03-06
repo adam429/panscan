@@ -83,7 +83,7 @@ total_roi: <%= (@addr.return_amt*100 / @addr.invest_amt).round(2)%>%
   <td> | <a href="/epoch/<%= epoch.epoch %>"><%= epoch.epoch %></a></td>
   <td> | <span style="background-color: <%= "lightpink" if last_block_order<=3 %>"> <%= tx.block_number %>(<%=  last_block_order %>)</span> </td>
   <td> | <%= tx.block_time.to_formatted_s(:db) %> </td>
-  <td> | <%= epoch.get_bull_payout(tx.block_number-1).round(2) %> <%= epoch.get_bear_payout(tx.block_number-1).round(2) %></td>
+  <td> | <%= epoch.get_bull_payout(tx.block_number-2).round(2) %> <%= epoch.get_bear_payout(tx.block_number-2).round(2) %></td>
   <td> |  <span style="background-color: <%= "lightsalmon" if wrong_bet %>"> <%= tx.method_name %></span></td>
   <td> |    <span style="color:<%= tx.tx_status ? "green" : "red" %>">
         <%= tx.tx_status %> 

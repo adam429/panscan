@@ -50,7 +50,7 @@ class Worker
 
     def start_worker(instance)
         get_public_ips
-        start_script = "docker container run -d --restart=always -e DB_CONNECT_STR='__PARAMS_CONNECT_STR__' -e WORKER_NAME='__WORKER__' --name __WORKER__  adam429/pan-repo:panworker"
+        start_script = "docker container run -d --restart=always -e DB_CONNECT_STR=\"__PARAMS_CONNECT_STR__\" -e WORKER_NAME='__WORKER__' --name __WORKER__  adam429/pan-repo:panworker"
         script_a = start_script.gsub(/__WORKER__/,"#{instance}_#{SecureRandom.hex(2)}").gsub(/__PARAMS_CONNECT_STR__/,+ENV["DB_CONNECT_STR"])
 
         worker_run([instance],script_a)
