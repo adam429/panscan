@@ -52,6 +52,13 @@ class TaskController < ApplicationController
         task = Task.find(params[:id])
         task.status = params[:status]
         task.save
+        if params[:status] == "kill" then
+            begin
+                w = Worker.new
+                w.restart_worker([Task.find(params[:id]).runner])    
+            rescue
+            end
+        end
         redirect_to "/task/#{params[:id]}"
     end
 

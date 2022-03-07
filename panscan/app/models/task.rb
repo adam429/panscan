@@ -208,8 +208,12 @@ def __main()
   if defined?(render_html)=="method" then
       html=ERB.new(render_html()).result(binding)
   end
-  
-  return {raw_ret:@raw_ret,html:html}
+
+  if defined?(schedule_at)=="method" then
+    next_schedule_at = schedule_at()
+  end
+
+  return {raw_ret:@raw_ret,html:html,schedule_at:next_schedule_at}
 end
 
 __main()
@@ -263,7 +267,13 @@ __main()
         # self.reload
         self.return = JSON.dump(ret)
         self.log("#{Time.now} == end run ==\n")
-        self.status = "close"
+
+        if ret[:schedule_at] then
+          self.status = "open"
+          self.schedule_at = ret[:schedule_at]
+        else
+          self.status = "close"
+        end
         self.save      
       end
     end

@@ -20,7 +20,11 @@ task status = <span id="status"><%= @task.status or "edit" %></span>
  <% if @task.status == "abort" then %>
     -> [<a href="/task/status/<%= @task.id %>/open">open</a>][<a href="/task/status/<%= @task.id %>/close">close</a>] 
  <% end %>
+ <% if @task.status == "open" or @task.status == "run" then %>
+    -> [<a href="/task/status/<%= @task.id %>/kill">kill</a>] 
+ <% end %>
 <br/>
+task schedule_at = <span id="schedule_at"><%= @task.schedule_at ? @task.schedule_at.to_formatted_s(:db) : "" %></span><br/>
 task last_run = <span id="run_timestamp"><%= @task.run_timestamp ? @task.run_timestamp.to_formatted_s(:db) : "" %></span><br/>
 task last_save = <span id="save_timestamp"><%= @task.save_timestamp ? @task.save_timestamp.to_formatted_s(:db) : "" %></span><br/>
 task last_update = <span id="updated_at"><%= @task.updated_at ? @task.updated_at.to_formatted_s(:db) : "" %></span><br/>

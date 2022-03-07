@@ -33,6 +33,7 @@ def update_page(json)
     $document.at_css("#tid").inner_html = json[:tid]
     $document.at_css("#name").inner_html = json[:name]
     $document.at_css("#run_timestamp").inner_html = json[:run_timestamp]
+    $document.at_css("#schedule_at").inner_html = json[:schedule_at]
     $document.at_css("#save_timestamp").inner_html = json[:save_timestamp]
     $document.at_css("#updated_at").inner_html = json[:updated_at]
     $document.at_css("#status").inner_html = json[:status]
