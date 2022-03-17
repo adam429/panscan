@@ -105,6 +105,17 @@ CODE
         @params = @task.params
     end
 
+    def task_filter
+        
+        @task = Task.where(status:params[:status])
+        if params[:class]=="name_task" then
+            @task = @task.where("tid is not null")
+        end
+        if params[:class]=="closure_task" then
+            @task = @task.where("tid is null")
+        end
+    end
+
     def task_all
         @prefix = params[:prefix] || ""
         @prefix.gsub!(/^\//,"")
@@ -135,10 +146,24 @@ CODE
 
     def task_kill
         w = Worker.new
-        w.restart_worker([Task.find_by_tid(params[:tid]).runner])
+        w.restart_worker([Task.find_by_id(params[:tid]).runner])
+
+        task = Task.find_by_id(params[:tid])
+        task.status = "kill"
+        task.save
+
+        redirect_to '/task/all' 
+    end
+
+    def task_schedule_now
+        task = Task.find_by_id(params[:tid])
+        task.schedule_at = Time.now
+        task.save
         
         redirect_to '/task/all' 
     end
+
+
 
     def task_run
         if params[:tid]=="(new)" then

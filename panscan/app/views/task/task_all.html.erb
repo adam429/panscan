@@ -1,7 +1,7 @@
 <h1>Task All</h1>
 <h3>Stats</h3>
-Name Task: <%= @name_task %><br/>
-Closure Task: <%= @closure_task %><br/>
+Name Task: <%= raw @name_task.map { |x| ["<a href='/task/filter/name_task/#{x[0]}'>#{x[0]}</a>",x[1]] }.to_h %><br/>
+Closure Task: <%= raw @closure_task.map { |x| ["<a href='/task/filter/closure_task/#{x[0]}'>#{x[0]}</a>",x[1]] }.to_h%><br/>
 --------------------------------<br/>
 <h3>Running Tasks</h3>
 <table>
@@ -24,7 +24,7 @@ Closure Task: <%= @closure_task %><br/>
   <td>| <%= t.schedule_at ? t.schedule_at.to_formatted_s(:db) : "" %></td>
   <td>| <%= t.runner %></td>
   <td>| <%= t.run_timestamp ? ActiveSupport::Duration.build(Time.now - t.run_timestamp).parts.map do |key, value|  [value.to_i, key].join(' ') end.join(' ')  : "" %></td>
-  <td>| <a href='/task/kill/<%= t.tid %>'>kill</a></td>
+  <td>| <a href='/task/kill/<%= t.id %>'>kill</a></td>
 </tr>
 <% end %>
 </table>
@@ -38,6 +38,7 @@ Closure Task: <%= @closure_task %><br/>
   <td>| status</td>
   <td>| schedule_at</td>
   <td>| countdown time</td>
+  <td>| action</td>
 </tr>
 <% @schedule_task.each_with_index do |t,i| %>
 <tr>
@@ -45,8 +46,9 @@ Closure Task: <%= @closure_task %><br/>
   <td>| <a href="/task/<%= t.tid %>"><%= t.tid %></a></td>
   <td>| <%= t.tid == t.name ? "" :t.name %></td>
   <td>| <%= t.status %></td>
-  <td>| <%= t.schedule_at ? t.schedule_at.to_formatted_s(:db) : "" %></td>
+  <td>| <%= t.schedule_at ? t.schedule_at.to_formatted_s(:db) : "" %> </td>
   <td>| <%= t.schedule_at ? ActiveSupport::Duration.build(t.schedule_at - Time.now).parts.map do |key, value|  [value.to_i, key].join(' ') end.join(' ')  : "" %></td>
+  <td>| <a href="/task/schedule_now/<%= t.id %>">run now</a> <a href="/task/kill/<%= t.id %>">kill</a> </td>
 </tr>
 <% end %>
 </table>

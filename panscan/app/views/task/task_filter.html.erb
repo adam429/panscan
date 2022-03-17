@@ -1,0 +1,28 @@
+<h1>Task Filter</h1>
+Task Count: <%= @task.count %><br/>
+
+<h3>Tasks</h3>
+<table>
+<tr>
+  <td>| #</td>
+  <td>| id</td>
+  <td>| tid</td>
+  <td>| name</td>
+  <td>| status</td>
+  <td>| schedule_at</td>
+  <td>| runner</td>
+  <td>| action</td>
+</tr>
+<% @task.each_with_index do |t,i| %>
+<tr>
+  <td>| <%= i %></td>
+  <td>| <a href="/task/<%= t.id %>"><%= t.id %></a></td>
+  <td>| <a href="/task/<%= t.tid %>"><%= t.tid %></a></td>
+  <td>| <%= t.tid == t.name ? "" :t.name %></td>
+  <td>| <%= t.status %></td>
+  <td>| <%= t.schedule_at ? t.schedule_at.to_formatted_s(:db) : "" %></td>
+  <td>| <%= t.runner %></td>
+  <td>| <a href='/task/kill/<%= t.id %>'>kill</a> <a href='/task/status/<%= t.id %>/delete'>delete</a> <a href='/task/status/<%= t.id %>/edit'>edit</a> </td>
+</tr>
+<% end %>
+</table>
