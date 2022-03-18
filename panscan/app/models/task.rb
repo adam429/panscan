@@ -151,6 +151,11 @@ class Task < ActiveRecord::Base
       end
     end
 
+    def abi
+      abi = code.scan(/(__[a-zA-Z0-9_]+__)/).flatten
+      abi = abi.filter {|x| x!='__TASK_NAME__'}.map {|x| x.gsub(/^__/,"").gsub(/__$/,"") }
+    end
+
     def update_name()    
       begin
         ast = Parser::CurrentRuby.parse(self.code)

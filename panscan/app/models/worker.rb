@@ -190,7 +190,7 @@ class Worker
         check.each_with_index do |c,i|
             if not c =~ /Hello from Docker!/ then
                 delete_instances([worker[i]])
-                start_ec2(worker[i])
+                start_ec2(worker[i],docker_per_instance)
             end
         end
 
