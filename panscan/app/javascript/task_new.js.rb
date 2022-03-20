@@ -16,20 +16,22 @@ def take_action(json)
 end
 
 def get_page
+    id = $document.at_css("#id").inner_html
     tid = $document.at_css("#tid").inner_html
     status = $document.at_css("#status").inner_html
     code = Native(`editor.getValue()`)
-    json = {status:status, tid:tid, code:code, params:get_params}
+    json = {status:status, id:id, tid:tid, code:code, params:get_params}
 end
 
 def do_update_page()
     json = get_page
-    get_server_task(json[:tid]) do |task|
+    get_server_task(json[:id]) do |task|
         update_page(task)
     end
 end
 
 def update_page(json)
+    $document.at_css("#id").inner_html = json[:id]
     $document.at_css("#tid").inner_html = json[:tid]
     $document.at_css("#name").inner_html = json[:name]
     $document.at_css("#run_timestamp").inner_html = json[:run_timestamp]
@@ -42,8 +44,8 @@ def update_page(json)
     $document.at_css("#return").inner_html = json[:return]
 end
 
-def get_server_task(tid)
-    Browser::HTTP.get "/task/json/#{tid}" do
+def get_server_task(id)
+    Browser::HTTP.get "/task/json/#{id}" do
         on :success do |res|
             yield(res.json)
         end        
@@ -55,7 +57,7 @@ end
 def update_task_run
     json = get_page
     if (json[:status]=="run" || json[:status]=="open") then
-        get_server_task(json[:tid]) do |task|
+        get_server_task(json[:id]) do |task|
             update_page(task)
             $$[:setTimeout].call(->{ update_task_run },1000)
         end

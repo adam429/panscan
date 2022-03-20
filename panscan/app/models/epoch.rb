@@ -106,12 +106,12 @@ class Epoch < ApplicationRecord
         return false if detail==nil
 
         if method_name=="betBull" then
-            return true if detail.bull_payout < detail.bear_payout
+            return false if detail.bull_payout > 2/0.97
         end
         if method_name=="betBear" then
-            return true if detail.bull_payout > detail.bear_payout
+            return false if detail.bear_payout > 2/0.97
         end
-        return false
+        return true
     end
 
     def get_address_bet(address)

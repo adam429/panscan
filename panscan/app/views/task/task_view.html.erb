@@ -13,7 +13,7 @@
 </style>
 
 <h1> Task View </h1>
-task uid = <span id="tid"><%= @task.tid or "(new)" %></span> (<span id="name"><%= @task.name %></span>)  [<a id="fork" href="#">Fork</a>]
+task uid = <span id="tid"><%= @task.tid or "(new)" %></span> (<span id="id"><%= @task.id  %></span>  | <span id="name"><%= @task.name %></span>)  [<a id="fork" href="#">Fork</a>]
  <span id="message"></span>
 <br/>
 task status = <span id="status"><%= @task.status or "edit" %></span>

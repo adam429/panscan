@@ -263,7 +263,7 @@ CODE
     end
 
     def task_json
-        task = Task.find_by_tid(params[:tid])
+        task = Task.find(params[:id])
         if task then
             json = task.attributes
             ret = ""
