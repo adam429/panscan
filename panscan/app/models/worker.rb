@@ -1,3 +1,6 @@
+
+require 'open3'
+
 class Worker
     def initialize
         create_pem_file
@@ -21,7 +24,10 @@ class Worker
             ip = v
             docker_ret = run_cmd(ip,"docker ps")
             docker = []
-            if docker_ret != "" then
+            
+            if docker_ret == "(timeout)" then
+                docker = "(timeout)"
+            elsif docker_ret != "" then
                 docker_ps = docker_ret.split("\n")
                 docker_ps = docker_ps[1,docker_ps.size-1]
                 docker = docker_ps.map {|x| {worker:x.split(" ")[-1],run_time:(x.scan(/ Up ([ 0-9a-zA-Z]+) panworker/)).first.first,ps:x} }
@@ -117,9 +123,15 @@ class Worker
 
     def run_cmd(ip,cmd)
         puts "====begin cmd #{time=Time.now} @#{ip}===="
-        cmd = "ssh -i aws.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'"
-        puts cmd
-        ret = `#{cmd}`
+        cmd = "timeout -v 10 ssh -i aws.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'"
+        puts "#{cmd}"
+
+        stdout, stderr, status = Open3.capture3(cmd)
+        ret = stdout
+
+        ret = "(timeout)" if stderr=~/timeout: sending signal/
+        puts ret
+
         puts "====end cmd #{Time.now} @#{ip} time #{Time.now-time} s===="
         return ret
       end
