@@ -123,7 +123,7 @@ class Worker
 
     def run_cmd(ip,cmd)
         puts "====begin cmd #{time=Time.now} @#{ip}===="
-        cmd = "timeout -v 10 ssh -i aws.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'"
+        cmd = "timeout -v 300 ssh -i aws.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'"
         puts "#{cmd}"
 
         stdout, stderr, status = Open3.capture3(cmd)
@@ -164,9 +164,9 @@ class Worker
     def start_ec2(worker,docker_per_instance)
         ## start ec2
         if worker.size>1 then
-            create_worker = "aws lightsail create-instances --no-cli-pager --instance-names {#{worker.map{|x| "'#{x}'"}.join(',')}} --availability-zone 'us-east-1a' --blueprint-id 'ubuntu_20_04' --bundle-id 'medium_2_0'"
+            create_worker = "aws lightsail create-instances --no-cli-pager --instance-names {#{worker.map{|x| "'#{x}'"}.join(',')}} --availability-zone 'us-east-1a' --blueprint-id 'ubuntu_20_04' --bundle-id 'large_2_0'"
         else
-            create_worker = "aws lightsail create-instances --no-cli-pager --instance-names #{worker.map{|x| "'#{x}'"}.join(',')} --availability-zone 'us-east-1a' --blueprint-id 'ubuntu_20_04' --bundle-id 'medium_2_0'"
+            create_worker = "aws lightsail create-instances --no-cli-pager --instance-names #{worker.map{|x| "'#{x}'"}.join(',')} --availability-zone 'us-east-1a' --blueprint-id 'ubuntu_20_04' --bundle-id 'large_2_0'"
         end
         puts create_worker
         system(create_worker)

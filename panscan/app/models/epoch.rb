@@ -101,8 +101,8 @@ class Epoch < ApplicationRecord
     end
 
     def get_wrong_bet(method_name,block_number)
-        block_number = lock_block_number if block_number>lock_block_number
-        detail = get_detail(block_number)
+        # block_number = lock_block_number if block_number>lock_block_number
+        detail = get_detail(lock_block_number)
         return false if detail==nil
 
         if method_name=="betBull" then
