@@ -115,6 +115,7 @@ GEM
     jbuilder (2.11.5)
       actionview (>= 5.0.0)
       activesupport (>= 5.0.0)
+    jquery (0.0.1)
     loofah (2.14.0)
       crass (~> 1.0.2)
       nokogiri (>= 1.5.9)
@@ -152,6 +153,8 @@ GEM
     opal-browser (0.3.3)
       opal (>= 1.0, < 2.0)
       paggio (>= 0.3.0)
+    opal-jquery (0.4.6)
+      opal (>= 0.10.0, < 2.0)
     opal-optimizer (0.1.6)
       opal (>= 1.0.0)
       rkelly-turbo
@@ -269,9 +272,11 @@ DEPENDENCIES
   goldiloader
   importmap-rails
   jbuilder
+  jquery
   method_source
   opal
   opal-browser
+  opal-jquery
   opal-optimizer
   opal-rails
   pagy (~> 5.9)

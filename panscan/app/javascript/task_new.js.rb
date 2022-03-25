@@ -41,7 +41,8 @@ def update_page(json)
     $document.at_css("#status").inner_html = json[:status]
     $document.at_css("#runner").inner_html = json[:runner]
     $document.at_css("#output").inner_html = json[:output]
-    $document.at_css("#return").inner_html = json[:return]
+    Element.find('#return').html = json[:return]
+    
 end
 
 def get_server_task(id)
@@ -74,6 +75,12 @@ def do_run
         json["runner"] = ""
         json["output"] = ""
         json["status"] = "open"
+
+        %x{
+            var id = window.setTimeout(function() {}, 0);
+            while (id--) { window.clearTimeout(id); }
+        }
+
         update_page(json)
     
         Browser::HTTP.post "/task/run", json do
@@ -218,3 +225,4 @@ $document.ready do
     end
 
 end
+

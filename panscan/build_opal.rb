@@ -1,4 +1,6 @@
 require 'opal'
+require 'opal-browser'
+require 'opal-jquery'
 
 source_path = "./app/javascript/"
 dest_path = "./app/assets/javascript/"

@@ -259,7 +259,10 @@ CODE
             task = Task.where(name:params[:tid]).where("tid is not null").order(save_timestamp: :desc).first
         end
 
-        html = "<script src='/assets/opal_lib.js'></script>" + task.html 
+        html = 
+               "<script src='https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js'></script>" +
+               "<script src='/assets/opal_lib.js'></script>" +
+                task.html.to_s
 
         render :inline => html
     end
