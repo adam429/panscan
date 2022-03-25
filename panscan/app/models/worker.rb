@@ -62,7 +62,7 @@ class Worker
         worker_run([instance],script_a)
     end
 
-    def create_instances(instance_number, docker_per_instance=6)
+    def create_instances(instance_number, docker_per_instance=2)
         # generate instance number list
         instances = get_instances.map {|k,v| k}
         last_id = 0

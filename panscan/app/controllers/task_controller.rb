@@ -259,7 +259,9 @@ CODE
             task = Task.where(name:params[:tid]).where("tid is not null").order(save_timestamp: :desc).first
         end
 
-        render :inline => task.html
+        html = "<script src='/assets/opal_lib.js'></script>" + task.html 
+
+        render :inline => html
     end
 
     def task_json

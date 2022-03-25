@@ -1,6 +1,6 @@
 <h1>Logs</h1>
 <% @log.each do |log| %>
-  <%= log.worker %> <%= log.pid %> | <%= log.created_at.to_formatted_s(:db) %>  | <%= log.log %><br/>
+  <a href="/log?id=<%= log.id %>&worker=<%= log.worker %>"><%= log.id %></a> | <a href="/log?worker=<%= log.worker %>"><%= log.worker %></a> | <%= log.created_at.to_formatted_s(:db) %>  | <%= log.log %><br/>
 <% end %>
 
 ------------------------------------------------------------------------------------<br/>

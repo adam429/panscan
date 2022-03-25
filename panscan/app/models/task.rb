@@ -1,6 +1,7 @@
 require 'parser/current'
 require 'unparser'
 require 'erb'
+require 'opal'
 
 class Task < ActiveRecord::Base
     def self.create_task(name,code,schedule_at = Time.at(0))
@@ -210,9 +211,18 @@ class Task < ActiveRecord::Base
 def __main()
   @raw_ret = main()
   html = @raw_ret.to_s
+
   if defined?(render_html)=="method" then
       html=ERB.new(render_html()).result(binding)
   end
+
+  if defined?(render_js_rb)=="method" then
+    js_rb=ERB.new(render_js_rb()).result(binding)
+
+    builder = Opal::Builder.new.build_str(js_rb,"")                
+    html=html + "<script>(function() {  #{builder.to_s}  })();</script>"
+  end
+
 
   if defined?(schedule_at)=="method" then
     next_schedule_at = schedule_at()
