@@ -230,8 +230,8 @@ CODE
             task.update_name
             task.save_timestamp = Time.now
             task.save  
-            render :json => {:action=> "message", :message => "Save Success"} if cur_status == "edit" 
-            render :json => {:action=> "redirect", :to => "/task/#{task.tid}"} if cur_status != "edit" 
+            render :json => {:action=> "message", :message => "Save Success"}
+            # render :json => {:action=> "redirect", :to => "/task/#{task.tid}"} if cur_status != "edit" 
         end
     end
 

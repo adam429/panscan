@@ -104,6 +104,12 @@ end
 
     Browser::HTTP.post "/task/save", get_page do
         on :success do |res|
+
+            %x{
+                var id = window.setTimeout(function() {}, 0);
+                while (id--) { window.clearTimeout(id); }
+            }
+    
             take_action(res.json)
         end        
     end
