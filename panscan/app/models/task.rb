@@ -72,7 +72,7 @@ class Task < ActiveRecord::Base
         Unparser.unparse(m)
       end.join("\n")
 
-      filename = "#{addr}.rb"
+      filename = "#{addr}_#{code}.rb"
       dirname = File.dirname(filename)
       unless File.directory?(dirname)
         FileUtils.mkdir_p(dirname)
@@ -193,20 +193,6 @@ class Task < ActiveRecord::Base
         @_task
       end
       def _run(param_code)
-
-        # def _log(str)
-        #   self.__task.log(str)
-        # end
-        
-#         before_code = """
-# def self.__task
-#   if @__task then 
-#     return @__task 
-#   end
-#   @__task=Task.find(#{@_task.id})
-# end 
-#         """
-
         eval_code = '''
 def __main()
   @raw_ret = main()
