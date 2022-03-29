@@ -207,7 +207,6 @@ CODE
     end
 
     def task_save
-
         if params[:tid]=="(new)" then
             task = Task.new
             task.tid = SecureRandom.hex(8)
@@ -229,7 +228,7 @@ CODE
             task.params = json_params(params)
             task.update_name
             task.save_timestamp = Time.now
-            task.save  
+            task.save
             render :json => {:action=> "message", :message => "Save Success"}
             # render :json => {:action=> "redirect", :to => "/task/#{task.tid}"} if cur_status != "edit" 
         end

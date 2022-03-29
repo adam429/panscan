@@ -46,8 +46,8 @@ def update_page(json)
 end
 
 def get_server_task(id)
-    Browser::HTTP.get "/task/json/#{id}" do
-        on :success do |res|
+    HTTP.get "/task/json/#{id}"  do |res|
+        if res.ok? then
             yield(res.json)
         end        
     end
@@ -82,9 +82,9 @@ def do_run
         }
 
         update_page(json)
-    
-        Browser::HTTP.post "/task/run", json do
-            on :success do |res|
+
+        HTTP.post("/task/run", payload:json) do |res|
+            if res.ok? then      
                 take_action(res.json)
                 $$[:setTimeout].call(->{ update_task_run },1000)
             end        
@@ -101,23 +101,20 @@ end
   end
 
   def do_save
-
-    Browser::HTTP.post "/task/save", get_page do
-        on :success do |res|
-
-            %x{
-                var id = window.setTimeout(function() {}, 0);
-                while (id--) { window.clearTimeout(id); }
-            }
-    
-            take_action(res.json)
-        end        
+    HTTP.post("/task/save", payload:get_page) do |res|
+      if res.ok? then
+        %x{
+            var id = window.setTimeout(function() {}, 0);
+            while (id--) { window.clearTimeout(id); }
+        }
+        take_action(res.json)
+      end 
     end
 end
 
 def do_fork
-    Browser::HTTP.post "/task/fork", get_page do
-        on :success do |res|
+    HTTP.post("/task/fork", payload:get_page) do |res|
+        if res.ok? then
             take_action(res.json)
         end        
     end
@@ -163,9 +160,9 @@ def update_params(init_params=nil)
     params = code.scan(/(__[a-zA-Z0-9_]+__)/).flatten
     params = params.filter {|x| x!='__TASK_NAME__'}.map {|x| x.gsub(/^__/,"").gsub(/__$/,"") }
     if params.size>0 then
-        $document.at_css("#params_box").show
+        Element["#params_box"].show
     else
-        $document.at_css("#params_box").hide
+        Element["#params_box"].hide
     end
     if params!=$params then
         params_html = params.map { |param|
