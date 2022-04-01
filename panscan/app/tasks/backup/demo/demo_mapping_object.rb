@@ -1,9 +1,6 @@
 __TASK_NAME__ = "demo/demo_mapping_object"
 
-
 load(Task.load("base/render_wrap"))
-load(Task.load("base/opal_binding"))
-load(Task.load("base/widget"))
 
 
 class Fibonacci < MappingObject
@@ -34,8 +31,6 @@ class Fibonacci < MappingObject
 end
 
 def main()
-    $logger.call(defined?(RenderWrap))
-    
     fobj = Fibonacci.new(11)
     $logger.call("fobj.result = #{fobj.result}") # ==> 144
 
@@ -55,18 +50,5 @@ def main()
     RenderWrap.data
 end
 
-
-
-# def render_js_rb()
-#     ret = RenderWrap.render_jsrb(binding)
-#     return ret
-# end
-
-
-# def render_html()
-
-#     ret = RenderWrap.render_html(binding)
-#     return ret
-# end
 
 
