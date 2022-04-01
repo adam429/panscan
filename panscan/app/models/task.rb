@@ -65,7 +65,6 @@ class Task < ActiveRecord::Base
         raise "Task.load() find error in script #{addr}. Parser error: #{e.message}"
       end
       match = ast.children.filter {|x| not (x.type==:lvasgn and x.children.first==:__TASK_NAME__) and not (x.type==:def and x.children.first==:main) }
-      if code!=:"" then
         match = match.filter {|x| 
           (x.children and x.children.first==code) or
           (x.children and x.children.first.class==Parser::AST::Node and x.children.first.type==:const and x.children.first.children[1]==code )
@@ -75,7 +74,7 @@ class Task < ActiveRecord::Base
         Unparser.unparse(m)
       end.join("\n")
 
-      filename = "#{addr}_#{code}.rb"
+      filename = "#{addr}_#{code.join('_')}.rb"
       dirname = File.dirname(filename)
       unless File.directory?(dirname)
         FileUtils.mkdir_p(dirname)
