@@ -65,14 +65,14 @@ class Task < ActiveRecord::Base
         raise "Task.load() find error in script #{addr}. Parser error: #{e.message}"
       end
       match = ast.children.filter {|x| not (x.type==:lvasgn and x.children.first==:__TASK_NAME__) and not (x.type==:def and x.children.first==:main) }
-        match = match.filter {|x| 
-          match = false
+      match = match.filter {|x| 
+          m = false
           code.each do |c|
-            match = true if (x.children and x.children.first==c)
-            match = true if (x.children and x.children.first.class==Parser::AST::Node and x.children.first.type==:const and x.children.first.children[1]==c )
+            m = true if (x.children and x.children.first==c)
+            m = true if (x.children and x.children.first.class==Parser::AST::Node and x.children.first.type==:const and x.children.first.children[1]==c )
           end
-          match          
-        }
+          m
+      }
       end
       select_code = match.map do |m|
         Unparser.unparse(m)
