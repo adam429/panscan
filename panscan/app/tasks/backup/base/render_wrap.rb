@@ -108,9 +108,11 @@ class RenderWrap
             self.instance.after_html_erb.to_h.map {|k,v| v }.join("\n")
         ).result(binding)
         
-        self.instance.before_html.to_h.map {|k,v| v }.join("\n") +
+        ret = self.instance.before_html.to_h.map {|k,v| v }.join("\n") +
         html + 
         self.instance.after_html.to_h.map {|k,v| v }.join("\n")
+        
+        ERB.new(ret).result(binding)
     end
 
     def self.render_jsrb(binding)
@@ -124,8 +126,7 @@ class RenderWrap
         jsrb + 
         self.instance.after_jsrb.to_h.map {|k,v| v }.join("\n")
         
-        return ret
-
+        ERB.new(ret).result(binding)
     end
     
     def self.before_html(id,val)
