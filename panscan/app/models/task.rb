@@ -209,8 +209,8 @@ class Task < ActiveRecord::Base
       end
       def _run(param_code)
         eval_code = '''
-$logger =  lambda {|x| _log(x.to_s+"\n")}        
-$task = _task
+load "tmp/runner_task_closure_#{@_task.id}.rb"
+
 def __main()
   @raw_ret = main()
   html = @raw_ret.to_s
@@ -234,8 +234,7 @@ __main()
         load_code =  param_code
         Dir.mkdir("tmp") unless File.exists?("tmp")
         File.write "tmp/runner_task_closure_#{@_task.id}.rb",load_code
-        load "tmp/runner_task_closure_#{@_task.id}.rb"
-
+        
         eval(eval_code,binding)
       end
     end   
