@@ -1,10 +1,8 @@
 __TASK_NAME__ = "demo/demo_formatter"
 
-
 def main()
     return [1,2,3,4]
 end
-
 
 def render_html()
 '''<h1>output</h1>
