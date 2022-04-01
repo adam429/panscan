@@ -65,6 +65,22 @@ def update_task_run
     end    
 end
 
+def do_fullscreen
+    if $fullscreen then
+        Element["#task_info"].show
+        Element["#run_info"].show
+        Element["#editor"].removeClass("editor-fullscreen")
+        Element["#editor"].add_class("editor")
+        $fullscreen = false
+    else
+        Element["#task_info"].hide
+        Element["#run_info"].hide
+        Element["#editor"].removeClass("editor")
+        Element["#editor"].add_class("editor-fullscreen")
+        $fullscreen = true
+    end
+end
+
 def do_run
     json = get_page
     
@@ -94,21 +110,21 @@ end
 
 
 
-    def myalert(value)
+def myalert(value)
     `console.log(value)`
 
     value
-  end
+end
 
-  def do_save
+def do_save
     HTTP.post("/task/save", payload:get_page) do |res|
-      if res.ok? then
+        if res.ok? then
         %x{
             var id = window.setTimeout(function() {}, 0);
             while (id--) { window.clearTimeout(id); }
         }
         take_action(res.json)
-      end 
+        end 
     end
 end
 
@@ -182,6 +198,7 @@ $document.ready do
     $params = {}
     $meta_down = false
     $shift_down = false
+    $fullscreen = false
 
     $document.at_css("#save").on(:click) do
         do_save
@@ -219,6 +236,11 @@ $document.ready do
         if e.shift? and e.key=="Enter" then
             puts "run task"
             do_run
+            e.prevent
+        end
+        if e.meta? and e.shift? and e.char=="F" then
+            puts "fullscreen"
+            do_fullscreen
             e.prevent
         end
     end

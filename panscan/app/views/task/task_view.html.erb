@@ -2,11 +2,19 @@
 <script src="/assets/task_new.js"></script>
 
 <style type="text/css" media="screen">
-.ace_editor {
+
+.editor {
     border: 4px solid lightgray;
     margin: auto;
     height: 800px;
     width: 80%;
+}
+.editor-fullscreen { 
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
 }
 
 .scrollmargin {
@@ -14,6 +22,8 @@
     text-align: center;
 }
 </style>
+
+<div id="task_info">
 
 <h1> Task View </h1>
 task uid = <span id="tid"><%= @task.tid or "(new)" %></span> (<span id="id"><%= @task.id  %></span>  | <span id="name"><%= @task.name %></span>)  [<a id="fork" href="#">Fork</a>]
@@ -49,11 +59,15 @@ cmd:
   <br/><br/>
 
 <div class="scrollmargin"></div>
+</div>
+
 <h3>Task Code</h3>
 <div id="refs" style="width: 80%; margin: auto;"></div><br/>
+<div id="code">
+<pre id="editor" class="editor"><%= @task.code %></pre>
+</div>
 
-<pre id="editor"><%= @task.code %></pre>
-
+<div id="run_info">
 <h3>Task Runner</h3>
 <div id="runner"style="border: 4px solid lightgray; width: 80%; margin: auto;">
 <pre></pre>
@@ -70,6 +84,7 @@ cmd:
 <div style="border: 4px solid lightgray; width: 80%; margin: auto;">
 <pre id="output"><%= @output%></pre>
 </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/ace.js" integrity="sha512-6ts6Fu561/yzWvD6uwQp3XVYwiWNpWnZ0hdeQrETqtnQiGjTfOS06W76aUDnq51hl1SxXtJaqy7IsZ3oP/uZEg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
@@ -77,12 +92,13 @@ cmd:
 
 <script>
     var editor = ace.edit("editor", {
+       theme:"ace/theme/one_dark",
+       mode:"ace/mode/ruby",
        autoScrollEditorIntoView: true,
-       maxLines: 40 ,
-       fontSize: 16
+       fontSize: 16 ,
+       scrollPastEnd: 0.5,
     });
-    editor.setTheme("ace/theme/one_dark");
-    editor.session.setMode("ace/mode/ruby");
+
 </script>
 
 
