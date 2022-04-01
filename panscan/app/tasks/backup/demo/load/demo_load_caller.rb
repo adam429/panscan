@@ -5,8 +5,9 @@ load(Task.load("demo/load/demo_load_sum::sum"))
 load(Task.load("demo/load/demo_load_class"))
 
 def main()
-    _log sum(4,5).to_s+"\n"
-    _log Avg.call([1,2,3,4]).to_s+"\n"
-    _log mul(2,3).to_s+"\n"
+    $logger.call File.read(Task.load("demo/load/demo_load_sum::sum"))
+    $logger.call sum(4,5)
+    $logger.call Avg.call([1,2,3,4])
+    $logger.call mul(2,3)
     nil
 end
