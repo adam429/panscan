@@ -1,5 +1,10 @@
 __TASK_NAME__ = "z"
 
-def init_logger(binding)
-    eval('$logger =  lambda {|x| _log(x.to_s+"\n")}',binding)
+# load(Task.load("base/logger"))
+
+def main
+    # init_logger(binding)
+    
+    $logger.call ($task.name)
+    
 end
