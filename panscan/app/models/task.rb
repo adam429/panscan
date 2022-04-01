@@ -210,6 +210,7 @@ class Task < ActiveRecord::Base
       def _run(param_code)
         eval_code = '''
 $task = _task
+$logger =  lambda {|x| _log(x.to_s+"\n")}
 
 load "tmp/runner_task_closure_#{@_task.id}.rb"
 
