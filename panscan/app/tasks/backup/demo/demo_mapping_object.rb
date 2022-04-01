@@ -34,6 +34,8 @@ class Fibonacci < MappingObject
 end
 
 def main()
+    $logger.call(defined?(RenderWrap))
+    
     fobj = Fibonacci.new(11)
     $logger.call("fobj.result = #{fobj.result}") # ==> 144
 
