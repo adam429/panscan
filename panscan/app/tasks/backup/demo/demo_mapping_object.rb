@@ -1,6 +1,5 @@
 __TASK_NAME__ = "demo/demo_mapping_object"
 
-load(Task.load("base/logger"))
 
 load(Task.load("base/render_wrap"))
 load(Task.load("base/opal_binding"))
@@ -35,11 +34,8 @@ class Fibonacci < MappingObject
 end
 
 def main()
-    init_logger(binding)
-    $task_name = _task.name
-
     fobj = Fibonacci.new(11)
-    $logger.call(fobj.result) # ==> 144
+    $logger.call("fobj.result = #{fobj.result}") # ==> 144
 
     RenderWrap[:fobj] = fobj
     RenderWrap.data
