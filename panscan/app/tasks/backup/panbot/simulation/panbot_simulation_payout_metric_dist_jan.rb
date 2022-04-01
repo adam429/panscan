@@ -11,7 +11,6 @@ load(Task.load("base/opal_binding"))
 load(Task.load("base/widget"))
 
 load(Task.load("panbot/panbot_stats"))
-load(Task.load("base/logger"))
 
 
 def run_simluation(min_amount,min_payout,bet_amount_factor,bet_amount_value,epoch_begin,epoch_end,bot_class)
@@ -109,7 +108,6 @@ end
 
 
 def main
-    init_logger(binding)
     RenderWrap.load(Task.load("#{_task.name}::cut_window"))
     RenderWrap.load(Task.load("#{_task.name}::dist_chart"))
     
