@@ -221,6 +221,7 @@ def __main()
   if defined?(RenderWrap)=="constant" then
     html = RenderWrap.render_html(binding)
     js_rb = RenderWrap.render_jsrb(binding)
+    
     builder = Opal::Builder.new.build_str(js_rb,"")                
     html=html + "<script>(function() {  #{builder.to_s}  })();</script>"
   else
