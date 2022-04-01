@@ -86,15 +86,74 @@ class SimulationRunner < PanRunner
     def getCurrentBlock
         @block
     end
+    
+    def removeAddress(addr,bull_amount,bear_amount)
+        tx = Tx.where(from:addr)
+          .where("? <= block_number and block_number < ?",Epoch.find_by_epoch(@epoch.epoch).start_block_number,@block)
+          .where("method_name='betBull' or method_name='betBear' ")
+          .where(tx_status:true).first       
+          
+        if tx!=nil then
+            amount = tx.amount/1e18
+            action = tx.method_name
+            
+            if action=="betBull" then
+                bull_amount = bull_amount - amount
+            end
+            if action=="betBear" then
+                bear_amount = bear_amount - amount
+            end
+        end
+        
+        return bull_amount,bear_amount
+    end
+    
+    def removeAddr(bull_amount,bear_amount)
+        ret_bull_amount = bull_amount
+        ret_bear_amount = bear_amount
+        
+        Vault.get("bot_address").each do |addr|
+            ret_bull_amount,ret_bear_amount = removeAddress(addr,ret_bull_amount,ret_bear_amount)
+        end
 
+        return ret_bull_amount,ret_bear_amount
+    end
+    
     def getCurrentPayout
         ar_epoch = getEpoch
-        return ar_epoch.get_bull_payout(@block),ar_epoch.get_bear_payout(@block),ar_epoch.get_bull_amount(@block),ar_epoch.get_bear_amount(@block)
+        bull_amount = ar_epoch.get_bull_amount(@block)
+        bear_amount = ar_epoch.get_bear_amount(@block)
+        
+        bull_amount,bear_amount = removeAddr(bull_amount,bear_amount)
+        
+        total_amount = bull_amount + bear_amount
+        if total_amount == 0 then
+            bull_payout = 0
+            bear_payout = 0
+        else
+            bull_payout =  total_amount / bull_amount
+            bear_payout=  total_amount / bear_amount
+        end
+
+        return bull_payout,bear_payout,bull_amount,bear_amount
     end
 
     def getCurrentAmount
         ar_epoch = getEpoch
-        return ar_epoch.get_amount(@block)
+        bull_amount = ar_epoch.get_bull_amount(@block)
+        bear_amount = ar_epoch.get_bear_amount(@block)
+
+        bull_amount,bear_amount = removeAddr(bull_amount,bear_amount)
+        
+        total_amount = bull_amount + bear_amount
+        
+        # @logger.call "epoch = #{ar_epoch.epoch} | total_amount = #{total_amount}\n"
+        
+        return total_amount
+    end
+
+    def betNone(sender)
+        sender.epoch_bet = ["none",0,lastBlockOrder-2]+getCurrentPayout() if sender.epoch_bet==nil
     end
 
     def betBull(sender,amount)
@@ -111,6 +170,7 @@ class SimulationRunner < PanRunner
         ar_epoch = getEpoch
 
         @logger.call "#{Time.now} - #{ar_epoch.epoch}\n" if ar_epoch.epoch % 100 == 0
+        # @logger.call "#{Time.now} - #{ar_epoch.epoch}\n" if ar_epoch.epoch % 1 == 0
 
         @block = ar_epoch.lock_block_number
         log "===endRound #{ar_epoch.epoch}==="

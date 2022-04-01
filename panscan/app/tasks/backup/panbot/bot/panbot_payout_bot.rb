@@ -17,6 +17,7 @@ class PayoutBot < PanBot
                 betBear(self,getCurrentAmount * @config[:bet_amount_factor] + @config[:bet_amount_value]) if payout_bull < payout_bear
             else
                 log "do not bet"
+                betNone(self)
             end
         end
     end

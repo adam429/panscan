@@ -23,6 +23,9 @@ class PanRunner
 
     def betBear(sender,amount)
     end
+    
+    def betNone(sender)
+    end
 
     def endRound()
     end

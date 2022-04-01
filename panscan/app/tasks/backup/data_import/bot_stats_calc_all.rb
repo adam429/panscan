@@ -63,6 +63,8 @@ def main()
     addr_list = Address.where(is_panbot:true).order(:id).select(:addr,:id)
     addr_list = addr_list.map.with_index.map {|x,i| [x.addr,x.id, i] }
     
+    _log ("bot_stats_calc.addr_list #{addr_list.count} bot_stats_calc.addr_list")
+    
     Cache.set("bot_stats_calc.addr_list",addr_list)
     Cache.set("bot_stats_calc.panbot_address",addr_hash)
     
