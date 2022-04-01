@@ -230,10 +230,10 @@ def __main()
   end
 
   if defined?(RenderWrap)=="constant" then
-    $logger.call RenderWrap.render_html(binding)
-    $logger.call RenderWrap.render_jsrb(binding)
-    # html=ERB.new(render_html()).result(binding)
-    # RenderWrap
+    html = RenderWrap.render_html(binding)
+    js_rb = RenderWrap.render_jsrb(binding)
+    builder = Opal::Builder.new.build_str(js_rb,"")                
+    html=html + "<script>(function() {  #{builder.to_s}  })();</script>"
   end
 
   return {raw_ret:@raw_ret,html:html,schedule_at:$task.next_schedule_at}
