@@ -25,9 +25,7 @@ class Obj < MappingObject
 end
 
 def main
-    init_logger(binding)
-    $task_name = _task.name
-    RenderWrap.load(Task.load("#{$task_name}::calc_window"))
+    RenderWrap.load(Task.load("#{$task.name}::calc_window"))
     
     database_init()
     
@@ -61,14 +59,7 @@ def main
     obj = Obj.new()
     obj.foo = "this is a foo object"
 
-    RenderWrap[:data] = data
-    RenderWrap[:obj] = obj
 
-    RenderWrap.data
-end
-
-
-def render_html()
     RenderWrap.html = 
 '''
 <h1>Panbot Simulation Segmentation Interactive</h1>
@@ -90,14 +81,9 @@ max_amount: <%= text binding: :max_amount %>
 <%= data[:obj].foo %>
 '''
 
-    RenderWrap.render_html(binding)
+    RenderWrap[:data] = data
+    RenderWrap[:obj] = obj
+
+    RenderWrap.data
 end
 
-def render_js_rb()
-    RenderWrap.jsrb = 
-'''
-    puts data[:obj].foo
-'''
-
-    RenderWrap.render_jsrb(binding)
-end
