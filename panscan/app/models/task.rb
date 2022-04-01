@@ -44,12 +44,15 @@ class Task < ActiveRecord::Base
     ## for task editor
     def self.load(address)
       addr, code = address.split("::")
-      code=[] if code==nil
       if code[0]=="(" and code[-1]==")" then
         code = code[1..-2]
         code = code.split(",")
       else
-        code = [code]
+        if code==nil then
+          code = []
+        else
+          code = [code]
+        end
       end
     
       task = nil
