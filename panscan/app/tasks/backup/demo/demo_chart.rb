@@ -10,6 +10,7 @@ def main()
         
     '''<%= timer title:"play", code:":input = :input.to_i+1", stop:":input.to_i<100", timeout:1000 %>'''
     '''<%= button title:"next day", code:":input=:input.to_i+288" %>'''
+    
     RenderWrap.html=
     '''
     <h1>Chart</h1>
@@ -23,6 +24,7 @@ def main()
     
     '''
     
+    nil
 end
 
 def chart_data1(input)
