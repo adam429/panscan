@@ -37,29 +37,34 @@ def main()
     fobj = Fibonacci.new(11)
     $logger.call("fobj.result = #{fobj.result}") # ==> 144
 
-    RenderWrap[:fobj] = fobj
-    RenderWrap.data
-end
 
-def render_js_rb()
-    RenderWrap.jsrb = 
-'''
-    Element["#result"].html = data[:fobj].result
-'''
-    ret = RenderWrap.render_jsrb(binding)
-    return ret
-end
-
-
-def render_html()
     RenderWrap.html = 
 '''
 (html) data[:fobj].result = <%= data[:fobj].result %> <br/>
 (js) data[:fobj].result = <span id="result"></span> <br/><br/>
 '''
 
-    ret = RenderWrap.render_html(binding)
-    return ret
+    RenderWrap.jsrb = 
+'''
+    Element["#result"].html = data[:fobj].result
+'''
+
+    RenderWrap[:fobj] = fobj
+    RenderWrap.data
 end
+
+
+
+# def render_js_rb()
+#     ret = RenderWrap.render_jsrb(binding)
+#     return ret
+# end
+
+
+# def render_html()
+
+#     ret = RenderWrap.render_html(binding)
+#     return ret
+# end
 
 
