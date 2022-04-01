@@ -66,8 +66,12 @@ class Task < ActiveRecord::Base
       end
       match = ast.children.filter {|x| not (x.type==:lvasgn and x.children.first==:__TASK_NAME__) and not (x.type==:def and x.children.first==:main) }
         match = match.filter {|x| 
-          (x.children and x.children.first==code) or
-          (x.children and x.children.first.class==Parser::AST::Node and x.children.first.type==:const and x.children.first.children[1]==code )
+          match = false
+          code.each do |c|
+            match = true if (x.children and x.children.first==c)
+            match = true if (x.children and x.children.first.class==Parser::AST::Node and x.children.first.type==:const and x.children.first.children[1]==c )
+          end
+          match          
         }
       end
       select_code = match.map do |m|
