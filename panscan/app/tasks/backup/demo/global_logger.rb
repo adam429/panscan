@@ -5,5 +5,6 @@ __TASK_NAME__ = "demo/global_logger"
 def main
     # init_logger(binding)
     
-    $logger.call ("global logger - hello world!")
+    $logger.call ($task.name)
+    
 end

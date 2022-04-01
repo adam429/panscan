@@ -195,6 +195,7 @@ class Task < ActiveRecord::Base
       def _run(param_code)
         eval_code = '''
 $logger =  lambda {|x| _log(x.to_s+"\n")}        
+$task = _task
 def __main()
   @raw_ret = main()
   html = @raw_ret.to_s
