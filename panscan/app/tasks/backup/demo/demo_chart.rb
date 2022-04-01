@@ -7,10 +7,24 @@ load(Task.load("base/widget"))
 load(Task.load("base/opal_binding"))
 
 def main()
-    init_logger(binding)
-
-    RenderWrap.load(Task.load("#{_task.name}::chart_data1"))
-    RenderWrap.load(Task.load("#{_task.name}::chart_data2"))
+    RenderWrap.load(Task.load("#{$task.name}::chart_data1"))
+    RenderWrap.load(Task.load("#{$task.name}::chart_data2"))
+        
+    '''<%= timer title:"play", code:":input = :input.to_i+1", stop:":input.to_i<100", timeout:1000 %>'''
+    '''<%= button title:"next day", code:":input=:input.to_i+288" %>'''
+    RenderWrap.html=
+    '''
+    <h1>Chart</h1>
+    input: <%= text binding: :input %><br/><br/>
+    0-100<%= slider min:0, max:100, value:10, binding: :input %> 
+    
+    <%= calculated_var ":chart_val1 = chart_data1(:input.to_i)" %>
+    <%= calculated_var ":chart_val2 = chart_data2(:input.to_i)" %>
+    <%= chart binding: :chart_val1 %>
+    <%= chart binding: :chart_val2 %>
+    
+    '''
+    
 end
 
 def chart_data1(input)
@@ -58,33 +72,4 @@ def chart_data2(input)
 
     return spec
 end
-
-def render_html()
-'''<%= timer title:"play", code:":input = :input.to_i+1", stop:":input.to_i<100", timeout:1000 %>'''
-'''<%= button title:"next day", code:":input=:input.to_i+288" %>'''
-    RenderWrap.html=
-'''
-<h1>Chart</h1>
-input: <%= text binding: :input %><br/><br/>
-0-100<%= slider min:0, max:100, value:10, binding: :input %> 
-
-<%= calculated_var ":chart_val1 = chart_data1(:input.to_i)" %>
-<%= calculated_var ":chart_val2 = chart_data2(:input.to_i)" %>
-<%= chart binding: :chart_val1 %>
-<%= chart binding: :chart_val2 %>
-
-'''
-    ret = RenderWrap.render_html(binding)
-    return ret
-end
-
-
-def render_js_rb()
-    RenderWrap.jsrb = 
-'''
-'''
-    ret = RenderWrap.render_jsrb(binding)
-    return ret
-end
-
 
