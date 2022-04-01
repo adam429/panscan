@@ -27,7 +27,6 @@ end
 def render_js_rb()
     RenderWrap.jsrb = 
 '''
-    Element["#result"].html = data[:fobj].result
 '''
     ret = RenderWrap.render_jsrb(binding)
     return ret
@@ -37,10 +36,6 @@ end
 def render_html()
     RenderWrap.html = 
 '''
-(html) data[:fobj].result = <%= data[:fobj].result %> <br/>
-(js) data[:fobj].result = <span id="result"></span> <br/><br/>
-
-
 <%= var :base, 10000 %>
 
 <div class="container">
