@@ -1,7 +1,5 @@
 __TASK_NAME__ = "demo/demo_binding"
 
-load(Task.load("base/logger"))
-
 load(Task.load("base/render_wrap"))
 load(Task.load("base/opal_binding"))
 load(Task.load("base/widget"))
@@ -14,14 +12,10 @@ def min(a,b)
     a<b ? a : b
 end
 
-
 def main()
-    init_logger(binding)
-    $task_name = _task.name
-    
     RenderWrap.load(Task.load("demo/load/demo_load_sum::sum"))
-    RenderWrap.load(Task.load("#{_task.name}::max"))
-    RenderWrap.load(Task.load("#{_task.name}::min"))
+    RenderWrap.load(Task.load("#{$task.name}::max"))
+    RenderWrap.load(Task.load("#{$task.name}::min"))
 end
 
 def render_js_rb()
