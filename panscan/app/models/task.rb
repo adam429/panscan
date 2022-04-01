@@ -229,6 +229,10 @@ def __main()
     html=html + "<script>(function() {  #{builder.to_s}  })();</script>"
   end
 
+  if defined?(RenderWrap)=="constant" then
+
+  end
+
   return {raw_ret:@raw_ret,html:html,schedule_at:$task.next_schedule_at}
 end
 
