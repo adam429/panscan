@@ -9,7 +9,7 @@ def main()
     
     remote_task = Task.wait_until_done(remote_task)
     remote_task.each do |task|
-        _log "#{task.output}\n"
+        $logger.call "#{task.output}""
     end
     return "done"
 end
