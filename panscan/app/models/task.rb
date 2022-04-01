@@ -210,6 +210,7 @@ class Task < ActiveRecord::Base
       def _run(param_code)
         eval_code = '''
 $task = _task
+
 load "tmp/runner_task_closure_#{@_task.id}.rb"
 
 def __main()
