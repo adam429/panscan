@@ -44,7 +44,7 @@ class Task < ActiveRecord::Base
     ## for task editor
     def self.load(address)
       addr, code = address.split("::")
-      code="*" if code==nil
+      code="" if code==nil
       code=code.to_sym
 
       task = nil
@@ -62,7 +62,7 @@ class Task < ActiveRecord::Base
         raise "Task.load() find error in script #{addr}. Parser error: #{e.message}"
       end
       match = ast.children.filter {|x| not (x.type==:lvasgn and x.children.first==:__TASK_NAME__) and not (x.type==:def and x.children.first==:main) }
-      if code!=:* then
+      if code!=:"" then
         match = match.filter {|x| 
           (x.children and x.children.first==code) or
           (x.children and x.children.first.class==Parser::AST::Node and x.children.first.type==:const and x.children.first.children[1]==code )
