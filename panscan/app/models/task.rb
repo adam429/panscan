@@ -4,6 +4,8 @@ require 'erb'
 require 'opal'
 
 class Task < ActiveRecord::Base
+    attr_accessor :next_schedule_at
+
     def self.create_task(name,code,schedule_at = Time.at(0))
       task = Task.new
       task.status = "open"
@@ -224,12 +226,7 @@ def __main()
     html=html + "<script>(function() {  #{builder.to_s}  })();</script>"
   end
 
-
-  if defined?(schedule_at)=="method" then
-    next_schedule_at = schedule_at()
-  end
-
-  return {raw_ret:@raw_ret,html:html,schedule_at:next_schedule_at}
+  return {raw_ret:@raw_ret,html:html,schedule_at:$task.next_schedule_at}
 end
 
 __main()

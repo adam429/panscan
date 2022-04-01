@@ -1,9 +1,6 @@
 __TASK_NAME__ = "demo/demo_schedule_task"
 
-$task.schedule_at = Time.now+60
-def schedule_at()
-    
-end
+$task.next_schedule_at = Time.now+60
 
 def main()
     sleep(30)
