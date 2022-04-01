@@ -45,8 +45,8 @@ class Task < ActiveRecord::Base
     def self.load(address)
       addr, code = address.split("::")
       code="" if code==nil
-      code=code.to_sym
-
+      code = code[1..-2] if code[0]=="(" and code[-1]==")" then
+    
       task = nil
       if addr =~ /^[0-9a-f]{16}$/ then
         task = Task.find_by_tid(addr)
