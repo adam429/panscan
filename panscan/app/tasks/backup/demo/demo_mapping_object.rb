@@ -35,10 +35,11 @@ class Fibonacci < MappingObject
 end
 
 def main()
+    init_logger(binding)
     $task_name = _task.name
 
     fobj = Fibonacci.new(11)
-    fobj.result # ==> 144
+    $logger.call(fobj.result) # ==> 144
 
     RenderWrap[:fobj] = fobj
     RenderWrap.data
