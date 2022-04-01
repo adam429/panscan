@@ -48,6 +48,8 @@ class Task < ActiveRecord::Base
       if code[0]=="(" and code[-1]==")" then
         code = code[1..-2]
         code = code.split(",")
+      else
+        code = [code]
       end
     
       task = nil
