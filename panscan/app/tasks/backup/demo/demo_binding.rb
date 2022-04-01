@@ -22,12 +22,6 @@ def main()
     RenderWrap.load(Task.load("demo/load/demo_load_sum::sum"))
     RenderWrap.load(Task.load("#{_task.name}::max"))
     RenderWrap.load(Task.load("#{_task.name}::min"))
-    
-    fobj = Fibonacci.new(11)
-    fobj.result # ==> 144
-
-    RenderWrap[:fobj] = fobj
-    RenderWrap.data
 end
 
 def render_js_rb()
