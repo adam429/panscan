@@ -14,33 +14,6 @@ def min(a,b)
     a<b ? a : b
 end
 
-class Fibonacci < MappingObject
-    attr_accessor :n
-
-    def to_data
-        self.n
-    end
-    
-    def from_data(data)
-        self.n = data.to_i
-    end
-    
-    def fn(n)
-        return 1 if n==0
-        return 1 if n==1 
-        return fn(n-1)+fn(n-2) 
-    end
-    
-    def result
-        fn(self.n)
-    end
-    
-    def initialize(n)
-        self.n = n
-    end
-        
-end
-
 
 def main()
     init_logger(binding)
@@ -56,6 +29,16 @@ def main()
     RenderWrap[:fobj] = fobj
     RenderWrap.data
 end
+
+def render_js_rb()
+    RenderWrap.jsrb = 
+'''
+    Element["#result"].html = data[:fobj].result
+'''
+    ret = RenderWrap.render_jsrb(binding)
+    return ret
+end
+
 
 def render_html()
     RenderWrap.html = 
@@ -110,11 +93,3 @@ max = <%= text binding: :max %><%= calculated_var ":max = max(:number1.to_i, :nu
 end
 
 
-def render_js_rb()
-    RenderWrap.jsrb = 
-'''
-    Element["#result"].html = data[:fobj].result
-'''
-    ret = RenderWrap.render_jsrb(binding)
-    return ret
-end
