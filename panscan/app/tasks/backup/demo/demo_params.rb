@@ -2,7 +2,7 @@ __TASK_NAME__ = "demo/demo_params"
 
 def task(count)
     count.times do |x|
-        _log x.to_s+"\n"
+        $logger.call x
         sleep(1)
     end
     return "my value"
