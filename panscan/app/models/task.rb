@@ -218,22 +218,22 @@ def __main()
   @raw_ret = main()
   html = @raw_ret.to_s
 
-  if defined?(render_html)=="method" then
-      html=ERB.new(render_html()).result(binding)
-  end
-
-  if defined?(render_js_rb)=="method" then
-    js_rb=ERB.new(render_js_rb()).result(binding)
-
-    builder = Opal::Builder.new.build_str(js_rb,"")                
-    html=html + "<script>(function() {  #{builder.to_s}  })();</script>"
-  end
-
   if defined?(RenderWrap)=="constant" then
     html = RenderWrap.render_html(binding)
     js_rb = RenderWrap.render_jsrb(binding)
     builder = Opal::Builder.new.build_str(js_rb,"")                
     html=html + "<script>(function() {  #{builder.to_s}  })();</script>"
+  else
+    if defined?(render_html)=="method" then
+      html=ERB.new(render_html()).result(binding)
+    end
+
+    if defined?(render_js_rb)=="method" then
+      js_rb=ERB.new(render_js_rb()).result(binding)
+
+      builder = Opal::Builder.new.build_str(js_rb,"")                
+      html=html + "<script>(function() {  #{builder.to_s}  })();</script>"
+    end
   end
 
   return {raw_ret:@raw_ret,html:html,schedule_at:$task.next_schedule_at}
