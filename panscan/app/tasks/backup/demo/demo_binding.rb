@@ -13,24 +13,6 @@ def min(a,b)
 end
 
 def main()
-    $logger.call(Task.load("demo/load/demo_load_sum::(sum,plus)"))
-    $logger.call(Task.load("demo/load/demo_load_sum"))
-
-    RenderWrap.load(Task.load("demo/load/demo_load_sum::sum"))
-    RenderWrap.load(Task.load("#{$task.name}::max"))
-    RenderWrap.load(Task.load("#{$task.name}::min"))
-end
-
-def render_js_rb()
-    RenderWrap.jsrb = 
-'''
-'''
-    ret = RenderWrap.render_jsrb(binding)
-    return ret
-end
-
-
-def render_html()
     RenderWrap.html = 
 '''
 <%= var :base, 10000 %>
@@ -74,8 +56,9 @@ max = <%= text binding: :max %><%= calculated_var ":max = max(:number1.to_i, :nu
 </style>
 '''
 
-    ret = RenderWrap.render_html(binding)
-    return ret
+    RenderWrap.load(Task.load("demo/load/demo_load_sum::sum"))
+    RenderWrap.load(Task.load("#{$task.name}::max"))
+    RenderWrap.load(Task.load("#{$task.name}::min"))
 end
 
 
