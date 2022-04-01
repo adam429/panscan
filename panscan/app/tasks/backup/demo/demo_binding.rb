@@ -13,6 +13,8 @@ def min(a,b)
 end
 
 def main()
+    $logger.call(Task.load("demo/load/demo_load_sum"))
+
     RenderWrap.load(Task.load("demo/load/demo_load_sum::sum"))
     RenderWrap.load(Task.load("#{$task.name}::max"))
     RenderWrap.load(Task.load("#{$task.name}::min"))
