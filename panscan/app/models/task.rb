@@ -44,8 +44,11 @@ class Task < ActiveRecord::Base
     ## for task editor
     def self.load(address)
       addr, code = address.split("::")
-      code="" if code==nil
-      code = code[1..-2] if code[0]=="(" and code[-1]==")" then
+      code=[] if code==nil
+      if code[0]=="(" and code[-1]==")" then
+        code = code[1..-2]
+        code = code.split(",")
+      end
     
       task = nil
       if addr =~ /^[0-9a-f]{16}$/ then
