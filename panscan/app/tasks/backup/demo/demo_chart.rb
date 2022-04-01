@@ -1,7 +1,5 @@
 __TASK_NAME__ = "demo/demo_chart"
 
-load(Task.load("base/logger"))
-
 load(Task.load("base/render_wrap"))
 load(Task.load("base/widget"))
 load(Task.load("base/opal_binding"))
