@@ -97,7 +97,7 @@ class Task < ActiveRecord::Base
       return filename
     end
 
-    def self.run_remote(address,params={},schedule_at=Time.at(0))
+    def self.run_remote(address,params={},schedule_at=Time.at(0),logger==nil)
       params = params.map {|k,v| [k,v.to_s]}.to_h
       task = nil
       if address =~ /^[0-9a-f]{16}$/ then
@@ -115,6 +115,9 @@ class Task < ActiveRecord::Base
       new_task.status = "open"
       new_task.schedule_at = schedule_at
       new_task.save
+
+      logger.call("remote task <a href='/task/#{new_task.id}'>#{new_task.id}</a> : #{new_task.name} : #{new_task.params}") if logger!=nil
+
       return new_task
     end
 
