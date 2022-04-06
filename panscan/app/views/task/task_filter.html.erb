@@ -8,9 +8,11 @@ Task Count: <%= @task.count %><br/>
   <td>| id</td>
   <td>| tid</td>
   <td>| name</td>
+  <td>| params</td>
   <td>| status</td>
   <td>| schedule_at</td>
   <td>| runner</td>
+  <td>| runner_time</td>
   <td>| action</td>
 </tr>
 <% @task.each_with_index do |t,i| %>
@@ -19,9 +21,11 @@ Task Count: <%= @task.count %><br/>
   <td>| <a href="/task/<%= t.id %>"><%= t.id %></a></td>
   <td>| <a href="/task/<%= t.tid %>"><%= t.tid %></a></td>
   <td>| <%= t.tid == t.name ? "" :t.name %></td>
+  <td>| <%= t.params %></td>
   <td>| <%= t.status %></td>
   <td>| <%= t.schedule_at ? t.schedule_at.to_formatted_s(:db) : "" %></td>
   <td>| <%= t.runner %></td>
+  <td>| <%= t.run_timestamp ? ActiveSupport::Duration.build(Time.now - t.run_timestamp).parts.map do |key, value|  [value.to_i, key].join(' ') end.join(' ')  : "" %></td>
   <td>| <a href='/task/kill/<%= t.id %>'>kill</a> <a href='/task/status/<%= t.id %>/delete'>delete</a> <a href='/task/status/<%= t.id %>/edit'>edit</a> </td>
 </tr>
 <% end %>

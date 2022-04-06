@@ -8,7 +8,9 @@ Closure Task: <%= raw @closure_task.map { |x| ["<a href='/task/filter/closure_ta
 <tr>
   <td>| #</td>
   <td>| tid</td>
+  <td>| id</td>
   <td>| name</td>
+  <td>| params</td>
   <td>| status</td>
   <td>| schedule_at</td>
   <td>| runner</td>
@@ -18,8 +20,10 @@ Closure Task: <%= raw @closure_task.map { |x| ["<a href='/task/filter/closure_ta
 <% @running_task.each_with_index do |t,i| %>
 <tr>
   <td>| <%= i %></td>
+  <td>| <a href="/task/<%= t.id %>"><%= t.id %></a></td>
   <td>| <a href="/task/<%= t.tid %>"><%= t.tid %></a></td>
   <td>| <%= t.tid == t.name ? "" :t.name %></td>
+  <td>| <%= t.params %></td>
   <td>| <%= t.status %></td>
   <td>| <%= t.schedule_at ? t.schedule_at.to_formatted_s(:db) : "" %></td>
   <td>| <%= t.runner %></td>

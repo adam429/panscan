@@ -14,7 +14,16 @@ start new instances <a href="/worker/create_workers/1">+1</a> <a href="/worker/c
     <li><span style="color:red">timeout</span></li>
  <% else %>
   <% v[:docker].each do |d| %>
-    <li>[<a href="/worker/restart_worker/<%= d[:worker] %>">restart</a>] [<a href="/worker/delete_worker/<%= d[:worker] %>">delete</a>] <%= d[:worker] %> | <%= d[:run_time]%> | <%=  @task[d[:worker]] ? @task[d[:worker]][0] : ""%>  | <%=  @task[d[:worker]] ? @task[d[:worker]][1].round(2) : ""%> </li>
+    <li>[<a href="/worker/restart_worker/<%= d[:worker] %>">restart</a>] 
+    [<a href="/worker/delete_worker/<%= d[:worker] %>">delete</a>]
+    <%= d[:worker] %> | <%= d[:run_time]%> |
+    <% if  @task[d[:worker]] then%>
+      <a href="/task/<%=@task[d[:worker]][2]%>"><%= @task[d[:worker]][2] %></a>  
+    <%end %>|
+    <%=  @task[d[:worker]] ? @task[d[:worker]][1].round(2) : ""%> |
+    <%=  @task[d[:worker]] ? @task[d[:worker]][0] : ""%>  |
+    <%=  @task[d[:worker]] ? @task[d[:worker]][3] : ""%> 
+    </li>
   <% end %>
  <% end %>
 <% end %>

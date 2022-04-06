@@ -44,7 +44,7 @@ class TaskController < ApplicationController
 
         @task = {}
         Task.where(status:"run").order(:run_timestamp).each do |t|
-            @task[t.runner]= [t.name,(Time.now-t.run_timestamp)]
+            @task[t.runner]= [t.name,(Time.now-t.run_timestamp),t.id,t.params]
         end
     end
 
@@ -123,7 +123,7 @@ CODE
         @name_task = Task.where("tid is not null").group(:status).count
         @closure_task = Task.where("tid is null").group(:status).count
         
-        @running_task = Task.order(updated_at: :desc).where(status:"run").where("tid is not null").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
+        @running_task = Task.order(:tid,updated_at: :desc).where(status:"run").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
         @schedule_task = Task.order(updated_at: :desc).where(status:"open").where("tid is not null").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
 
         @task = Task.where("name like ?","#{@prefix}%").order(status: :asc,updated_at: :desc).where("tid is not null").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at).all
