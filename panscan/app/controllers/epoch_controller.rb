@@ -34,7 +34,7 @@ class EpochController < ApplicationController
 
     def address_update_stats
         addr = params[:addr]
-        Task.remote_task("bot_stats_address_update",{addr:addr})
+        Task.run_remote("data_import/bot_stats_address_update",{addr:addr})
         redirect_to "/address/#{addr}"
     end
 
