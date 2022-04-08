@@ -19,7 +19,7 @@ class Cache < ActiveRecord::Base
       return self.value_s if self.value_type == "String"
       return self.value_t if self.value_type == "Time" or self.value_type == "DateTime" or self.value_type == "Date"
       return self.value_b if self.value_type == "FalseClass" or self.value_type == "TrueClass"
-      return JSON.parse(self.value_s) if self.value_type == "JSON"
+      return JSON.parse(self.value_s.gsub(/:NaN/,":0")) if self.value_type == "JSON"
     end
     
     def self.set(key,value)
