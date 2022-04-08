@@ -245,6 +245,21 @@ CODE
         JSON.dump(params_hash)
     end
 
+    def task_return_json
+        task = nil
+        if params[:tid] =~ /^[0-9a-f]{16}$/ then
+            task = Task.find_by_tid(params[:tid])
+        else
+            task = Task.where(name:params[:tid]).where("tid is not null").order(save_timestamp: :desc).first
+        end
+
+        if task then
+            render :json => JSON.dump({status:"ok",result:task.raw_ret["json"]})
+        else
+            render :json => JSON.dump({status:"error",result:nil})
+        end
+    end
+
     def task_return_view
         task = nil
         if params[:tid] =~ /^[0-9a-f]{16}$/ then
