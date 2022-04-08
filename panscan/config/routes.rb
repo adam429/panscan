@@ -17,6 +17,7 @@ Rails.application.routes.draw do
 
   get "/address/top", to: "epoch#address_top"
   get "/address/:id", to: "epoch#address"
+  get "/address/update_stats/:addr", to: "epoch#address_update_stats"
   get "/address/group/top", to: "epoch#address_group_top"
   get "/address/group/:group", to: "epoch#address_group"
   get "/address/group/graph/:group", to: "epoch#address_group_graph"

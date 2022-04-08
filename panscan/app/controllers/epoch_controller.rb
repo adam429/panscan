@@ -32,9 +32,16 @@ class EpochController < ApplicationController
         @pagy, @tx = pagy(Transfer.where('"from" = ? or "to"=?',@address,@address).order(:block_number))        
     end
 
+    def address_update_stats
+        addr = params[:addr]
+        Task.remote_task("bot_stats_address_update",{addr:addr})
+        redirect_to "/address/#{addr}"
+    end
+
     def address
         @address = params[:id].downcase
         @addr = Address.find_by_addr(@address)
+        @cache = Cache.get("address_stats_#{@address}")
 
 
         @pagy, @tx = pagy(Tx.where('"from" = ?',@address).where("method_name=? or method_name=?",'betBull','betBear').order(:block_number))        

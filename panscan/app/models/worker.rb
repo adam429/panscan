@@ -22,7 +22,7 @@ class Worker
         ret = get_instances
         ret = Parallel.map(ret,in_threads: 10) {|k,v|
             ip = v
-            docker_ret = run_cmd(ip,"docker ps")
+            docker_ret = run_cmd(ip,"docker ps",10)
             docker = []
             
             if docker_ret == "(timeout)" then
@@ -121,9 +121,9 @@ class Worker
     end
 
 
-    def run_cmd(ip,cmd)
+    def run_cmd(ip,cmd,timeout=300)
         puts "====begin cmd #{time=Time.now} @#{ip}===="
-        cmd = "timeout -v 300 ssh -i aws.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'"
+        cmd = "timeout -v #{timeout} ssh -i aws.pem -o 'StrictHostKeyChecking no' ubuntu@#{ip} '#{cmd}'"
         puts "#{cmd}"
 
         stdout, stderr, status = Open3.capture3(cmd)

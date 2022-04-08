@@ -13,6 +13,9 @@ contract: <%=@addr.is_contract ? "true" : "false" %> </br>
 <% end %>
 <a href="https://bscscan.com/address/<%= @address %>">[bnbscan]</a> </br>
 ----------------------------------------------------<br/>
+<a href="/address/update_stats/<%=@address%>">update stats</a>
+
+<h3>==All Epoch==</h3>
 bet epoch: <%= @addr.bet_epoch_cnt %> / all_epoch: <%= Epoch.count %>  = bet_ratio: <%= (@addr.bet_epoch_cnt*100.to_f / Epoch.count).round(2) %>% <br/>
 <br/>
 invest_cnt: <%= @addr.invest_cnt %> / bet_cnt: <%= @addr.bet_cnt %>  = bet_success_rate: <%=  (@addr.invest_cnt*100.to_f / @addr.bet_cnt).round(2)  %>%  <br/>
@@ -37,9 +40,40 @@ invest_amt: <%= @addr.invest_amt.round(4)%>
 return_amt: <%= @addr.return_amt.round(4)%> <br/>
 <% if @addr.invest_amt!=0 then%>
 total_roi: <%= (@addr.return_amt*100 / @addr.invest_amt).round(2)%>%
-<% end%>
-<br/>
+<% end%><br/>
 ----------------------------------------------------<br/>
+
+<% if @cache %>
+<h3>==Selected Epoch==</h3>
+bet epoch: <%= @cache["bet_epoch_cnt"] %> / all_epoch: <%= Epoch.count %>  = bet_ratio: <%= (@cache["bet_epoch_cnt"]*100.to_f / Epoch.count).round(2) %>% <br/>
+<br/>
+invest_cnt: <%= @cache["invest_cnt"] %> / bet_cnt: <%= @cache["bet_cnt"] %>  = bet_success_rate: <%=  (@cache["invest_cnt"]*100.to_f / @cache["bet_cnt"]).round(2)  %>%  <br/>
+<br/>
+bet_bull_cnt: <%= @cache["bet_bull_cnt"] %> / bet_cnt: <%= @cache["bet_cnt"] %>  = bet_bull_ratio: <%= (@cache["bet_bull_cnt"]*100.to_f / @cache["bet_cnt"]).round(2)  %>% <br/>
+<br/>
+avg_bet_amt: <%=@cache["avg_bet_amt"].round(4) %> <br/>
+<% def calculate_percentile(json, percentile)
+  array = JSON.parse(json)
+  array.sort[(percentile * array.length).ceil - 1] or 0
+end
+%>
+bet_amt_percentile 25%: <%= calculate_percentile(@cache["bet_amt"],0.25).round(4) %> | 50%: <%= calculate_percentile(@cache["bet_amt"],0.5).round(4) %> | 75%: <%= calculate_percentile(@cache["bet_amt"],0.75).round(4) %><br/>
+<br/>
+
+avg_last_block_order: <%= @cache["avg_last_block_order"].round(2)  %> <br/>
+right_bet_ratio: <%= (@cache["right_bet_ratio"]*100).round(2)  %>% <br/>
+win_bet_ratio: <%= (@cache["win_bet_ratio"]*100).round(2) %>% <br/>
+<br/>
+invest_cnt: <%= @cache["invest_cnt"]%> 
+invest_amt: <%= @cache["invest_amt"].round(4)%> 
+return_amt: <%= @cache["return_amt"].round(4)%> <br/>
+<% if @cache["invest_amt"]!=0 then%>
+total_roi: <%= (@cache["return_amt"]*100 / @cache["invest_amt"]).round(2)%>%
+<% end%><br/>
+
+----------------------------------------------------<br/>
+<% end %>
+
 <% end %>
 <table>
 <td> | #</td>
