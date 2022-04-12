@@ -31,6 +31,10 @@ def do_update_page()
 end
 
 def update_page(json)
+    if not (json[:status]=="run" || json[:status]=="open") then
+        puts json[:status]
+        puts json[:output]
+    end
     $document.at_css("#id").inner_html = json[:id]
     $document.at_css("#tid").inner_html = json[:tid]
     $document.at_css("#name").inner_html = json[:name]
@@ -191,9 +195,7 @@ def update_params(init_params=nil)
     end
 end
 
-
 $document.ready do    
-
 
     $params = {}
     $meta_down = false
