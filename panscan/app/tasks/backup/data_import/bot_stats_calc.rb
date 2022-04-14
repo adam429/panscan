@@ -139,7 +139,7 @@ def main()
     addr_list = Address.where(is_panbot:true).order(:id).select(:addr,:id)
     addr_list = addr_list.map.with_index.map {|x,i| [x.addr,x.id, i] }
 
-    calc_bot_stats("0xaCC961474eb17C103BBed96FC8f0E4eEac91c475".downcase)
-    calc_bot_stats("0x6cf545a3bf58e59b0b16f88ce0b3e6d6589c7b80".downcase)
-    calc_bot_stats("0x65FCb37A28d8504B9dD87DdabE4E0302ec247d63".downcase)
+    Vault.get("bot_address").each do |addr| 
+        calc_bot_stats(addr.downcase)
+    end 
 end

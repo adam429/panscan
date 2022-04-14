@@ -8,7 +8,7 @@ load(Task.load("base/database"))
 class PancakePrediction
     attr_accessor :client, :contract, :bot_address, :address, :decoder, :encoder,:function_abi,:event_abi
     
-    def initialize(gas_premium = 1, bot_private_key=nil)
+    def initialize(gas_premium = 1, bot_private_key=nil, end_point = nil)
         @gas_premium = gas_premium
         @bot_private_key = bot_private_key ? bot_private_key : Vault.get("bot_private_key").last
         @address = Vault.get("pancake_prediction_v2")
@@ -28,8 +28,10 @@ class PancakePrediction
            ["0x"+x.signature,x]
         end.to_h
 
+        @client = Ethereum::HttpClient.new(Vault.get("bsc_endpoint")) if end_point == nil
+        @client = Ethereum::HttpClient.new(end_point) if end_point
+        @client.default_account=Vault.get("bot_address")[0]
 
-        @client = Ethereum::HttpClient.new(Vault.get("bsc_endpoint"))
         @contract = Ethereum::Contract.create(
             client: @client, 
             name: "pancake_prediction_v2", 
@@ -37,7 +39,7 @@ class PancakePrediction
             abi: abi
         )
         
-
+        
         ## config chain_id for EIP-155
         Eth.configure { |c| c.chain_id = @client.net_version["result"].to_i }
 

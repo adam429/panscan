@@ -11,9 +11,12 @@ load(Task.load("base/auto-retry"))
 Object.include AutoRetry
 
 def data_import_epoch(epoch,contract)
+  $logger.call "epoch #{epoch}"
+  $logger.call "ar #{Epoch.find_by_epoch(epoch)}"
   if Epoch.find_by_epoch(epoch)==nil
  
     current_round = auto_retry(lambda {|x| _log(x.to_s+"\n")},12) { contract.call.rounds(epoch) }
+    $logger.call "current_round #{current_round.class}"
     startTimestamp = Time.at(current_round[1])
     lockTimestamp = Time.at(current_round[2])
     closeTimestamp = Time.at(current_round[3])

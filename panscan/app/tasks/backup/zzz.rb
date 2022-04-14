@@ -1,4 +1,4 @@
-__TASK_NAME__ = "data_import/block_data_import"
+__TASK_NAME__ = "zzz"
 
 
 require 'parallel'

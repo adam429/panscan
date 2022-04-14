@@ -115,7 +115,7 @@ def main()
     block_numbers = __block_begin__..__block_end__
     
     Parallel.map(block_numbers.to_a,in_threads: 10) do |block_number|  
-      _log  "#{Time.now} blocks: #{block_number}\n" if block_number%10000==0
+      _log  "#{Time.now} blocks: #{block_number}\n" if block_number%100==0
       data_import_transfer(block_number,pan_call.client,addr_hash)
     end
     nil

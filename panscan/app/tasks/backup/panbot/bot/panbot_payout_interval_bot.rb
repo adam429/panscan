@@ -11,8 +11,8 @@ class PayoutIntervalBot < PanBot
             payout_bull, payout_bear = getCurrentPayout
             amount = getCurrentAmount
 
-            if [payout_bull, payout_bear].max > @config[:min_payout] and  [payout_bull, payout_bear].max <= @config[:min_payout] + 0.1 and
-                amount >  @config[:min_amount] and amount <= @config[:min_amount] + 1 then
+            payout = [payout_bull, payout_bear].max 
+            if payout > @config[:min_payout] and payout < @config[:max_payout] and amount >  @config[:min_amount] and amount < @config[:max_amount] then
                 log "make bet"
                 betBull(self,getCurrentAmount * @config[:bet_amount_factor] + @config[:bet_amount_value]) if payout_bull > payout_bear
                 betBear(self,getCurrentAmount * @config[:bet_amount_factor] + @config[:bet_amount_value]) if payout_bull < payout_bear

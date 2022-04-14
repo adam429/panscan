@@ -14,7 +14,8 @@ def epoch_calc(epoch_start,epoch_end)
       _log "time:#{Time.now} epoch_number: #{epoch_number}\n" if epoch_number%1000==0
     
       e = Epoch.find_by_epoch(epoch_number)
-      next if e.total_count!=nil
+      $logger.call "epoch #{epoch_number} is missing" if e==nil
+      next if not (e.total_count==nil or e.total_count==0)
     
       e.total_count = e._event.where("name = ? or name = ?","BetBear","BetBull").count
     
@@ -94,12 +95,9 @@ end
 def main()
     database_init(false) # allow to write
     
-    epoch_start = Epoch.where(total_count:nil).select(:epoch).map {|x| x.epoch}.min
-    epoch_end = Epoch.where(total_count:nil).select(:epoch).map {|x| x.epoch}.max
-    # epoch_start = 47235
-    # epoch_end = 47235
-    
-    
+    epoch_start = Epoch.where("total_count is null or total_count = 0").select(:epoch).map {|x| x.epoch}.min
+    epoch_end = Epoch.where("total_count is null or total_count = 0").select(:epoch).map {|x| x.epoch}.max
+
     if epoch_start==nil or epoch_end==nil then
         _log ("epoch data is updated\n")
     else

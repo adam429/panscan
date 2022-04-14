@@ -1,14 +1,44 @@
 __TASK_NAME__ = "base/render_wrap"
 
+require 'zlib'
+require 'base64'
+
 class MappingObject
+    def self.mapping_accessor(*attrs)
+      attrs.each do |attr|
+        define_method("#{attr}") { self.data[attr] }
+        define_method("#{attr}=") { |val| self.data[attr] = val }
+      end
+    end    
+    
+    attr_accessor :data
+
+    def initialize
+        self.data = {}
+    end
+    
+    def to_data
+        ret = JSON.dump(self.data)
+        ret
+    end
+    
+    def from_data(data)
+        self.data=JSON.parse(data)
+    end
+    
+    def []=(key,val)
+        self.data[key] = val
+    end
+    
+    def [](key)
+        self.data[key]
+    end
+    
     def self.add_class
-        RenderWrap.load(Task.load("base/render_wrap::jsrb_undata"))
         RenderWrap.load(Task.load("base/render_wrap::MappingObject"))
         RenderWrap.load(Task.load("#{$task.name}::#{self.name}"))
     end
     
-    def to_data
-    end
 end
 
 def html_data(data)
@@ -16,6 +46,10 @@ def html_data(data)
 end
 
 def jsrb_data(data)
+    RenderWrap.load(Task.load("base/render_wrap::jsrb_undata"))
+    RenderWrap.before_html("library.pako","<script src='https://cdn.jsdelivr.net/npm/pako@2.0.4/dist/pako.min.js'></script>")
+    RenderWrap.before_jsrb("library.base64","require 'base64'\n")
+    
     non_mapping_obj =  data.filter do |k,v| (v.class.ancestors.include? MappingObject)==false end
     mapping_obj = data.filter do |k,v| v.class.ancestors.include? MappingObject end
     
@@ -23,30 +57,55 @@ def jsrb_data(data)
         if (v.class.ancestors.include? MappingObject)==false then
             [k,v]
         else
+            v.class.add_class
             [k,"(MappingObject)|||#{v.class.name}|||#{v.to_data}"]
         end
     end.to_h
+    
+    
+    ret = JSON.dump(ret)
+    ret = Zlib::Deflate.deflate(ret)
+    ret = Base64.encode64(ret)
+    ret
 end
 
 def jsrb_undata(data)
+%x{
+    function compress_decode(data) {
+        data = data.split('').map(function(x){return x.charCodeAt(0);});
+        data = new Uint8Array(data);
+        uint8Arr = pako.inflate(data)
+
+        const APPLY_MAX = 4*1024;
+        var encodedStr = ''; 
+        for(var i = 0; i < uint8Arr.length; i+=APPLY_MAX){
+          encodedStr += String.fromCharCode.apply(
+            null, uint8Arr.slice(i, i+APPLY_MAX)
+          );
+        }
+        return encodedStr
+    }
+    Opal.global.compress_decode = compress_decode
+}
+    data = $$.compress_decode(Base64.decode64(data))
+    
+    data = JSON.parse(data)
     ret = data.map do |k,v|
         if v =~ /^\(MappingObject\)\|\|\|/ then
-            _,class_name,data = v.split("|||")
+            _,class_name,obj_data = v.split("|||")
             obj = (Object.const_get class_name).new
-            obj.from_data(data)
+            obj.from_data(obj_data)
             [k,obj]
         else
             [k,v]
         end
-        
-        
+    
     end.to_h
 end
 
-
-class RenderWrap
+class RenderWrap 
     include Singleton
-    
+
     attr_accessor :html, :jsrb, :data
     attr_accessor :before_html, :after_html, :before_jsrb, :after_jsrb
     attr_accessor :before_html_erb, :after_html_erb, :before_jsrb_erb, :after_jsrb_erb
@@ -71,17 +130,11 @@ class RenderWrap
     end
     
     def self.data
-        self.before_html_erb("data.transfer","""<% data = html_data(@raw_ret) %>\n""")
-        self.before_jsrb_erb("data.transfer","""data =  jsrb_undata(<%= jsrb_data(@raw_ret) %>) \n""")
+        self.before_html_erb("data.transfer","""<% data = html_data(@raw_ret[:data]) %>\n""")
+        self.before_html_erb("data.transfer_js","""<pre id='data-transfer' style='display:none'><%= @raw_ret[:json] %></pre>\n""")
+        self.before_jsrb_erb("data.transfer","""$data = jsrb_undata($document.at_css('#data-transfer').text)\n""")
         
-        non_mapping_obj = self.instance.data.filter do |k,v| (v.class.ancestors.include? MappingObject)==false end
-        mapping_obj = self.instance.data.filter do |k,v| v.class.ancestors.include? MappingObject end
-        
-        mapping_obj.map do |k,v| 
-            v.class.add_class
-        end
-
-        return self.instance.data 
+        return {json:jsrb_data(self.instance.data),data:self.instance.data}
     end
     
     def self.[]=(key,val)

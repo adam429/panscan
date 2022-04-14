@@ -72,6 +72,7 @@ def main()
     _log "addr_list.count #{addr_list.count}\n"
 
     Cache.set("bot_stats_calc.addr_list",addr_list)
+    # addr_list = Cache.get("bot_stats_calc.addr_list")
     
     remote_task = []
     start_addr = 0

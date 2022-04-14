@@ -4,16 +4,6 @@ load(Task.load("base/render_wrap"))
 
 
 class Fibonacci < MappingObject
-    attr_accessor :n
-
-    def to_data
-        self.n
-    end
-    
-    def from_data(data)
-        self.n = data.to_i
-    end
-    
     def fn(n)
         return 1 if n==0
         return 1 if n==1 
@@ -21,17 +11,13 @@ class Fibonacci < MappingObject
     end
     
     def result
-        fn(self.n)
+        fn(self.data[:n])
     end
-    
-    def initialize(n)
-        self.n = n
-    end
-        
 end
 
 def main()
-    fobj = Fibonacci.new(11)
+    fobj = Fibonacci.new
+    fobj.data[:n] = 11
     $logger.call("fobj.result = #{fobj.result}") # ==> 144
 
 
@@ -43,7 +29,7 @@ def main()
 
     RenderWrap.jsrb = 
 '''
-    Element["#result"].html = data[:fobj].result
+    Element["#result"].html = $data[:fobj].result
 '''
 
     RenderWrap[:fobj] = fobj

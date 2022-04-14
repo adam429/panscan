@@ -1,4 +1,4 @@
-__TASK_NAME__ = "data_import/bot_stats_calc_item"
+__TASK_NAME__ = "data_import/bot_stats_address_update"
 
 
 require 'parallel'
@@ -118,24 +118,24 @@ def calc_bot_stats(address)
   
   # stats interval
   
-#   txes = Tx.where('"from" = ?',address).where("?<=block_number and block_number<=?",15654789,16541716).where("method_name=? or method_name=?",'betBull','betBear').order(:block_number)
-#   avg_amount,avg_last_block_order, wrong_bet_list, win_bet_list, invest_amt, return_amt = calc_bot_stat_from_txes(txes)
+  txes = Tx.where('"from" = ?',address).where("?<=block_number and block_number<=?",15654789,16541716).where("method_name=? or method_name=?",'betBull','betBear').order(:block_number)
+  avg_amount,avg_last_block_order, wrong_bet_list, win_bet_list, invest_amt, return_amt = calc_bot_stat_from_txes(txes)
   
-#   stats_interval = {
-#       bet_epoch_cnt:txes.map {|x| x.block ? x.block.epoch : 0}.uniq.size,
-#       invest_cnt:txes.where(tx_status:true).size,
-#       bet_cnt:txes.size,
-#       bet_bull_cnt:txes.where(method_name:"betBull").size,
-#       bet_bear_cnt:txes.where(method_name:"betBear").size,
-#       avg_bet_amt:avg_amount.sum / avg_amount.size.to_f,
-#       bet_amt:JSON.dump(avg_amount),
-#       avg_last_block_order:avg_last_block_order.sum / avg_last_block_order.size.to_f,
-#       right_bet_ratio:wrong_bet_list.filter{|x| x==false}.size / wrong_bet_list.size.to_f,
-#       win_bet_ratio:win_bet_list.filter{|x| x==true}.size / win_bet_list.size.to_f,
-#       invest_amt:invest_amt,
-#       return_amt:return_amt,
-#   }
-#   Cache.set("address_stats_#{address}",stats_interval)
+  stats_interval = {
+      bet_epoch_cnt:txes.map {|x| x.block ? x.block.epoch : 0}.uniq.size,
+      invest_cnt:txes.where(tx_status:true).size,
+      bet_cnt:txes.size,
+      bet_bull_cnt:txes.where(method_name:"betBull").size,
+      bet_bear_cnt:txes.where(method_name:"betBear").size,
+      avg_bet_amt:avg_amount.sum / avg_amount.size.to_f,
+      bet_amt:JSON.dump(avg_amount),
+      avg_last_block_order:avg_last_block_order.sum / avg_last_block_order.size.to_f,
+      right_bet_ratio:wrong_bet_list.filter{|x| x==false}.size / wrong_bet_list.size.to_f,
+      win_bet_ratio:win_bet_list.filter{|x| x==true}.size / win_bet_list.size.to_f,
+      invest_amt:invest_amt,
+      return_amt:return_amt,
+  }
+  Cache.set("address_stats_#{address}",stats_interval)
 
 end
 
@@ -162,18 +162,7 @@ def main()
     Address.client = pan_call.client
     Address.get_abi = get_abi
     Address.decoder = Ethereum::Decoder.new
-    
 
-    Address.panbot_address = Cache.get("bot_stats_calc.panbot_address")
-    addr_list = Cache.get("bot_stats_calc.addr_list")
-    
-    addr_begin = __addr_begin__
-    addr_end = __addr_end__
-    
-    _log "addr_begin #{addr_begin} - addr_end #{addr_end}\n"
-    
-    addr_list.filter {|x| addr_begin<=x[2] and x[2]<=addr_end}.map {|x| x[0]}.each do |addr|
-        _log "#{addr}\n"
-        calc_bot_stats(addr)
-    end
+    addr = '__addr__'
+    calc_bot_stats(addr)
 end

@@ -43,7 +43,7 @@ max = <%= text binding: :max %><%= calculated_var ":max = max(:number1.to_i, :nu
 }
 
 .right {
-    width: 600px;
+    width: 800px;
     float: right;
 }
 

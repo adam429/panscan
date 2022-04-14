@@ -8,20 +8,45 @@ def main()
     RenderWrap.load(Task.load("#{$task.name}::chart_data1"))
     RenderWrap.load(Task.load("#{$task.name}::chart_data2"))
         
-    '''<%= timer title:"play", code:":input = :input.to_i+1", stop:":input.to_i<100", timeout:1000 %>'''
-    '''<%= button title:"next day", code:":input=:input.to_i+288" %>'''
-    
     RenderWrap.html=
     '''
     <h1>Chart</h1>
     input: <%= text binding: :input %><br/><br/>
     0-100<%= slider min:0, max:100, value:10, binding: :input %> 
+    <%= button text:"Next", action:":input = :input.to_i+1" %>
+    <%= button text:"Play", action:"play()" %>
+    <%= button text:"Stop", action:"stop()" %>
+    
+    <br/><br/>
     
     <%= calculated_var ":chart_val1 = chart_data1(:input.to_i)" %>
     <%= calculated_var ":chart_val2 = chart_data2(:input.to_i)" %>
     <%= chart binding: :chart_val1 %>
     <%= chart binding: :chart_val2 %>
     
+    '''
+    
+    RenderWrap.jsrb=
+    '''
+        def stop()
+            $play_flag = false
+        end
+        def play()
+            $play_flag = true
+            $$[:setTimeout].call(->{ play_callback() },100)
+        end
+        
+        def play_callback()
+            if $play_flag then
+                $vars[:input]=$vars[:input].to_i+1
+                $vars[:input]=0 if $vars[:input].to_i>100
+                binding_update_change_all()
+                calculated_var_update_all()            
+                
+                $$[:setTimeout].call(->{ play_callback() },100) 
+            end
+        end
+
     '''
     
     nil

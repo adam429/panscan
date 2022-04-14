@@ -1,4 +1,4 @@
-__TASK_NAME__ = "panbot/simulation/panbot_simulation_segmentation_interactive"
+__TASK_NAME__ = "panbot/simulation/panbot_simulation_segmentation_interactive_v2"
 
 
 load(Task.load("base/database"))
@@ -21,7 +21,6 @@ class Segmentation < MappingObject
             ob_bear_payout = 0
             ob_bull_amount = epoch.get_bull_amount(block)
             ob_bear_amount = epoch.get_bear_amount(block)
-
 
             round_bull_payout = 0
             round_bear_payout = 0
@@ -95,7 +94,7 @@ class Segmentation < MappingObject
         round_amount_arr = filter.map {|x| x[:round_amount]}
         
         # simulation
-        filter.map { |x|
+        filter = filter.map { |x|
             bet = x[:ob_bull_amount] < x[:ob_bear_amount] ? "bull" : "bear"
             right_bet = x[:round_bull_amount] < x[:round_bear_amount] ? "bull" : "bear"
 
@@ -134,10 +133,25 @@ class Segmentation < MappingObject
             x[:ret_amount]=ret_amount
             bet=="bull" ? x[:bet_bull_ratio]=1 : x[:bet_bull_ratio]=0
             bet==win_bet ? x[:win_bet_ratio]=1 : x[:win_bet_ratio]=0
-            bet==right_bet ? x[:right_bet_ratio]=1 : x[:right_bet_ratio]=0
+            (bet==right_bet and x["bet_#{bet}_payout".to_sym]>(2/0.97) ) ? x[:right_bet_ratio]=1 : x[:right_bet_ratio]=0
+
+            if bet==win_bet then
+                x[:bet_payout_win]=x["bet_#{bet}_payout".to_sym]
+                x[:bet_payout_lose] = nil
+            else
+                x[:bet_payout_win]=nil
+                x[:bet_payout_lose]=x["bet_#{bet}_payout".to_sym]
+            end                
             
             x
         }
+
+        arr = filter.filter {|x| x[:bet_payout_win]!=nil }.map {|x| x[:bet_payout_win]}
+        bet_avg_payout_win = arr.sum.to_f / arr.count
+
+        arr = filter.filter {|x| x[:bet_payout_lose]!=nil }.map {|x| x[:bet_payout_lose]}
+        bet_avg_payout_lose = arr.sum.to_f / arr.count
+
 
         ret_amount = filter.map {|x| x[:ret_amount]}.sum
         bet_bull_ratio = filter.map {|x| x[:bet_bull_ratio]}.sum.to_f / count
@@ -167,6 +181,8 @@ class Segmentation < MappingObject
           right_bet_ratio:right_bet_ratio,
           win_bet_ratio:win_bet_ratio,
           max_trace:max_trace,
+          bet_avg_payout_win:bet_avg_payout_win, 
+          bet_avg_payout_lose:bet_avg_payout_lose, 
         }
     end
 end
@@ -208,10 +224,11 @@ def main
         
         epoch_end: <%= text binding: :epoch_end %>
         <%= slider min:data[:epoch_begin], max:data[:epoch_end], value:data[:epoch_end], binding: :epoch_end %> 
-        
-        <li><%= button text:"2022-Jan", action:"put 'hello world!'" %> - [32630,41292]</li>
-        <li><%= button text:"2022-Feb", action:"put 'hello world!'" %> - [41293,49057]</li>
-        <li><%= button text:"2022-Mar", action:"put 'hello world!'" %> - [49058,57731]</li>
+    </div>
+    <div>
+        <li><%= button text:"2022-Jan", action:":epoch_begin=32630; :epoch_end=41292" %> - [32630,41292]</li>
+        <li><%= button text:"2022-Feb", action:":epoch_begin=41293; :epoch_end=49057" %> - [41293,49057]</li>
+        <li><%= button text:"2022-Mar", action:":epoch_begin=49058; :epoch_end=57731" %> - [49058,57731]</li>
     </div>
     <div>
         min_payout: <%= text binding: :min_payout %>
@@ -233,8 +250,7 @@ def main
 
 
 <h3>==Segmentation==</h3>
-total epoch = <%= text binding: :total %><br/>
-segmentation epoch =  <%= text binding: :count %><br/><br/>
+total epoch = <%= text binding: :total %> | segmentation epoch =  <%= text binding: :count %> | bet_ratio = <%= text binding: :bet_ratio %><br/>
 <%= chart binding: :seg_portion_chart %> <%= chart binding: :dist_chart1 %><%= chart binding: :dist_chart2 %> <%= chart binding: :dist_chart3 %><%= chart binding: :dist_chart4 %><br/>
 
 ob avg payout (<%= text binding: :ob_avg_payout %>) -> round avg payout (<%= text binding: :round_avg_payout %>) <br/>
@@ -247,11 +263,64 @@ bet_amount: <%= text binding: :bet_amount %>
 <%= calculated_var ":bet_amount = :bet_amount_raw.to_f/10" %>
 <%= slider min:0, max:20, value:1, binding: :bet_amount_raw %> 
 
-bet_bull_ratio: <%= text binding: :bet_bull_ratio %> <br/>
-right_bet_ratio: <%= text binding: :right_bet_ratio %> <br/>
-win_bet_ratio: <%= text binding: :win_bet_ratio %> <br/>
-max_trace: <%= text binding: :max_trace %> <br/>
-return_amt: <%= text binding: :ret_amount %> <br/>
+
+[bet_avg_payout|win]=<%=text binding: :bet_avg_payout_win %> [bet_avg_payout|lose]=<%= text binding: :bet_avg_payout_lose  %> <br/><br/>
+
+<table>
+  <tr><td>group</td><td>|</td><td>bet_bull_ratio</td><td>|</td><td>right_bet_ratio</td><td>|</td><td>win_bet_ratio</td><td>|</td><td>max_trace</td><td>|</td><td>return_amt</td></tr>
+  <tr>
+    <td>all</td>
+    <td> | </td>
+    <td><%= text binding: :bet_bull_ratio %></td>
+    <td> | </td>
+    <td><%= text binding: :right_bet_ratio %></td>
+    <td> | </td>
+    <td><%= text binding: :win_bet_ratio %></td>
+    <td> | </td>
+    <td><%= text binding: :max_trace %></td>
+    <td> | </td>
+    <td><%= text binding: :ret_amount %></td>
+  </tr>
+  <tr>
+    <td>m1</td>
+    <td> | </td>
+    <td><%= text binding: :bet_bull_ratio_m1 %></td>
+    <td> | </td>
+    <td><%= text binding: :right_bet_ratio_m1 %></td>
+    <td> | </td>
+    <td><%= text binding: :win_bet_ratio_m1 %></td>
+    <td> | </td>
+    <td><%= text binding: :max_trace_m1 %></td>
+    <td> | </td>
+    <td><%= text binding: :ret_amount_m1 %></td>
+  </tr>
+  <tr>
+    <td>m2</td>
+    <td> | </td>
+    <td><%= text binding: :bet_bull_ratio_m2 %></td>
+    <td> | </td>
+    <td><%= text binding: :right_bet_ratio_m2 %></td>
+    <td> | </td>
+    <td><%= text binding: :win_bet_ratio_m2 %></td>
+    <td> | </td>
+    <td><%= text binding: :max_trace_m2 %></td>
+    <td> | </td>
+    <td><%= text binding: :ret_amount_m2 %></td>
+  </tr>
+  <tr>
+    <td>m3</td>
+    <td> | </td>
+    <td><%= text binding: :bet_bull_ratio_m3 %></td>
+    <td> | </td>
+    <td><%= text binding: :right_bet_ratio_m3 %></td>
+    <td> | </td>
+    <td><%= text binding: :win_bet_ratio_m3 %></td>
+    <td> | </td>
+    <td><%= text binding: :max_trace_m3 %></td>
+    <td> | </td>
+    <td><%= text binding: :ret_amount_m3 %></td>
+  </tr>
+</table>
 
 <% calculated_var ":calc = $data['seg'.to_sym].calc(:epoch_begin,:epoch_end,:min_payout, :max_payout, :min_amount, :max_amount, :bet_amount)" %>
 <% calculated_var ":count = :calc['count'.to_sym]" %>
@@ -260,27 +329,52 @@ return_amt: <%= text binding: :ret_amount %> <br/>
 <% calculated_var ":ob_payout_arr = :calc['ob_payout_arr']" %>
 <% calculated_var ":ob_amount_arr = :calc['ob_amount_arr']" %>
 <% calculated_var ":round_avg_payout = :calc['round_avg_payout'].round(2)" %>
+<% calculated_var ":bet_avg_payout_win = :calc['bet_avg_payout_win'].round(4)" %>
+<% calculated_var ":bet_avg_payout_lose = :calc['bet_avg_payout_lose'].round(4)" %>
 <% calculated_var ":round_avg_amount = :calc['round_avg_amount'].round(2)" %>
 <% calculated_var ":round_payout_arr = :calc['round_payout_arr']" %>
 <% calculated_var ":round_amount_arr = :calc['round_amount_arr']" %>
 <% calculated_var ":ret_amount = :calc['ret_amount'].round(2)" %>
 <% calculated_var ":max_trace = :calc['max_trace'].round(2)" %>
-<% calculated_var ":win_bet_ratio = :calc['win_bet_ratio'].round(2)" %>
-<% calculated_var ":right_bet_ratio = :calc['right_bet_ratio'].round(2)" %>
-<% calculated_var ":bet_bull_ratio = :calc['bet_bull_ratio'].round(2)" %>
+<% calculated_var ":win_bet_ratio = :calc['win_bet_ratio'].round(4)" %>
+<% calculated_var ":right_bet_ratio = :calc['right_bet_ratio'].round(4)" %>
+<% calculated_var ":bet_bull_ratio = :calc['bet_bull_ratio'].round(4)" %>
 <% calculated_var ":total = :epoch_end.to_i - :epoch_begin.to_i + 1 " %>
 
+<% calculated_var ":bet_ratio = (:count / :total).round(4)" %>
 <% calculated_var ':seg_portion_chart = pie_chart([{"category"=>"2-Other","value"=>:total-:count},{"category"=>"1-Segmentation","value"=>:count}],"Segmentation Portion")' %>
 <% calculated_var ':dist_chart1 = dist_chart(:ob_payout_arr.map{|x| {"vals"=>x} },"ob payout")' %>
 <% calculated_var ':dist_chart2 = dist_chart(:round_payout_arr.map{|x| {"vals"=>x} },"round payout")' %>
 <% calculated_var ':dist_chart3 = dist_chart(:ob_amount_arr.map{|x| {"vals"=>x} },"ob amount")' %>
 <% calculated_var ':dist_chart4 = dist_chart(:round_amount_arr.map{|x| {"vals"=>x} },"round amount")' %>
 
+
+<% calculated_var ":calc_m1 = $data['seg'.to_sym].calc(32630,41292,:min_payout, :max_payout, :min_amount, :max_amount, :bet_amount)" %>
+<% calculated_var ":ret_amount_m1 = :calc_m1['ret_amount'].round(2)" %>
+<% calculated_var ":max_trace_m1 = :calc_m1['max_trace'].round(2)" %>
+<% calculated_var ":win_bet_ratio_m1 = :calc_m1['win_bet_ratio'].round(4)" %>
+<% calculated_var ":right_bet_ratio_m1 = :calc_m1['right_bet_ratio'].round(4)" %>
+<% calculated_var ":bet_bull_ratio_m1 = :calc_m1['bet_bull_ratio'].round(4)" %>
+
+<% calculated_var ":calc_m2 = $data['seg'.to_sym].calc(41293,49057,:min_payout, :max_payout, :min_amount, :max_amount, :bet_amount)" %>
+<% calculated_var ":ret_amount_m2 = :calc_m2['ret_amount'].round(2)" %>
+<% calculated_var ":max_trace_m2 = :calc_m2['max_trace'].round(2)" %>
+<% calculated_var ":win_bet_ratio_m2 = :calc_m2['win_bet_ratio'].round(4)" %>
+<% calculated_var ":right_bet_ratio_m2 = :calc_m2['right_bet_ratio'].round(4)" %>
+<% calculated_var ":bet_bull_ratio_m2 = :calc_m2['bet_bull_ratio'].round(4)" %>
+
+<% calculated_var ":calc_m3 = $data['seg'.to_sym].calc(49058,57731,:min_payout, :max_payout, :min_amount, :max_amount, :bet_amount)" %>
+<% calculated_var ":ret_amount_m3 = :calc_m3['ret_amount'].round(2)" %>
+<% calculated_var ":max_trace_m3 = :calc_m3['max_trace'].round(2)" %>
+<% calculated_var ":win_bet_ratio_m3 = :calc_m3['win_bet_ratio'].round(4)" %>
+<% calculated_var ":right_bet_ratio_m3 = :calc_m3['right_bet_ratio'].round(4)" %>
+<% calculated_var ":bet_bull_ratio_m3 = :calc_m3['bet_bull_ratio'].round(4)" %>
+
 EOS
 
 
 RenderWrap.jsrb = <<~EOS
-    $document.at_css("#btn").inner_html="999"
+    puts "ready"
 EOS
 
     RenderWrap[:epoch_begin] = epoch_begin

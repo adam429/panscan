@@ -18,7 +18,7 @@ def main
     
     # loop do
         pan_actions.each_with_index { |pan_action,i|
-            _log "=== Bot #{i} ===\n"
+            _log "== Bot #{i} ==\n"
             balance = auto_retry(lambda {|x| _log(x.to_s+"\n")},12) { pan_action.client.eth_get_balance(pan_action.bot_address)["result"].to_i(16) / 1e18.to_f }
             epoch = pan_action.contract.call.current_epoch
         
@@ -38,8 +38,6 @@ def main
     #     sleep(3600)
     # end    
 
+    $task.next_schedule_at = Time.now+3600
 end
 
-def schedule_at()
-    Time.now+3600
-end

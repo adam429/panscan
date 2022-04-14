@@ -6,7 +6,7 @@ module AutoRetry
     def auto_retry(logger=nil,retry_cnt=12)
         begin
             yield
-        rescue Faraday::TimeoutError,Net::OpenTimeout,OpenSSL::SSL::SSLError,JSON::ParserError,Net::ReadTimeout,Errno::ECONNRESET,Errno::ECONNREFUSED, EOFError=>e
+        rescue IOError,Faraday::TimeoutError,Net::OpenTimeout,OpenSSL::SSL::SSLError,JSON::ParserError,Net::ReadTimeout,Errno::ECONNRESET,Errno::ECONNREFUSED, EOFError=>e
             if (retry_cnt-=1) > 0 then
                 retry_number = 12-retry_cnt
                 

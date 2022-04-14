@@ -162,7 +162,8 @@ def main()
             remote_task = []
 
             concurrent_limit(remote_task) {
-              remote_task << Task.run_remote("data_import/bot_stats_calc_diff",{})    
+            #   remote_task << Task.run_remote("data_import/bot_stats_calc_diff",{})    
+              remote_task << Task.run_remote("data_import/bot_stats_calc",{})    
             }
 
             remote_task = Task.wait_until_done(remote_task)
@@ -189,9 +190,6 @@ def main()
         # sleep(3600)
     # end
 
-end
-
-def schedule_at()
-    Time.now+3600*24
+    $task.next_schedule_at = Time.now+3600
 end
 
