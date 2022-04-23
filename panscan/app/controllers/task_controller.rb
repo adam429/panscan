@@ -63,6 +63,16 @@ class TaskController < ApplicationController
         redirect_to "/task/#{params[:id]}"
     end
 
+    def task_change_params
+        task = Task.find(params[:id])
+        task_params = JSON.parse(task.params)
+        params[:update_params].each do |k,v|
+            task_params[k]=v
+        end
+        task.params = JSON.dump(task_params)
+        task.save
+    end
+
     def task_view    
         tid = params[:tid]
         if tid.downcase == 'new' then

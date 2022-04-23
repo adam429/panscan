@@ -44,6 +44,7 @@ Rails.application.routes.draw do
   get "/worker/start_worker/:id", to: "task#start_worker"
   
   get "/task/status/:id/:status", to: "task#task_change_status"
+  post "/task/params/:id", to: "task#task_change_params"
   get "/task/kill/:tid", to: "task#task_kill"
   get "/task/schedule_now/:tid", to: "task#task_schedule_now"
   get "/task/filter/:class/:status", to: "task#task_filter"

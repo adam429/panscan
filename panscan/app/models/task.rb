@@ -196,7 +196,11 @@ class Task < ActiveRecord::Base
     def param_code
       code = self.code.clone
       params = self.params == nil ? [] : JSON.parse(self.params)
-      params.each {|k,v| code.gsub!(/__#{k}__/,v) }
+      params.each {|k,v| 
+        if v!=nil then
+          code.gsub!(/__#{k.to_s}__/,v.to_s)
+        end
+      }
       return code
     end
 
