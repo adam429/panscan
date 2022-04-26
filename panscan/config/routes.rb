@@ -34,6 +34,7 @@ Rails.application.routes.draw do
   get "/task/all", to: "task#task_all"
   get "/task/:tid", to: "task#task_view"
   get "/task/view/:tid", to: "task#task_return_view"
+  get "/task/output/:tid", to: "task#task_output_view"
   get "/task/json_view/:tid", to: "task#task_return_json"
   get "/task/json/:id", to: "task#task_json"
 

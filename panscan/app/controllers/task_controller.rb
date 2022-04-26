@@ -292,6 +292,26 @@ CODE
         render :inline => html
     end
 
+    def task_output_view
+        task = nil
+        if params[:tid] =~ /^[0-9a-f]{16}$/ then
+            task = Task.find_by_tid(params[:tid])
+
+            # tid -> name -> tid (url show name)
+            Task.where(name:task.name).where("tid is not null").order(save_timestamp: :desc).first.tid == params[:tid]
+            redirect_to "/task/output/#{URI.escape(task.name,"/")}" if Task.where(name:task.name).where("tid is not null").order(save_timestamp: :desc).first.tid == params[:tid]
+            return
+        else
+            task = Task.where(name:params[:tid]).where("tid is not null").order(save_timestamp: :desc).first
+        end
+
+        @task = task
+        # html = "<pre>" + task.output.to_s + "</pre>"
+
+        # render :inline => html
+    end
+
+
     def task_json
         task = Task.find(params[:id])
         if task then

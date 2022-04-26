@@ -1,0 +1,13 @@
+<h1>Task Status</h1>
+<li>task.id = <%= @task.id %></li>
+<li>task.status = <%= @task.status %></li>
+<h4>Action</h4>
+<li>[<a href="/task/status/<%= @task.id %>/kill">kill</a>]</li>
+
+<h1>Views</h1>
+<li>[<a href="/task/<%= @task.tid %>">edit</a>]</li>
+<li>[<a href="/task/view/<%= @task.tid %>">view</a>]</li>
+<li>[<a href="/task/output/<%= @task.tid %>">status</a>]</li>
+
+<h1>Output</h1>
+<pre><%= @task.output %></pre>
