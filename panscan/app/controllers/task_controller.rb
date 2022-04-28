@@ -111,7 +111,10 @@ CODE
         @task =  Task.find(tid) if @task==nil
 
         @runner = @task.runner
-        @return = @task.html
+        if params[:return]=="false" then
+        else
+            @return = @task.html 
+        end
         @output = @task.output
         @params = @task.params
     end

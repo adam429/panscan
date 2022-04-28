@@ -45,7 +45,7 @@ def update_page(json)
     $document.at_css("#status").inner_html = json[:status]
     $document.at_css("#runner").inner_html = json[:runner]
     $document.at_css("#output").inner_html = json[:output]
-    Element.find('#return').html = json[:return]
+    Element.find('#return').html = json[:return] if $display_return
     
 end
 
@@ -76,12 +76,14 @@ def do_fullscreen
         Element["#editor"].removeClass("editor-fullscreen")
         Element["#editor"].add_class("editor")
         $fullscreen = false
+        $display_return = true
     else
         Element["#task_info"].hide
         Element["#run_info"].hide
         Element["#editor"].removeClass("editor")
         Element["#editor"].add_class("editor-fullscreen")
         $fullscreen = true
+        $display_return = false
     end
 end
 
@@ -201,6 +203,7 @@ $document.ready do
     $meta_down = false
     $shift_down = false
     $fullscreen = false
+    $display_return = true
 
     $document.at_css("#save").on(:click) do
         do_save
@@ -241,7 +244,6 @@ $document.ready do
             e.prevent
         end
         if e.meta? and e.shift? and e.char=="F" then
-            puts "fullscreen"
             do_fullscreen
             e.prevent
         end
