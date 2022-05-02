@@ -51,5 +51,6 @@ Rails.application.routes.draw do
   get "/task/filter/:class/:status", to: "task#task_filter"
   post "/task/save", to: "task#task_save"
   post "/task/fork", to: "task#task_fork"
+  post "/task/create/:id", to: "task#task_create"
   post "/task/run", to: "task#task_run"
 end

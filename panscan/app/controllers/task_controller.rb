@@ -207,7 +207,7 @@ CODE
 
     def task_fork
         task = Task.new
-        task.tid = SecureRandom.hex(8)
+        task.tid = SecureRandom.hex(8) 
         task.code = params[:code]
         task.status = "edit"
         task.runner = nil
@@ -217,8 +217,28 @@ CODE
         task.update_name
         task.save_timestamp = Time.now
         task.save
-        render :json => {:action=> "open", :to => "/task/#{task.tid}"}
+        render :json => {:action=> "open", :to => "/task/#{task.tid}", :id => task.id}
     end
+
+    def task_create
+        t = Task.find(params[:id])
+
+        task = Task.new
+        task.code = t.code
+        task.status = "open"
+        task.runner = nil
+        task.output = nil
+        task.return = nil
+        task_params = JSON.parse(t.params)
+        params[:update_params].each do |k,v|
+            task_params[k]=v
+        end
+        task.params = JSON.dump(task_params)
+        task.save
+
+        render :json => {:id => task.id}
+    end
+
 
     def task_save
         if params[:tid]=="(new)" then
@@ -285,6 +305,7 @@ CODE
             return
         else
             task = Task.where(name:params[:tid]).where("tid is not null").order(save_timestamp: :desc).first
+            task = Task.find(params[:tid]) if task==nil
         end
 
         html = 
@@ -306,6 +327,7 @@ CODE
             return
         else
             task = Task.where(name:params[:tid]).where("tid is not null").order(save_timestamp: :desc).first
+            task = Task.find(params[:tid]) if task==nil
         end
 
         @task = task
