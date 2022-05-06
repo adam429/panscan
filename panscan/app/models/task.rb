@@ -18,7 +18,7 @@ class Task < ActiveRecord::Base
     
     ## for worker
     def self.take_task(runner)
-      env,_ = runner.split(":")
+      env,_ = runner.split(".")
 
       task = nil
       Task.transaction do
