@@ -18,15 +18,17 @@ class Task < ActiveRecord::Base
     
     ## for worker
     def self.take_task(runner)
+      env,_ = runner.split(":")
+
       task = nil
       Task.transaction do
-        task = Task.lock.where(status:"open").order(:updated_at).where("schedule_at is null or schedule_at <= ?",Time.now).first
+        task = Task.lock.where(status:"open").where(env:env).order(:updated_at).where("schedule_at is null or schedule_at <= ?",Time.now).first
         if task then
           task.status = "run"
           task.runner = runner
           task.output = "#{Time.now} runner #{runner} take task #{task.id} : #{task.name}\n"
           task.run_timestamp = Time.now
-          task.save      
+          task.save     
         end
       end
       return task
@@ -71,7 +73,7 @@ class Task < ActiveRecord::Base
       rescue =>e
         raise "Task.load() find error in script #{addr}. Parser error: #{e.message}"
       end
-      match = ast.children.filter {|x| not (x.type==:lvasgn and x.children.first==:__TASK_NAME__) and not (x.type==:def and x.children.first==:main) }
+      match = ast.children.filter {|x| not (x.type==:lvasgn and x.children.first==:__ENV__) and not (x.type==:lvasgn and x.children.first==:__TASK_NAME__) and not (x.type==:def and x.children.first==:main) }
       if code!=[] then
         match = match.filter do |x| 
             m = false
@@ -172,7 +174,7 @@ class Task < ActiveRecord::Base
 
     def abi
       abi = code.scan(/(__[a-zA-Z0-9_]+__)/).flatten
-      abi = abi.filter {|x| x!='__TASK_NAME__'}.map {|x| x.gsub(/^__/,"").gsub(/__$/,"") }
+      abi = abi.filter {|x| x!='__TASK_NAME__' and x!='__ENV__' }.map {|x| x.gsub(/^__/,"").gsub(/__$/,"") }
     end
 
     def update_name()    
@@ -181,6 +183,14 @@ class Task < ActiveRecord::Base
         match = ast.children.filter {|x| x.type==:lvasgn and x.children.first==:__TASK_NAME__ }
         task_name = eval(Unparser.unparse(match.last.children.last))
         self.name = task_name
+
+        begin
+          match = ast.children.filter {|x| x.type==:lvasgn and x.children.first==:__ENV__ }
+          task_env = eval(Unparser.unparse(match.last.children.last))
+        rescue
+          task_env = "base" 
+        end
+        self.env = task_env
       rescue 
       end
     end

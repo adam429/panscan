@@ -114,8 +114,8 @@ CODE
         if params[:return]=="false" then
         else
             @return = @task.html 
+            @output = @task.output
         end
-        @output = @task.output
         @params = @task.params
     end
 

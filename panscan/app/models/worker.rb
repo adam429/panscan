@@ -15,7 +15,7 @@ class Worker
     def get_instances
         get_public_ips
 
-        @public_ips.filter {|x| x=~/^panworker-/}.to_a.sort {|x,y| x[0]<=>y[0]}.to_h
+        @public_ips.filter {|x| x=~/panworker-/}.to_a.sort {|x,y| x[0]<=>y[0]}.to_h
     end
 
     def get_workers
@@ -62,7 +62,7 @@ class Worker
         worker_run([instance],script_a)
     end
 
-    def create_instances(instance_number, docker_per_instance=2)
+    def create_instances(instance_number, docker_per_instance=6)
         # generate instance number list
         instances = get_instances.map {|k,v| k}
         last_id = 0
@@ -70,7 +70,7 @@ class Worker
             _, last_id = instances.last.split("-")
         end
         last_id = last_id.to_i
-        worker = (last_id+1..last_id+instance_number).map {|x| "panworker-#{x}"}
+        worker = (last_id+1..last_id+instance_number).map {|x| "base:panworker-#{x}"}
         
         start_ec2(worker,docker_per_instance)
     end
@@ -164,9 +164,9 @@ class Worker
     def start_ec2(worker,docker_per_instance)
         ## start ec2
         if worker.size>1 then
-            create_worker = "aws lightsail create-instances --no-cli-pager --instance-names {#{worker.map{|x| "'#{x}'"}.join(',')}} --availability-zone 'us-east-1a' --blueprint-id 'ubuntu_20_04' --bundle-id 'large_2_0'"
+            create_worker = "aws lightsail create-instances --no-cli-pager --instance-names {#{worker.map{|x| "'#{x}'"}.join(',')}} --availability-zone 'us-east-1a' --blueprint-id 'ubuntu_20_04' --bundle-id 'medium_2_0'"
         else
-            create_worker = "aws lightsail create-instances --no-cli-pager --instance-names #{worker.map{|x| "'#{x}'"}.join(',')} --availability-zone 'us-east-1a' --blueprint-id 'ubuntu_20_04' --bundle-id 'large_2_0'"
+            create_worker = "aws lightsail create-instances --no-cli-pager --instance-names #{worker.map{|x| "'#{x}'"}.join(',')} --availability-zone 'us-east-1a' --blueprint-id 'ubuntu_20_04' --bundle-id 'medium_2_0'"
         end
         puts create_worker
         system(create_worker)
@@ -174,7 +174,11 @@ class Worker
         public_ips = get_public_ips
 
         ## install docker
-        script1 = '''sudo apt-get update
+        script1 = '''sudo dd if=/dev/zero of=/var/swap bs=1M count=8192
+        sudo mkswap /var/swap
+        sudo chmod 600 /var/swap
+        sudo swapon /var/swap
+        sudo apt-get update
         sudo apt-get install -y ca-certificates curl gnupg lsb-release
         curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null

@@ -180,7 +180,7 @@ def update_params(init_params=nil)
 
     code = json[:code]
     params = code.scan(/(__[a-zA-Z0-9_]+__)/).flatten
-    params = params.filter {|x| x!='__TASK_NAME__'}.map {|x| x.gsub(/^__/,"").gsub(/__$/,"") }
+    params = params.filter {|x| x!='__TASK_NAME__' and x!='__ENV__' }.map {|x| x.gsub(/^__/,"").gsub(/__$/,"") }
     if params.size>0 then
         Element["#params_box"].show
     else
