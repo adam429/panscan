@@ -30,7 +30,8 @@ class Worker
             elsif docker_ret != "" then
                 docker_ps = docker_ret.split("\n")
                 docker_ps = docker_ps[1,docker_ps.size-1]
-                docker = docker_ps.map {|x| {worker:x.split(" ")[-1],run_time:(x.scan(/ Up ([ 0-9a-zA-Z]+) panworker/)).first.first,ps:x} }
+                puts docker_ps
+                docker = docker_ps.map {|x| {worker:x.split(" ")[-1],run_time:(x.scan(/ Up ([ 0-9a-zA-Z]+) [0-9a-zA-Z]+.panworker/)).first.first,ps:x} }
             end
             
             new_v = {ip:ip, docker:docker}
@@ -41,7 +42,7 @@ class Worker
     def delete_worker(worker)
         get_public_ips
 
-        instance, docker = worker.split("_")
+        env, instance, docker = worker.split(/\.|_/)
 
         Task.where(status:"run").where(runner:worker).map do |t|
             t.status = "kill"
@@ -54,7 +55,7 @@ class Worker
         worker_run_script([instance],stop_script)
     end
 
-    def start_worker(instance,image="base")
+    def start_worker(instance,image="ruby3")
         get_public_ips
         start_script = '''docker container run -d --restart=always -e DB_CONNECT_STR=__PARAMS_DB_CONNECT_STR__ -e REDIS_CONNECT_STR=__PARAMS_REDIS_CONNECT_STR__ -e WORKER_NAME="__WORKER__" --name __WORKER__  adam429/pan-repo:panworker___ENV__'''
         script_a = start_script.gsub(/__WORKER__/,"#{image}.#{instance}_#{SecureRandom.hex(2)}").gsub(/__PARAMS_DB_CONNECT_STR__/,ENV["DB_CONNECT_STR"]).gsub(/__PARAMS_REDIS_CONNECT_STR__/,ENV["REDIS_CONNECT_STR"]).gsub(/__ENV__/,image)
@@ -62,7 +63,7 @@ class Worker
         worker_run([instance],script_a)
     end
 
-    def create_instances(instance_number, docker_per_instance=6, image="base")
+    def create_instances(instance_number, docker_per_instance=2, image="base")
         # generate instance number list
         instances = get_instances.map {|k,v| k}
         last_id = 0
@@ -96,7 +97,7 @@ class Worker
     def restart_worker(workers)
         get_public_ips
         workers.each do |worker|
-            instance, docker = worker.split("_")
+            env, instance, docker = worker.split(/\.|_/)
         
             if docker!=nil then
                 cmd = "docker restart #{worker}"          

@@ -23,14 +23,14 @@ class TaskController < ApplicationController
 
     def restart_worker
         w = Worker.new
-        w.restart_worker([params[:id]])
+        w.restart_worker([params[:id]+"."+params[:format]])
 
         redirect_to "/task/worker"
     end
 
     def delete_worker
         w = Worker.new
-        w.delete_worker(params[:id])
+        w.delete_worker(params[:id]+"."+params[:format])
 
         redirect_to "/task/worker"
     end
