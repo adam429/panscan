@@ -11,7 +11,9 @@ end
 def main()
     time = Time.now()
     
-    task(__count__)
+    param = __count__
+    
+    task(param)
 
     time = Time.now()-time
 
