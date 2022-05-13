@@ -63,6 +63,8 @@ def main
     cex = Cex.new
     cex.init("ETH","USDT",0.0004)
 
+    $logger.call "start cex test"
+    $logger.call "cex = #{ cex.class }"
     cex.set_price(3000)
     cex.adj_position(-10)
     cex.stats
