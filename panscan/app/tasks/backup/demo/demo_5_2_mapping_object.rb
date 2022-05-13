@@ -29,34 +29,14 @@ def main()
 (html) data[:fobj].result = <%= data[:fobj].result %> <br/>
 (js) data[:fobj].result = <span id="result1"></span> <br/><br/>
 
-(html) data[:foo].fobj.result = <%= data[:foo].fobj.result %> <br/>
-(js) data[:foo].fobj.result = <span id="result2"></span> <br/><br/>
-
 '''
 
     RenderWrap.jsrb = 
 '''
-    $logger.call "-------------"
-    $logger.call $data[:fobj].to_data
-    $logger.call $data[:foo].to_data
-
-    $logger.call $data[:fobj].class
-    $logger.call $data[:foo].fobj.class
-    $logger.call $data[:foo].class
-
-    $logger.call $data[:fobj]
-    $logger.call $data[:foo].fobj
-    $logger.call $data[:foo]
-
-    $logger.call $data[:fobj].n
-    $logger.call $data[:foo].fobj.n
-
     Element["#result1"].html = $data[:fobj].result
-    Element["#result2"].html = $data[:foo].fobj.result
 '''
 
     RenderWrap[:fobj] = fobj
-    RenderWrap[:foo] = foo
     RenderWrap.data
 end
 
