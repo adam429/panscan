@@ -14,8 +14,6 @@ class StateSave < MappingObject
     end
     
     def get
-        # $logger.call "===get==="
-        # $logger.call self.n
         self.n
     end
 end
