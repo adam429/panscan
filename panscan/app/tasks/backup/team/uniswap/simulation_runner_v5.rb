@@ -168,7 +168,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         </div>
         <div>
           <h4>Simulation</h4>
-          Begin Time:<%= text binding: :sim_time_str %>  (<%= text binding: :sim_time %>)
+          <b>Begin Time</b>:<%= text binding: :sim_time_str %>  (<%= text binding: :sim_time %>)
           <br/><%= slider min:0, max:data[:sim].dex.count-1, value:data[:sim].sim_time, binding: :sim_time %>  |
           <%= datetime min:data[:sim].dex.time_str_widget(0), max:data[:sim].dex.time_str_widget(data[:sim].dex.count-1), value:data[:sim].dex.time_str_widget(data[:sim].dex.count-1), binding: :sim_time_datetime %>
           <br/>
