@@ -116,7 +116,7 @@ class Pool< MappingObject
 
                         price_a,price_b = adj_xy2lp(x,y,l,self.cur_price)           
 
-                        find_pool = self.cur_liquidity_pool.map.with_index {|x,i| x[:index]=i; x}.filter {|x| x[:pool_id]==pool_id }
+                        find_pool = self.cur_liquidity_pool.map.with_index {|x,i| x[:index]=i;puts x; x}.filter {|x| x[:pool_id]==pool_id }
                         if find_pool.size==1 then                            
                             self.cur_liquidity_pool[find_pool[0][:index]][:l] = self.cur_liquidity_pool[find_pool[0][:index]][:l] + l
                         else
