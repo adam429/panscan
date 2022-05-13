@@ -1,6 +1,6 @@
 __TASK_NAME__ = "demo/load/demo_load_class"
 
-load(Task.load("demo/load/demo_load_lv2::_mul"))
+load(Task.load("demo/load/demo_load_mul::_mul"))
 
 class Avg
     def self.call(array)
