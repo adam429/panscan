@@ -198,5 +198,8 @@ class EpochController < ApplicationController
     end
 
     def index
+        access_filter
+        @cur_role = cur_user_role
+        @cur_username = cur_user_name
     end
 end

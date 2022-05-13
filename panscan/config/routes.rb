@@ -8,7 +8,6 @@ Rails.application.routes.draw do
 
   get "/console", to: "epoch#web_console"
   get "/log", to: "epoch#log"
-
   get "/stats", to: "epoch#stats"
   post "/stats/clean_cache", to: "epoch#stats_clean_cache"
 

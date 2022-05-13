@@ -47,6 +47,12 @@ class TaskController < ApplicationController
         Task.where(status:"run").order(:run_timestamp).each do |t|
             @task[t.runner]= [t.name,(Time.now-t.run_timestamp),t.id,t.params]
         end
+
+        if cur_user_role == "team" then
+            @action = false
+        else
+            @action = true
+        end
     end
 
     def task_change_status
@@ -103,6 +109,14 @@ CODE
                 redirect_to "/task/#{URI.escape(@task.name,"/")}" if Task.where(name:@task.name).where("tid is not null").order(save_timestamp: :desc).first.tid == tid
               else
                 @task = Task.where(name:tid).where("tid is not null").order(save_timestamp: :desc).first
+
+                # todo access control
+                if cur_user_role == "team" then
+                    if @task then
+                        redirect_to "/404" if not @task.name =~ /^demo\/|^team\//
+                    end
+                end
+
               end
             @new_task = false
         end
@@ -128,6 +142,11 @@ CODE
         if params[:class]=="closure_task" then
             @task = @task.where("tid is null")
         end
+
+        # access control
+        if cur_user_role == "team" then
+            @task = @task.filter {|x| x.name =~ /^demo\/|^team\// }
+        end
     end
 
     def task_all
@@ -139,6 +158,7 @@ CODE
         
         @running_task = Task.order(:tid,updated_at: :desc).where(status:"run").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
         @schedule_task = Task.order(updated_at: :desc).where(status:"open").where("tid is not null").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at)
+
 
         @task = Task.where("name like ?","#{@prefix}%").order(status: :asc,updated_at: :desc).where("tid is not null").select(:schedule_at,:id,:tid,:name,:runner,:status,:params,:save_timestamp,:run_timestamp,:created_at,:updated_at).all
 
@@ -154,6 +174,15 @@ CODE
         }
 
         @path = @path.uniq.sort
+
+        puts @prefix
+        # access control
+        if cur_user_role == "team" then
+            @task = @task.filter {|x| x.name =~ /^demo\/|^team\// }
+            @running_task = @running_task.filter {|x| x.name =~ /^demo\/|^team\// }
+            @schedule_task = @schedule_task.filter {|x| x.name =~ /^demo\/|^team\// }
+            @path = @path.filter {|x| x =~ /demo|team/ } if not @prefix =~ /demo|team/
+        end
 
 
     end

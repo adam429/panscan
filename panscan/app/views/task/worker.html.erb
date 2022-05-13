@@ -1,21 +1,30 @@
 <h1> Workers </h1>
 
 <h3> Instances </h3>
+
+<% if @action then %>
 start new instances <a href="/worker/create_workers/1">+1</a> <a href="/worker/create_workers/5">+5</a> <a href="/worker/create_workers/10">+10</a></br></br>
+<% end %>
 
 <% @workers.each do |k,v| %>
-   <li>[<a href="/worker/delete_instance/<%= k %>">delete</a>] [<a href="/worker/restart_worker/<%= k %>">restart docker</a>] <%= k %> (<%= v[:ip] %>)</li>
+   <li>
+     <% if @action then %> [<a href="/worker/delete_instance/<%= k %>">delete</a>] [<a href="/worker/restart_worker/<%= k %>">restart docker</a>] <% end %><%= k %> (<%= v[:ip] %>)</li>
 <% end %>
 
 <h3> Workers </h3>
 <% @workers.each do |k,v| %>
-====<%= k %> [<a href="/worker/start_worker/<%= k %>">+1 docker</a>] ====</br>
+====<%= k %>
+  <% if @action then %>[<a href="/worker/start_worker/<%= k %>">+1 docker</a>] <%end %>
+====</br>
  <% if v[:docker]=="(timeout)" then %>
     <li><span style="color:red">timeout</span></li>
  <% else %>
   <% v[:docker].each do |d| %>
-    <li>[<a href="/worker/restart_worker/<%= d[:worker] %>">restart</a>] 
-    [<a href="/worker/delete_worker/<%= d[:worker] %>">delete</a>]
+    <li>
+      <% if @action then %>
+        [<a href="/worker/restart_worker/<%= d[:worker] %>">restart</a>]
+        [<a href="/worker/delete_worker/<%= d[:worker] %>">delete</a>]
+        <% end %>
     <%= d[:worker] %> | <%= d[:run_time]%> |
     <% if  @task[d[:worker]] then%>
       <a href="/task/<%=@task[d[:worker]][2]%>"><%= @task[d[:worker]][2] %></a>  

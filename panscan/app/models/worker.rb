@@ -63,7 +63,7 @@ class Worker
         worker_run([instance],script_a)
     end
 
-    def create_instances(instance_number, docker_per_instance=2, image="base")
+    def create_instances(instance_number, docker_per_instance=2, image="ruby3")
         # generate instance number list
         instances = get_instances.map {|k,v| k}
         last_id = 0
@@ -162,7 +162,7 @@ class Worker
         FileUtils.chmod 0400, 'aws.pem'
     end
 
-    def start_ec2(worker,docker_per_instance,image="base")
+    def start_ec2(worker,docker_per_instance,image)
         ## start ec2
         if worker.size>1 then
             create_worker = "aws lightsail create-instances --no-cli-pager --instance-names {#{worker.map{|x| "'#{x}'"}.join(',')}} --availability-zone 'us-east-1a' --blueprint-id 'ubuntu_20_04' --bundle-id 'medium_2_0'"
