@@ -1,4 +1,5 @@
 __TASK_NAME__ = "demo/demo_concurrent_limit"
+__ENV__ = 'ruby3'
 
 load(Task.load("demo/demo_task"))
 

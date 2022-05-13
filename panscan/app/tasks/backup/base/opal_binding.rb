@@ -7,14 +7,27 @@ class OpalBinding
     include Singleton
 
     def self.binding(name,value,widget,option={})
-
-        self.instance.vars[name] = value if value!=nil
         
-        suffix_name = self.suffix(name)
-        
-        self.instance.bindings.push [name,suffix_name,widget.update_change,widget.fetch_change,widget.change_event,option]
+        if name.class==Symbol then
+            self.instance.vars[name] = value if value!=nil
+            
+            suffix_name = self.suffix(name)
+            
+            self.instance.bindings.push [name,suffix_name,widget.update_change,widget.fetch_change,widget.change_event,option]
+    
+            return suffix_name
+        end
 
-        return suffix_name
+        if name.class==String then
+            # inline calculation
+            parts = name.split("=")
+            new_name = parts.shift
+            new_name = eval(new_name)
+            express = parts.join("=")
+    
+            self.define_calc_vars(new_name,express)
+            self.binding(new_name,value,widget,option)
+        end
     end
     
     def self.suffix(name)
@@ -23,7 +36,13 @@ class OpalBinding
     end
     
     def self.calculated_vars(expression)
-        self.instance.calculated_vars.push expression
+        var_name = self.suffix("__anonymous__")
+        self.instance.calculated_vars[var_name] = expression
+        nil
+    end
+    
+    def self.define_calc_vars(var_name,expression)
+        self.instance.calculated_vars[var_name] = expression
         nil
     end
     
@@ -37,7 +56,7 @@ class OpalBinding
     def initialize
         self.bindings = [] 
         self.vars = {}
-        self.calculated_vars = []
+        self.calculated_vars = {}
         self.define_vars = {}
 
         binding_jsrb = 
@@ -54,16 +73,6 @@ def on_change_event_proc(css_id,name)
       calculated_var_update_all()
   }
 end
-
-# def on_click_event_proc(css_id,name,action)
-#   proc {
-#       puts action
-#       $vars[:epoch_begin] = 32729;
-#       $vars[:epoch_end] = 32730;
-    
-#       calculated_var_update_all()
-#   }
-# end
 
 <% OpalBinding.instance.bindings.filter {|x| x[4]=="[click]"}.each do |x| %>
 
@@ -97,13 +106,16 @@ end
         
         binding_jsrb = 
 '''
-def binding_update_change(name)
+def binding_update_change(name,option={})
   $bindings.filter {|x| x[0]==name}.each do |x|
+    #   puts "--update_change--#{x}--"
        if x[2] == "[chart]" then
-           Native(`window.vegaEmbed`).call("##{x[1]}", $vars[x[0]].to_n, {mode: "vega-lite"}.to_n)
-       else
-           $document["##{x[1]}"].method(x[2]).call($vars[x[0]]) if x[2]!=nil and x[2]!=""
-       end
+          if not(option[:exclude]=="chart") then
+            Native(`window.vegaEmbed`).call("##{x[1]}", $vars[x[0]].to_n, {mode: "vega-lite"}.to_n)
+          end
+      else
+          $document["##{x[1]}"].method(x[2]).call($vars[x[0]]) if x[2]!=nil and x[2]!=""
+      end
   end
 end
 
@@ -112,25 +124,35 @@ def fetch_change(suffix_name)
     $vars[x[0]] = $document[suffix_name].method(x[3]).call()  if x[3]!=nil and x[3]!=""
 end
 
-def binding_update_change_all()
+def binding_update_change_all(option={})
     $bindings.map {|x| x[0]}.uniq.each do |x|
-        binding_update_change(x)
+        binding_update_change(x,option)
     end
 end
 
-def calculated_var_update_all()
-    <%= OpalBinding.instance.calculated_vars.map {
-      |x| x.gsub(/:[a-zA-Z0-9_]+/) { 
-        |y| "$vars[#{y}]" 
-      } 
+def calculated_var_update_all(option={:exclude=>"chart"})
+    <%= OpalBinding.instance.calculated_vars.map { |k,v|
+        x = ":"+k.to_s+" = "+v.to_s
+        x=x.gsub(/:[a-zA-Z0-9_]+/) { 
+            |y| "$vars[#{y}]" 
+        }
+        
+        x = """
+            if option[:exclude]==\"chart\" and $bindings.filter {|x| x[0]==:#{k.to_s} and x[2]==\"[chart]\" }.size>0 then
+                # skip chart binding widget calc_var
+            else
+                #{x}
+            end
+        """
+        # $logger.call x
+        x
     }.join("\n") %>
-    binding_update_change_all()    
+    binding_update_change_all(option)    
 end
 
 ## init
 $document.ready do    
-    binding_update_change_all()
-    calculated_var_update_all()
+    calculated_var_update_all({:exclude=>nil})
 end
 
 '''
@@ -141,6 +163,10 @@ end
 
 def calculated_var(expression)
     OpalBinding.calculated_vars(expression)
+end
+
+def calc_var(var_name,expression)
+    OpalBinding.define_calc_vars(var_name,expression)
 end
 
 def var(var_name,expression)

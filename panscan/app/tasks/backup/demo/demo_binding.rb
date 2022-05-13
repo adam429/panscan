@@ -1,4 +1,5 @@
 __TASK_NAME__ = "demo/demo_binding"
+__ENV__ = 'ruby3'
 
 load(Task.load("base/render_wrap"))
 load(Task.load("base/opal_binding"))
@@ -20,13 +21,13 @@ def main()
 <div class="container">
     <div class="right">
         number2: <%= text binding: :number2 %><br/><br/>
-        0-100<%= slider min:0, max:100, value:50, binding: :number2 %> 
-        20-60<%= slider min:20, max:60, binding: :number2 %> 
+        0-100<%= slider min:0, max:100, value:50, binding: :number2 %> <br/>
+        20-60<%= slider min:20, max:60, binding: :number2 %> <br/>
     </div>
     <div class="left">
         number1: <%= text binding: :number1 %><br/><br/>
-        0-100<%= slider min:0, max:100, value:50, binding: :number1 %> 
-        20-60<%= slider min:20, max:60, binding: :number1 %> 
+        0-100<%= slider min:0, max:100, value:50, binding: :number1 %> <br/>
+        20-60<%= slider min:20, max:60, binding: :number1 %> <br/>
     </div>
 </div>
 

@@ -1,4 +1,5 @@
 __TASK_NAME__ = "demo/demo_task"
+__ENV__ = 'ruby3'
 
 def task(count)
     count.times do |i|

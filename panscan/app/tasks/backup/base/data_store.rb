@@ -12,7 +12,6 @@ class DataStore
     
     def self.redis_object(key)
         return @@redis_objects[key] if @@redis_objects.has_key?(key)
-        $logger.call ("new")
         @@redis_objects[key] = Redis::Value.new(key,:marshal => true, :compress => true)
     end
         
@@ -33,6 +32,7 @@ class DataStore
 end
 
 def main()
+    $logger.call ENV["REDIS_CONNECT_STR"]
     DataStore.init
-    DataStore.get("loan_data")
+    $logger.call DataStore.get("hello-world")
 end

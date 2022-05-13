@@ -220,10 +220,10 @@ def main
 <div id="container">
     <div>
         epoch_begin: <%= text binding: :epoch_begin %>
-        <%= slider min:data[:epoch_begin], max:data[:epoch_end], value:data[:epoch_begin], binding: :epoch_begin %> 
+        <%= slider min:data[:epoch_begin], max:data[:epoch_end], value:data[:epoch_begin], binding: :epoch_begin %> <br/>
         
         epoch_end: <%= text binding: :epoch_end %>
-        <%= slider min:data[:epoch_begin], max:data[:epoch_end], value:data[:epoch_end], binding: :epoch_end %> 
+        <%= slider min:data[:epoch_begin], max:data[:epoch_end], value:data[:epoch_end], binding: :epoch_end %> <br/>
     </div>
     <div>
         <li><%= button text:"2021-Sep", action:":epoch_begin=1536; :epoch_end=9463" %> - [1536,9463]</li>
@@ -233,24 +233,25 @@ def main
         <li><%= button text:"2022-Jan", action:":epoch_begin=32630; :epoch_end=41292" %> - [32630,41292]</li>
         <li><%= button text:"2022-Feb", action:":epoch_begin=41293; :epoch_end=49057" %> - [41293,49057]</li>
         <li><%= button text:"2022-Mar", action:":epoch_begin=49058; :epoch_end=57731" %> - [49058,57731]</li>
+        <li><%= button text:"2022-Apr", action:":epoch_begin=57732; :epoch_end=66063" %> - [57732,66063]</li>
     </div>
     <div>
         min_payout: <%= text binding: :min_payout %>
         <%= calculated_var ":min_payout = :min_payout_raw.to_f/10" %>
-        <%= slider min:20, max:100, value:24, binding: :min_payout_raw %> 
+        <%= slider min:20, max:100, value:24, binding: :min_payout_raw %> <br/>
         
         max_payout: <%= text binding: :max_payout %>
         <%= calculated_var ":max_payout = :max_payout_raw.to_f/10" %>
-        <%= slider min:20, max:100, value:25, binding: :max_payout_raw %> 
+        <%= slider min:20, max:100, value:25, binding: :max_payout_raw %> <br/>
 
         <%= button text:"all range", action:":min_payout_raw=20; :max_payout_raw=100" %>
     </div>
     <div>
         min_amount: <%= text binding: :min_amount %>
-        <%= slider min:0, max:50, value:20, binding: :min_amount %> 
+        <%= slider min:0, max:50, value:20, binding: :min_amount %> <br/>
         
         max_amount: <%= text binding: :max_amount %>
-        <%= slider min:0, max:50, value:21, binding: :max_amount %> 
+        <%= slider min:0, max:50, value:21, binding: :max_amount %> <br/>
 
         <%= button text:"all range", action:":min_amount=0; :max_amount=50" %>
     </div>
@@ -277,7 +278,7 @@ def main
         <h3>==Simulation Metrics==</h3>
         bet_amount: <span style="color:red"> <%= text binding: :bet_amount %> </span>
         <%= calculated_var ":bet_amount = :bet_amount_raw.to_f/10" %>
-        <%= slider min:0, max:20, value:1, binding: :bet_amount_raw %> 
+        <%= slider min:0, max:20, value:1, binding: :bet_amount_raw %> <br/>
         
         
         [bet_avg_payout|win]= <span style="color:red"><%=text binding: :bet_avg_payout_win %></span>
@@ -407,6 +408,21 @@ def main
             <td> | </td>
             <td><%= text binding: :ret_amount_m3 %></td>
           </tr>
+          <tr>
+            <td>2022-04</td>
+            <td> | </td>
+            <td><%= text binding: :bet_bull_ratio_m4 %></td>
+            <td> | </td>
+            <td><%= text binding: :right_bet_ratio_m4 %></td>
+            <td> | </td>
+            <td><%= text binding: :bet_avg_payout_win_m4 %></td>
+            <td> | </td>
+            <td><%= text binding: :win_bet_ratio_m4 %></td>
+            <td> | </td>
+            <td><%= text binding: :max_trace_m4 %></td>
+            <td> | </td>
+            <td><%= text binding: :ret_amount_m4 %></td>
+          </tr>
         </table>
     </div>
 </div>
@@ -530,6 +546,15 @@ def main
 <% calculated_var ":right_bet_ratio_m3 = :calc_m3['right_bet_ratio'].round(4)" %>
 <% calculated_var ":bet_bull_ratio_m3 = :calc_m3['bet_bull_ratio'].round(4)" %>
 <% calculated_var ":bet_avg_payout_win_m3 = :calc_m3['bet_avg_payout_win'].round(4)" %>
+
+
+<% calculated_var ":calc_m4 = $data['seg'.to_sym].calc(57732,66063,:min_payout, :max_payout, :min_amount, :max_amount, :bet_amount)" %>
+<% calculated_var ":ret_amount_m4 = :calc_m4['ret_amount'].round(4)" %>
+<% calculated_var ":max_trace_m4 = :calc_m4['max_trace'].round(2)" %>
+<% calculated_var ":win_bet_ratio_m4 = :calc_m4['win_bet_ratio'].round(4)" %>
+<% calculated_var ":right_bet_ratio_m4 = :calc_m4['right_bet_ratio'].round(4)" %>
+<% calculated_var ":bet_bull_ratio_m4 = :calc_m4['bet_bull_ratio'].round(4)" %>
+<% calculated_var ":bet_avg_payout_win_m4 = :calc_m4['bet_avg_payout_win'].round(4)" %>
 
 EOS
 

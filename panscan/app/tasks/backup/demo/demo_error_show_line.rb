@@ -1,4 +1,5 @@
 __TASK_NAME__ = "demo/demo_error_show_line"
+__ENV__ = 'ruby3'
 
 
 def main()

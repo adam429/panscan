@@ -1,4 +1,5 @@
 __TASK_NAME__ = "demo/demo_run_tasks"
+__ENV__ = 'ruby3'
 
 def main()
     remote_task = []

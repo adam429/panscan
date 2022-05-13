@@ -1,4 +1,5 @@
 __TASK_NAME__ = "demo/demo_auto_split"
+__ENV__ = 'ruby3'
 
 load(Task.load("base/auto_split"))
 

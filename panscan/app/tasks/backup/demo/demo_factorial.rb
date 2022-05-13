@@ -1,5 +1,5 @@
 __TASK_NAME__ = "demo/demo_factorial"
-
+__ENV__ = 'ruby3'
 
 def main()
     n = __n__

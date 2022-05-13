@@ -17,9 +17,33 @@ class Widget
     end
 end
 
+# widgets = [
+#             {name: :trigger_position, value:0.1, min:0, max:10, step:0.1 }, 
+#             {name: :adj_position_ratio, value:1, min:0, max:2, step:0.1 },
+#         ]
+def load_widgets(widgets)
+    widgets.map { |w|
+        # $logger.call w
+        "#{w[:name].to_s}: #{text binding: w[:name].to_sym} <br/> #{slider step:w[:step] ,min:w[:min], max:w[:max], value:w[:value], binding: w[:name].to_sym}  #{ input value:w[:value], binding: w[:name].to_sym} <br/> "
+    }.join("<br/>")
+end
+
+def table(option)
+    Table.gen_html(option)
+end
+
 def text(option)
     Text.gen_html(option)
 end
+
+def input(option)
+    Input.gen_html(option)
+end
+
+def select(option)
+    Select.gen_html(option)
+end
+
 
 def button(option)
     Button.gen_html(option)
@@ -32,6 +56,10 @@ end
 
 def chart(option)
     Chart.gen_html(option)
+end
+
+def datetime(option)
+    Datetime.gen_html(option)
 end
 
 def pie_chart(data,title)
@@ -130,7 +158,7 @@ end
 
 class Button < Widget
     def self.gen_html(option)
-        option[:binding]="btn"
+        option[:binding]=:btn
         return """
         <a href='#/' id='#{OpalBinding.binding(option[:binding],nil,self,option)}'>#{ option[:text] }</a>
         """
@@ -171,6 +199,83 @@ class Text < Widget
 end
 
 
+class Datetime < Widget
+    def self.gen_html(option)
+        return """
+              <input type='datetime-local'  min='#{option[:min]}' max='#{option[:max]}' value='#{option[:value]}' id='#{OpalBinding.binding(option[:binding],option[:value],self)}'>
+        """
+    end
+
+    def self.update_change
+        "value="
+    end
+    
+    def self.fetch_change
+        "value"
+    end
+
+    def self.change_event
+        "change"
+    end
+end
+
+
+class Table < Widget
+
+    def self.gen_html(option)
+        table_loader=<<~EOS
+    
+        def table_loader(table)
+          field = table[0].map {|k,v| k}
+          ret = "<table>"
+          ret = ret+"<tr>"
+          field.each do |x|
+            ret = ret + "<td style='white-space: nowrap;'> | #\{x\}</td>"
+          end
+          ret = ret+"<td> | </td></tr>"
+          table.each do |row|
+              ret = ret+"<tr>"
+              field.each do |x|
+                ret = ret + "<td style='white-space: nowrap;'> | #\{row[x].to_s\}</td>"
+              end
+              ret = ret+"<td> | </td></tr>"
+          end
+          
+          ret = ret+"</table>"
+        end
+EOS
+
+        RenderWrap.before_jsrb("table.javascript",table_loader)
+        
+        if option[:binding].class==String then
+            parts = option[:binding].split("=")
+            name = parts.shift
+            value = parts.join("=")
+            # $logger.call option[:binding]
+            option[:binding] = "#{name} = table_loader(#{value})"
+            # $logger.call option[:binding]
+        end
+        
+        return """
+        <div id='#{OpalBinding.binding(option[:binding],nil,self)}'></div>
+        """
+    end
+
+    def self.update_change
+        "inner_html="
+    end
+    
+    def self.fetch_change
+        "inner_html"
+    end
+
+    def self.change_event
+        ""
+    end
+end
+
+
+
 class Slider < Widget
     def self.update_change
         "value="
@@ -189,6 +294,7 @@ class Slider < Widget
 <style>
 .slidecontainer {
   width: 100%;
+  display: inline-block;
 }
 
 .slider {
@@ -231,13 +337,60 @@ EOS
         
         return """
             <div class='slidecontainer' style='width:300px'>
-              <input type='range' min='#{option[:min]}' max='#{option[:max]}' value='#{option[:value]}' class='slider' id='#{OpalBinding.binding(option[:binding],option[:value],self)}'>
+              <input type='range' step='#{option[:step]}' min='#{option[:min]}' max='#{option[:max]}' value='#{option[:value]}' class='slider' id='#{OpalBinding.binding(option[:binding],option[:value],self)}'>
             </div>
-            <br/>
         """
     end
 end
 
+class Input < Widget
+    def self.update_change
+        "value="
+    end
+    
+    def self.fetch_change
+        "value"
+    end
+
+    def self.change_event
+        "input"
+    end
+
+    def self.gen_html(option)
+        return """
+            <input type='text' value='#{option[:value]}' id='#{OpalBinding.binding(option[:binding],option[:value],self)}'>
+        """
+    end
+end
+
+class Select < Widget
+    def self.update_change
+        "value="
+    end
+    
+    def self.fetch_change
+        "value"
+    end
+
+    def self.change_event
+        "input"
+    end
+
+    def self.gen_html(option)
+        ret =  """
+            <select id='#{OpalBinding.binding(option[:binding],option[:value],self)}'>
+            """
+            
+        option[:option].each_with_index { |x,i|
+            ret = ret + "<option value='#{ option[:option_value] ? option[:option_value][i] : i}'>#{x}</option>"
+        }
+              
+        ret = ret + """
+            </select>        
+        """
+        return ret
+    end
+end
 
 class Chart < Widget
     def self.gen_html(option)

@@ -23,7 +23,7 @@ def db_to_local_file(save_time = "1 minutes")
 end
 
 
-
+puts "begin to backup"
 db_to_local_file(save_time = "1 years")
 save_to_github()
 
