@@ -62,7 +62,8 @@ class Pool< MappingObject
         return price_a, price_b
     end
 
-
+    # input block_number
+    # calc lp to block_number time
     def calc_pool(block_number,user_pool=[])
         block_number = 9999999999 if block_number==-1
         
