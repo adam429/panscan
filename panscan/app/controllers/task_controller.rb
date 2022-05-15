@@ -254,7 +254,9 @@ CODE
 
         task = Task.new
         task.code = t.code
+        task.name = t.name
         task.status = "open"
+        task.env = t.env
         task.runner = nil
         task.output = nil
         task.return = nil
