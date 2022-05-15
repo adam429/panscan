@@ -34,17 +34,27 @@ module LoginFilter
   end
 
   def login_filter
-    access = authenticate_or_request_with_http_digest do |username|
-      @cur_user = USERS[username]
-      if @cur_user then
-        @cur_user[:username] = username
-        auth = @cur_user[:auth]
-      else
-        auth = nil
-      end
-      auth
+    access = authenticate_or_request_with_http_basic do |username,password|
+        @cur_user = USERS[username]
+        if @cur_user then
+          @cur_user[:username] = username
+          auth = @cur_user[:auth]
+        end
+
+        password == auth
     end
   end
+  #   access = authenticate_or_request_with_http_digest do |username|
+  #     @cur_user = USERS[username]
+  #     if @cur_user then
+  #       @cur_user[:username] = username
+  #       auth = @cur_user[:auth]
+  #     else
+  #       auth = nil
+  #     end
+  #     auth
+  #   end
+  # end
 end
 
 class ApplicationController < ActionController::Base
