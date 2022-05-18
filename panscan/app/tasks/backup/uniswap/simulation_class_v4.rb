@@ -846,18 +846,18 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         else
 
             # run simulation in backend  
-            sim_status = "#{Time.now} : Simulation Progress [#{time} / #{time_end}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
+            sim_status = "#{Time.now} : Simulation Progress [#{time-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
             $logger.call(sim_status)
             
             (time..time_end).each do |t| 
                 if t % 100==0 then
-                    sim_status = "#{Time.now} : Simulation Progress [#{t} / #{time_end}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
+                    sim_status = "#{Time.now} : Simulation Progress [#{t-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
                     $logger.call(sim_status)
                 end
                 simulate_tick_logic(t,time_end)
             end
             
-            sim_status = "#{Time.now} : Simulation Progress [#{time_end} / #{time_end}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
+            sim_status = "#{Time.now} : Simulation Progress [#{time_end-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
             $logger.call(sim_status)
         end
     end
