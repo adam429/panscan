@@ -89,8 +89,6 @@ class Simulation < MappingObject
                     self.uni.liquidity_pool = self.pool.calc_pool(-1, self.uni.liquidity_pool.filter {|x| x[:sender]=='user'}, ->() { self.uni.mark_slice_pool_dirty() } )
                     self.uni.mark_slice_pool_dirty()
 
-                    # $logger.call "self.uni.liquidity_pool = #{self.uni.liquidity_pool}"
-
                     $logger.call "==[load_action]== add_liqudity #{price_a_mul} #{price_b_mul} #{total_token} => #{price} #{price_a} #{price_b} #{total_token} #{token0} #{token1} #{self.uni.liquidity_pool.filter {|x| x[:sender]=='user'} }"
                 end
                 if cmd =~ /run_simulation_queue/ then
