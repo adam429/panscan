@@ -923,7 +923,7 @@ $document.ready do
     # init ui config
     $vars[:sim_time] = ($data['sim'].config['sim_time'] or $data['sim'].dex.count-1)
     $vars[:sim_time_end] = ($data['sim'].config['sim_time_end'] or $data['sim'].dex.count-1)
-    $vars[:price] = 
+    $vars[:price] = $data['sim'].uni.price
     $vars[:price_a_mul] = ($data['sim'].config['price_a_mul'] or -20)
     $vars[:price_b_mul] = ($data['sim'].config['price_b_mul'] or 20)
     
