@@ -923,14 +923,23 @@ $document.ready do
     # init ui config
     $vars[:sim_time] = ($data['sim'].config['sim_time'] or $data['sim'].dex.count-1)
     $vars[:sim_time_end] = ($data['sim'].config['sim_time_end'] or $data['sim'].dex.count-1)
+    $vars[:price] = 
     $vars[:price_a_mul] = ($data['sim'].config['price_a_mul'] or -20)
     $vars[:price_b_mul] = ($data['sim'].config['price_b_mul'] or 20)
     
     $data['sim'].change_time($vars[:sim_time].to_i)
     update_price()
 
+    $logger.call $vars['price'].to_f
+    $logger.call $vars['price_a'].to_f
+    $logger.call $vars['price_b'].to_f
+
     $vars[:add_liquidity_token0] = 999
     $vars[:add_liquidity_token1] = 999
+
+    $logger.call $vars['add_liquidity_token0'].to_f
+    $logger.call $vars['add_liquidity_token1'].to_f
+
     # $vars[:add_liquidity_token0] = ($data['sim'].config[:add_liquidity_token0] or 0).to_s
     # $vars[:add_liquidity_token1] = ($data['sim'].config[:add_liquidity_token1] or 0).to_s
 
