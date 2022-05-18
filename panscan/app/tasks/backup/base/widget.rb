@@ -26,6 +26,9 @@ def load_widgets(widgets,default_value={})
     $logger.call widgets
     $logger.call "default_value"
     $logger.call default_value
+
+    default_value = {} if default_value==nil
+    
     widgets.map { |w|
         # $logger.call w
         "#{w[:name].to_s}: #{text binding: w[:name].to_sym} <br/> #{slider step:w[:step] ,min:w[:min], max:w[:max], value:w[:value], binding: w[:name].to_sym}  #{ input value:w[:value], binding: w[:name].to_sym} <br/> "
