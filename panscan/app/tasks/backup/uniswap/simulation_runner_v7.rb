@@ -64,8 +64,6 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.dex.time_table = #{sim.dex.time_table.first}"
         $logger.call "sim.bot.config = #{sim.bot.config}"
         $logger.call "sim.config = #{sim.config}"
-        
-        
         sim.data_size_up()
 
         if sim.pool.swap.size>0 then
