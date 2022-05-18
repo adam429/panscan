@@ -919,8 +919,14 @@ $document.ready do
     $logger.call $data['sim'].sim_time_end
 
 
-    $vars[:sim_time] = ($data['sim'].config['sim_time'] or $data['sim'].dex.count-1)
-    $vars[:sim_time_end] = ($data['sim'].config['sim_time_end'] or $data['sim'].dex.count-1)
+    # $vars[:sim_time] = ($data['sim'].config['sim_time'] or $data['sim'].dex.count-1)
+    # $vars[:sim_time_end] = ($data['sim'].config['sim_time_end'] or $data['sim'].dex.count-1)
+    
+    $logger.call $vars[:sim_time]
+    $logger.call $vars[:sim_time_end]
+    $logger.call $vars[:sim_time_str]
+    $logger.call $vars[:sim_time_end_str]
+    
     $vars[:price_a_mul] = ($data['sim'].config['price_a_mul'] or -20)
     $vars[:price_b_mul] = ($data['sim'].config['price_b_mul'] or 20)
     
