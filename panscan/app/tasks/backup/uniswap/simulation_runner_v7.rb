@@ -929,11 +929,8 @@ $document.ready do
     $data['sim'].change_time($vars[:sim_time].to_i)
     update_price()
 
-    $logger.call $data['sim'].config
     $vars[:add_liquidity_token0] = ($data['sim'].config['add_liquidity_token0'] or 0)
-    $logger.call $data['sim'].config
     $vars[:add_liquidity_token1] = ($data['sim'].config['add_liquidity_token1'] or 0)
-    $logger.call $data['sim'].config
 
     update_price()
     update_metric()
