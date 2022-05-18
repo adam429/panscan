@@ -290,6 +290,11 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
       <%= calculated_var %( $data['sim'].sim_time = (:sim_time.to_i) ) %>
       <%= calculated_var %( $data['sim'].sim_time_end = (:sim_time_end.to_i) ) %>
       <%= calculated_var %( $data['sim'].config['sim_time'] = :sim_time  ) %>
+      <%= calculated_var %( $data['sim'].config['sim_time_end'] = :sim_time_end  ) %>
+      <%= calculated_var %( $data['sim'].config['price_a_mul'] = :price_a_mul  ) %>
+      <%= calculated_var %( $data['sim'].config['price_b_mul'] = :price_b_mul  ) %>
+      <%= calculated_var %( $data['sim'].config['token0'] = :token0  ) %>
+      <%= calculated_var %( $data['sim'].config['token1'] = :token1  ) %>
 
       
     EOS
