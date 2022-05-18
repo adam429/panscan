@@ -66,7 +66,6 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.config = #{sim.config}"
         # sim.data_size_up()
         
-        load_action = sim.load_action =~ /run_simulation_queue/ ? "run_simulation_queue" : ""
         sim.run_load_action
         
         sim.data_size_down()
@@ -953,7 +952,7 @@ end
 
     EOS
 
-    RenderWrap[:load_action]=load_action
+    RenderWrap[:load_action]=sim.load_action
     RenderWrap[:sim]=sim
     RenderWrap[:pool_option] = pool_option
     RenderWrap[:pool_option_value] = pool_option_value
