@@ -77,8 +77,8 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         
         load_action = sim.load_action =~ /run_simulation_queue/ ? "run_simulation_queue" : ""
         sim.run_load_action
+        
         sim.data_size_down()
-
         $logger.call "sim.pool_id = #{sim.pool_id}"
         $logger.call "sim.sim_time = #{sim.sim_time}"
         $logger.call "sim.sim_time_end = #{sim.sim_time_end}"
