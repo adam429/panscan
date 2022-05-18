@@ -62,12 +62,6 @@ class Simulation < MappingObject
                     
                     self.change_time(self.sim_time)
 
-                    # block_number = self.pool.swap[sim.sim_time][:block_number]
-                    # self.user_pool = self.uni.liquidity_pool.filter {|x| x[:sender]=="user"}
-                    # self.pool.cur_blocknumber = 9999999999+1
-                    # self.uni.liquidity_pool = self.pool.calc_pool(block_number,sim.user_pool)
-
-
                     $logger.call "==[load_action]== change_time #{time0} #{time1} => #{self.sim_time} #{self.sim_time_end}"
                 end
                 if cmd =~ /add_liqudity/ then
