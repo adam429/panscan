@@ -915,10 +915,16 @@ end
 $document.ready do    
     $vars[:hour_group] = []
     $vars[:dprice] = []
-    $vars[:sim_time] = $data['sim'].sim_time
-    $vars[:sim_time_end] = $data['sim'].sim_time_end
-    $vars[:price_a_mul] = ($data['sim'].bot.get_config[:price_a_mul] or -20)
-    $vars[:price_b_mul] = ($data['sim'].bot.get_config[:price_b_mul] or 20)
+
+
+    $vars[:sim_time] = $data['sim'].config['sim_time']
+    $vars[:sim_time_end] = $data['sim'].config['sim_time_end']
+    $vars[:price_a_mul] = $data['sim'].config['price_a_mul']
+    $vars[:price_b_mul] = $data['sim'].config['price_b_mul']
+    $vars[:token0] = $data['sim'].config['token0']
+    $vars[:token1] = $data['sim'].config['token1']
+
+
     
     update_price()
     update_metric()
