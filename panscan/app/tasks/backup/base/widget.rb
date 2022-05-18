@@ -21,7 +21,9 @@ end
 #             {name: :trigger_position, value:0.1, min:0, max:10, step:0.1 }, 
 #             {name: :adj_position_ratio, value:1, min:0, max:2, step:0.1 },
 #         ]
-def load_widgets(widgets)
+def load_widgets(widgets,default_value={})
+    $logger.call widgets
+    $logger.call default_value
     widgets.map { |w|
         # $logger.call w
         "#{w[:name].to_s}: #{text binding: w[:name].to_sym} <br/> #{slider step:w[:step] ,min:w[:min], max:w[:max], value:w[:value], binding: w[:name].to_sym}  #{ input value:w[:value], binding: w[:name].to_sym} <br/> "
