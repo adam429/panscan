@@ -40,6 +40,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         sim.bot.config = sim.bot.config.map {|k,v| [k.to_sym,v] }.to_h 
         sim.config = sim.config.map {|k,v| [k.to_sym,v] }.to_h 
         sim.sim_data = sim.sim_data.map {|x| x.map {|k,v| [k.to_sym,v] }.to_h }
+        sim.sim_data[:bot_config] = sim.sim_data[:bot_config].map {|x| x.map {|k,v| [k.to_sym,v] }.to_h }
 
         $logger.call "sim.pool_id = #{sim.pool_id}"
         $logger.call "sim.sim_time = #{sim.sim_time}"
