@@ -62,6 +62,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.dex.swap = #{sim.dex.swap.first}"
         $logger.call "sim.dex.time_table = #{sim.dex.time_table.first}"
         $logger.call "sim.bot.config = #{sim.bot.config}"
+        $logger.call "sim.config = #{sim.config}"
         
         
         sim.data_size_up()
@@ -98,6 +99,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.dex.swap = #{sim.dex.swap.first}"
         $logger.call "sim.dex.time_table = #{sim.dex.time_table.first}"
         $logger.call "sim.bot.config = #{sim.bot.config}"
+        $logger.call "sim.config = #{sim.config}"
         $logger.call "bot_stats = #{JSON.dump(sim.bot_stats())}"
 
     rescue =>e
