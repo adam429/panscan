@@ -38,6 +38,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         sim.dex.swap = sim.dex.swap.map {|x| x.map {|k,v| [k.to_sym,v] }.to_h }
         sim.uni.liquidity_pool = sim.uni.liquidity_pool.map {|x| x.map {|k,v| [k.to_sym,v] }.to_h }
         sim.bot.config = sim.bot.config.map {|k,v| [k.to_sym,v] }.to_h 
+        sim.config = sim.config.map {|k,v| [k.to_sym,v] }.to_h 
         sim.sim_data = sim.sim_data.map {|x| x.map {|k,v| [k.to_sym,v] }.to_h }
 
         $logger.call "sim.pool_id = #{sim.pool_id}"
