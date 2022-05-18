@@ -50,6 +50,7 @@ class Simulation < MappingObject
                     self.cur_time = 99999999
                     self.sim_data = []
                     self.sim_queue = []
+                    self.config = {}
                     self.data_import(pool_id)
                 end
                 if cmd =~ /change_time/ then
