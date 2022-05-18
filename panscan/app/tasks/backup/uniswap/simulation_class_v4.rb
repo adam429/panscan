@@ -11,7 +11,7 @@ class Simulation < MappingObject
     end
     
     mapping_accessor :dex, :cex, :uni, :pool, :bot, :cur_time, :sim_data, :user_pool, :reversed
-    mapping_accessor :sim_time, :sim_time_end,:load_action, :pool_id, :sim_queue
+    mapping_accessor :sim_time, :sim_time_end,:load_action, :pool_id, :sim_queue, :config
     
     def bot_stats
         if self.sim_data!=nil and self.sim_data!=[] then
@@ -120,6 +120,7 @@ class Simulation < MappingObject
         self.cur_time = 99999999
         self.sim_data = []
         self.sim_queue = []
+        self.config = []
         
         self.data_import(pool_id) 
     end

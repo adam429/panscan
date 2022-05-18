@@ -289,7 +289,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
       <!-- save to ui saver -->
       <%= calculated_var %( $data['sim'].sim_time = (:sim_time.to_i) ) %>
       <%= calculated_var %( $data['sim'].sim_time_end = (:sim_time_end.to_i) ) %>
-      <%= calculated_var %( $data['sim'].config[''] =  ) %>
+      <%= calculated_var %( $data['sim'].config['sim_time'] = :sim_time  ) %>
 
       
     EOS
