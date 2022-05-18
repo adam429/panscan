@@ -926,9 +926,6 @@ $document.ready do
     $vars[:add_liquidity_token0] = ($data['sim'].config['add_liquidity_token0'] or 0)
     $vars[:add_liquidity_token1] = ($data['sim'].config['add_liquidity_token1'] or 0)
 
-    $logger.call $data['sim'].bot.config
-
-    
     update_price()
     update_metric()
     update_chart()
