@@ -929,9 +929,10 @@ $document.ready do
     $data['sim'].change_time($vars[:sim_time].to_i)
     update_price()
 
+    $vars[:add_liquidity_token0] = 999
     $vars[:add_liquidity_token1] = 999
     # $vars[:add_liquidity_token0] = ($data['sim'].config[:add_liquidity_token0] or 0).to_s
-    $vars[:add_liquidity_token1] = ($data['sim'].config[:add_liquidity_token1] or 0).to_s
+    # $vars[:add_liquidity_token1] = ($data['sim'].config[:add_liquidity_token1] or 0).to_s
 
     update_price()
     update_metric()
