@@ -30,7 +30,8 @@ def load_widgets(widgets,default_value={})
     default_value = {} if default_value==nil
     
     widgets.map { |w|
-        val = 
+        val = w[:value]
+        val = default_value[w[:name]] if default_value[w[:name]]
         "#{w[:name].to_s}: #{text binding: w[:name].to_sym} <br/> #{slider step:w[:step] ,min:w[:min], max:w[:max], value:val, binding: w[:name].to_sym}  #{ input value:val, binding: w[:name].to_sym} <br/> "
     }.join("<br/>")
 end
