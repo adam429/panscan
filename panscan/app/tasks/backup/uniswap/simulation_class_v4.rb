@@ -46,9 +46,11 @@ class Simulation < MappingObject
                     
                     $logger.call "==[load_action]== init_pool #{pool_id}"
                     
-                    self.data_import(pool_id)
                     self.user_pool = []
                     self.cur_time = 99999999
+                    self.sim_data = []
+                    self.sim_queue = []
+                    self.data_import(pool_id)
                 end
                 if cmd =~ /change_time/ then
                     param = cmd.split("@")
