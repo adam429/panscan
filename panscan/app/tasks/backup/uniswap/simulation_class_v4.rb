@@ -32,9 +32,9 @@ class Simulation < MappingObject
     def run_load_action
         return if self.load_action==nil
         if self.load_action == "run_simulation" or self.load_action == "run_simulation_queue" then
-            $logger.call "run simulation #{self.sim_time} - #{self.sim_time_end}"
-            self.simulate(self.sim_time,self.sim_time_end)
-            self.load_action = nil
+            # $logger.call "run simulation #{self.sim_time} - #{self.sim_time_end}"
+            # self.simulate(self.sim_time,self.sim_time_end)
+            # self.load_action = nil
         else 
             ## load action seq
             self.load_action.split("|").map do |cmd|
