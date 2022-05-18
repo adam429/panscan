@@ -917,12 +917,12 @@ $document.ready do
     $vars[:dprice] = []
 
     # init ui config
-    $vars[:sim_time] = $data['sim'].config['sim_time'] or $data['sim'].dex.count-1
-    $vars[:sim_time_end] = $data['sim'].config['sim_time_end'] or $data['sim'].dex.count-1
-    $vars[:price_a_mul] = $data['sim'].config['price_a_mul'] or -20
-    $vars[:price_b_mul] = $data['sim'].config['price_b_mul'] or 20
-    $vars[:token0] = $data['sim'].config['token0'] or 0
-    $vars[:token1] = $data['sim'].config['token1'] or 0
+    $vars[:sim_time] = ($data['sim'].config['sim_time'] or $data['sim'].dex.count-1)
+    $vars[:sim_time_end] = ($data['sim'].config['sim_time_end'] or $data['sim'].dex.count-1)
+    $vars[:price_a_mul] = ($data['sim'].config['price_a_mul'] or -20)
+    $vars[:price_b_mul] = ($data['sim'].config['price_b_mul'] or 20)
+    $vars[:token0] = ($data['sim'].config['token0'] or 0)
+    $vars[:token1] = ($data['sim'].config['token1'] or 0)
 
     $logger.call $data['sim'].bot.config
 
