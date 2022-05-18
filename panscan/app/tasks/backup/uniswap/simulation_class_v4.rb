@@ -32,9 +32,9 @@ class Simulation < MappingObject
     def run_load_action
         return if self.load_action==nil
         if self.load_action == "run_simulation" or self.load_action == "run_simulation_queue" then
-            # $logger.call "run simulation #{self.sim_time} - #{self.sim_time_end}"
-            # self.simulate(self.sim_time,self.sim_time_end)
-            # self.load_action = nil
+            $logger.call "run simulation #{self.sim_time} - #{self.sim_time_end}"
+            self.simulate(self.sim_time,self.sim_time_end)
+            self.load_action = nil
         else 
             ## load action seq
             self.load_action.split("|").map do |cmd|
@@ -528,6 +528,13 @@ class Simulation < MappingObject
         $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
         $logger.call "dex.time_table = #{self.dex.time_table.to_s.size}"
         data_lood_from_redis(pool_id)
+        if sim.pool.swap.size>0 then
+            block_number = sim.pool.swap[sim.sim_time][:block_number]
+            sim.user_pool = sim.uni.liquidity_pool.filter {|x| x[:sender]=="user"}
+            sim.pool.cur_blocknumber = 9999999999+1
+            sim.uni.liquidity_pool = sim.pool.calc_pool(block_number,sim.user_pool)
+        end
+        
         $logger.call "dex.swap = #{self.dex.swap.to_s.size}"
         $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
         $logger.call "pool.pool = #{self.pool.pool.to_s.size}"

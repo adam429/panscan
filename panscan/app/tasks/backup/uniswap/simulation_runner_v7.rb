@@ -64,14 +64,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.dex.time_table = #{sim.dex.time_table.first}"
         $logger.call "sim.bot.config = #{sim.bot.config}"
         $logger.call "sim.config = #{sim.config}"
-        sim.data_size_up()
-        
-        # if sim.pool.swap.size>0 then
-        #     block_number = sim.pool.swap[sim.sim_time][:block_number]
-        #     sim.user_pool = sim.uni.liquidity_pool.filter {|x| x[:sender]=="user"}
-        #     sim.pool.cur_blocknumber = 9999999999+1
-        #     sim.uni.liquidity_pool = sim.pool.calc_pool(block_number,sim.user_pool)
-        # end
+        # sim.data_size_up()
         
         load_action = sim.load_action =~ /run_simulation_queue/ ? "run_simulation_queue" : ""
         sim.run_load_action
