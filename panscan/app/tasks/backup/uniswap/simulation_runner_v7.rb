@@ -926,9 +926,10 @@ $document.ready do
     $vars[:price_a_mul] = ($data['sim'].config['price_a_mul'] or -20)
     $vars[:price_b_mul] = ($data['sim'].config['price_b_mul'] or 20)
     
-    # $data['sim'].change_time($vars[:sim_time].to_i)
-    # update_price()
+    $data['sim'].change_time($vars[:sim_time].to_i)
+    update_price()
 
+    $vars[:add_liquidity_token1] = 999
     # $vars[:add_liquidity_token0] = ($data['sim'].config[:add_liquidity_token0] or 0).to_s
     $vars[:add_liquidity_token1] = ($data['sim'].config[:add_liquidity_token1] or 0).to_s
 
