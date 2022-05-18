@@ -930,12 +930,6 @@ $document.ready do
     $vars[:price] = $data['sim'].uni.price
     update_price()
 
-    # $logger.call $vars['price'].to_f
-    # $logger.call $vars['price_a'].to_f
-    # $logger.call $vars['price_b'].to_f
-    # $logger.call $vars['add_liquidity_token0'].to_f
-    # $logger.call $vars['add_liquidity_token1'].to_f
-
     $vars[:add_liquidity_token0] = ($data['sim'].config[:add_liquidity_token0] or 0).to_s
     $vars[:add_liquidity_token1] = ($data['sim'].config[:add_liquidity_token1] or 0).to_s
 
