@@ -31,6 +31,9 @@ class Pool< MappingObject
     
     
     def init(_pool=[],_init_tick=nil,_swap=[])
+        puts "_pool=#{_pool}"
+        puts "_init_tick=#{_init_tick}"
+        puts "_swap=#{_swap}"
         self.pool = _pool
         self.init_tick = _init_tick
         self.swap = _swap
@@ -43,6 +46,7 @@ class Pool< MappingObject
     end
 
     def reset(user_pool=[])
+        puts "call reset user_pool=#{user_pool}"
         self.cur_blocknumber = 0
         self.cur_liquidity_pool = user_pool
         self.cur_price = 1.0001**self.init_tick if self.init_tick
@@ -79,8 +83,11 @@ class Pool< MappingObject
             
             sid = nil
             pid = nil
-
+            
+            turn = 0
             loop do
+                turn += 1
+                puts "loop turn=#{turn}"
                 
                 if self.swap_p==_swap.size and self.pool_p==_pool.size then
                     break
@@ -133,7 +140,7 @@ class Pool< MappingObject
                         find_pool = self.cur_liquidity_pool.map.with_index {|x,i| x[:index]=i; x}.filter {|x| x[:pool_id]==pool_id }
                         if find_pool.size==1 then                            
                             self.cur_liquidity_pool[find_pool[0][:index]][:l] = self.cur_liquidity_pool[find_pool[0][:index]][:l] + l
-                            self.cur_liquidity_pool.delete_at(find_pool[0][:index]) if self.cur_liquidity_pool[find_pool[0][:index]][:liquidity]==0
+                            self.cur_liquidity_pool.delete_at(find_pool[0][:index]) if self.cur_liquidity_pool[find_pool[0][:index]][:l]==0
                         else
                             $logger.call _pool[self.pool_p]               
                             raise "the find pool number is wrong"
@@ -371,17 +378,17 @@ class UniswapV3 < MappingObject
         
         if user_only then
             user_pool = liquidity_pool.filter {|x| x[:sender]==user}
-            
+            $logger.call "user_pool len=#{user_pool.length()}"
             if user_pool.size>0 then
                 user_upper = user_pool.map {|x| x[:price_b]}.max
                 user_lower = user_pool.map {|x| x[:price_a]}.min
-                
+                $logger.call "user_upper=#{user_upper} user_lower=#{user_lower} len=#{selectd_liquidity_pool.length()}"
                 selectd_liquidity_pool = selectd_liquidity_pool.filter {|x| x[:price_b]>user_lower and x[:price_a]<user_upper }
             else
                 selectd_liquidity_pool = []
             end
         end
-        
+        $logger.call "selected_liqudity_pool len=#{selectd_liquidity_pool.length()}"
 
         edge = selectd_liquidity_pool.map {|x| [x[:price_a],x[:price_b]] }.flatten.uniq.sort
         edge = (0..edge.size-2).map.with_index {|x,i|
@@ -410,10 +417,13 @@ class UniswapV3 < MappingObject
     end
     
     def change_price(new_price,volume0=0,volume1=0,run=false,change_fee=false)
+        $logger.call "change price called 2"
+        $logger.call "liquidity_pool len= #{liquidity_pool.length()}"
         slice_pool,pool_mapping = self.slice_liquidity_pool("user",true)
-
+        $logger.call "new_price=#{new_price}, volume0=#{volume0}, slice_length=#{slice_pool.length()} slice_pool=#{slice_pool}"
         ul = slice_pool.filter{|x| x[:ul]>0 }.map {|x| x[:ul] }.sum
         l = slice_pool.filter{|x| x[:ul]>0 }.map {|x| x[:l] }.sum
+        $logger.call "ul=#{ul}, l=#{l}"
         self.ul_ratio =  (l!=0 ? (ul / l) : 0)
 
         if run then
@@ -433,6 +443,7 @@ class UniswapV3 < MappingObject
 
             # fee from price change
             if change_fee then
+                $logger.call "change fee called"
                 if new_price > self.price then
                     # direction => higher price
                     loop do

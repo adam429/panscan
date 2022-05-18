@@ -63,7 +63,14 @@ class Pool< MappingObject
     end
 
 
-    def calc_pool(block_number,user_pool=[])
+    def calc_pool(block_number,user_pool=[],mark_dirty=nil)
+
+# $logger.call "==calc_pool=="
+# $logger.call "user_pool = #{user_pool}"
+# $logger.call "block_number = #{block_number}"
+# $logger.call "cur_liquidity_pool = #{self.cur_liquidity_pool}"
+# $logger.call "cur_blocknumber = #{self.cur_blocknumber}"
+        
         block_number = 9999999999 if block_number==-1
 
         return self.cur_liquidity_pool if block_number==self.cur_blocknumber 
@@ -72,13 +79,19 @@ class Pool< MappingObject
             return calc_pool(block_number)
         end
         if block_number>self.cur_blocknumber then
-            _swap = swap.to_a
-            _pool = pool
+            _swap = self.swap.to_a
+            _pool = self.pool
             
             sid = nil
             pid = nil
 
+            # $logger.call " _swap.size = #{_swap.size}"
+            # $logger.call " _pool.size = #{_pool.size}"
+
             loop do
+                
+                # $logger.call " self.swap_p = #{self.swap_p}"
+                # $logger.call " self.pool_p = #{self.pool_p}"
                 
                 if self.swap_p==_swap.size and self.pool_p==_pool.size then
                     break
@@ -87,8 +100,13 @@ class Pool< MappingObject
                 sid = _swap[self.swap_p]==nil ? 999_999_999_999_999 : _swap[self.swap_p][:id]
                 pid = _pool[self.pool_p]==nil ? 999_999_999_999_999 : _pool[self.pool_p][:id]
 
+                # $logger.call " sid = #{sid}"
+                # $logger.call " pid = #{pid}"
+
+
                 if sid<=pid then
                 # do swap
+                    # $logger.call " do swap"
                     if _swap[self.swap_p][:block_number]>block_number then
                         self.swap_p = _swap.size
                         next
@@ -100,11 +118,17 @@ class Pool< MappingObject
 
                 if sid>pid then
                 # do liquidity
+                    # $logger.call " do liquidity"
                     if _pool[self.pool_p][:block_number]>block_number then
                         self.pool_p = _pool.size
                         next
                     end
                     
+                    # $logger.call "change #{_pool[self.pool_p]}" if _pool[self.pool_p][:pool_id]==66560                    
+                    # $logger.call "#{self.cur_liquidity_pool}" if _pool[self.pool_p][:pool_id]==66560                    
+
+                    mark_dirty.call if mark_dirty
+
                     if _pool[self.pool_p][:liquidity]>0 then
                         # add liquidity
                         x = _pool[self.pool_p][:amount0]
@@ -121,7 +145,11 @@ class Pool< MappingObject
                             self.cur_liquidity_pool.push( {pool_id:pool_id,price_a:price_a,price_b:price_b,l:l}) 
                         end
 
+                        # $logger.call "#{find_pool}" if _pool[self.pool_p][:pool_id]==66560                    
+                        # $logger.call "#{self.cur_liquidity_pool}" if _pool[self.pool_p][:pool_id]==66560                    
+
                         self.pool_p = self.pool_p + 1
+                        
                     else
                         # remove liquidity
                         pool_id = _pool[self.pool_p][:pool_id]
@@ -130,15 +158,30 @@ class Pool< MappingObject
 
                         find_pool = self.cur_liquidity_pool.map.with_index {|x,i| x[:index]=i; x}.filter {|x| x[:pool_id]==pool_id }
                         if find_pool.size==1 then                            
+                            # $logger.call "remove liquidity - input negative #{_pool[self.pool_p]}" if self.cur_liquidity_pool[find_pool[0][:index]][:l]<0
                             self.cur_liquidity_pool[find_pool[0][:index]][:l] = self.cur_liquidity_pool[find_pool[0][:index]][:l] + l
-                            self.cur_liquidity_pool.delete_at(find_pool[0][:index]) if self.cur_liquidity_pool[find_pool[0][:index]][:liquidity]==0
+                            self.cur_liquidity_pool.delete_at(find_pool[0][:index]) if self.cur_liquidity_pool[find_pool[0][:index]][:l] <= 0
+
+                            # if self.cur_liquidity_pool[find_pool[0][:index]][:l]<0 then
+                            #     $logger.call "remove liquidity - output negative #{ self.cur_liquidity_pool[find_pool[0][:index]] }"
+                            #     $logger.call "l = #{l}"
+                            #     $logger.call "event_log = #{ _pool.filter{|x| x[:pool_id]==pool_id } }"
+                            # end
+                            
+                            
                         else
+                            $logger.call "[error] the find pool number is wrong"
                             $logger.call _pool[self.pool_p]               
-                            raise "the find pool number is wrong"
+                            $logger.call "event_log = #{ _pool.filter{|x| x[:pool_id]==pool_id } }"
                         end
                         
+                        # $logger.call "#{find_pool}" if _pool[self.pool_p][:pool_id]==66560                    
+                        # $logger.call "#{self.cur_liquidity_pool}" if _pool[self.pool_p][:pool_id]==66560                    
+
                         self.pool_p = self.pool_p + 1
                     end
+                    
+                    
                 end
 
             end
@@ -162,6 +205,11 @@ class UniswapV3 < MappingObject
     
     def initialize
         super()
+        return nil
+    end
+    
+    def mark_slice_pool_dirty
+        return @slice_pool_dirty = true
     end
     
     def init(token0, token1, token0_decimal, token1_decimal, price, rate)
@@ -172,6 +220,7 @@ class UniswapV3 < MappingObject
         self.liquidity_pool = []
         self.price = number(price)
         self.rate = number(rate)
+        @slice_pool_dirty = true
     end
     
     def inspect
@@ -365,7 +414,9 @@ class UniswapV3 < MappingObject
     
     def slice_liquidity_pool(user="user",user_only=false)
 
-        selectd_liquidity_pool = liquidity_pool
+        selectd_liquidity_pool = self.liquidity_pool
+        
+    # $logger.call "selectd_liquidity_pool=#{selectd_liquidity_pool}"
         # $logger.call "slice_liquidity_pool - liquidity_pool.size = #{liquidity_pool.size}"
         
         if user_only then
@@ -383,10 +434,14 @@ class UniswapV3 < MappingObject
         
 
         edge = selectd_liquidity_pool.map {|x| [x[:price_a],x[:price_b]] }.flatten.uniq.sort
+
+    # $logger.call "edge=#{edge}"
+
         edge = (0..edge.size-2).map.with_index {|x,i|
             lower_price = edge[x]
             upper_price = edge[x+1]
             sub_pool = selectd_liquidity_pool.filter {|pool| pool[:price_a]<= lower_price and upper_price <=pool[:price_b] }
+    # $logger.call "sub_pool=#{sub_pool}"
             total_liquidity = sub_pool.map {|x| x[:l]}.sum
             user_liquidity = sub_pool.filter {|pool| pool[:sender]==user }.map {|x| x[:l]}.sum
             {id:i, price_a:lower_price,price_b:upper_price,l:total_liquidity,ul:user_liquidity}
@@ -409,14 +464,24 @@ class UniswapV3 < MappingObject
     end
     
     def change_price(new_price,volume0=0,volume1=0,run=false,change_fee=false)
-        slice_pool,pool_mapping = self.slice_liquidity_pool("user",true)
+profiler_time2 = Time.now()
+# $logger.call "change_price"
+# $logger.call "@slice_pool_dirty = #{@slice_pool_dirty}"
+        if @slice_pool_dirty or @slice_pool == nil then
+            
+            @slice_pool,@pool_mapping = self.slice_liquidity_pool("user",false) 
+            @slice_pool_dirty = false 
+# $logger.call "@slice_pool = #{@slice_pool}"
+# $logger.call "@pool_mapping = #{@pool_mapping}"
+        end
+$profiler[:slice_liquidity_pool] = ($profiler[:slice_liquidity_pool] or 0) + (Time.now()-profiler_time2)
 
         # ul = slice_pool.filter{|x| x[:ul]>0 }.map {|x| x[:ul] }.sum
         # l = slice_pool.filter{|x| x[:ul]>0 }.map {|x| x[:l] }.sum
 
-        pool_index = find_pool(slice_pool,price)
+        pool_index = find_pool(@slice_pool,price)
         if pool_index then
-            pool = slice_pool[pool_index]
+            pool = @slice_pool[pool_index]
             l = pool[:l]
             ul = pool[:ul]
             self.ul_ratio =  (l!=0 ? (ul.to_f / l) : 0)
@@ -433,19 +498,19 @@ class UniswapV3 < MappingObject
 
         if run then
             # fee from volume
-            pool_index = find_pool(slice_pool,price)
+            pool_index = find_pool(@slice_pool,price)
             
             if pool_index then
-                pool = slice_pool[pool_index]
+                pool = @slice_pool[pool_index]
                 l = pool[:l]
                 ul = pool[:ul]
         
                 feex = volume0 * self.rate
                 feey = volume1 * self.rate
                 
-                # $logger.call ("volume0 = #{volume0} | rate = #{self.rate} | feex = #{feex}")
+                # $logger.call ("pool_index = #{pool_index} | pool = #{pool} | volume0 = #{volume0} | rate = #{self.rate} | feex = #{feex}")
                 
-                distribute_fee(pool_mapping[pool_index],feex,feey,l,ul)
+                distribute_fee(@pool_mapping[pool_index],feex,feey,l,ul)
             end    
 
             # fee from price change
@@ -795,7 +860,7 @@ class UniswapV3 < MappingObject
     end
     
     def distribute_fee(pool_index,feex,feey,l,ul)
-        # $logger.call "l=#{l} ul=#{ul} ratio=#{ul/l}"
+        # $logger.call "pool_index=#{pool_index} l=#{l} ul=#{ul} ratio=#{ul/l}"
         return if pool_index<0
         if self.liquidity_pool[pool_index][:sender]!=nil then
             self.liquidity_pool[pool_index][:token0_fee] = self.liquidity_pool[pool_index][:token0_fee] + feex*ul/l

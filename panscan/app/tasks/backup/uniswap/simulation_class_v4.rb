@@ -1,4 +1,4 @@
-__TASK_NAME__ = "uniswap/simulation_class_v3"
+__TASK_NAME__ = "uniswap/simulation_class_v4"
 
 load(Task.load("base/render_wrap"))
 
@@ -7,10 +7,10 @@ require 'objspace'
 
 class Simulation < MappingObject
     def self.task
-        return "uniswap/simulation_class_v3"
+        return "uniswap/simulation_class_v4"
     end
     
-    mapping_accessor :dex, :cex, :uni, :pool, :bot, :cur_time, :sim_data, :user_pool
+    mapping_accessor :dex, :cex, :uni, :pool, :bot, :cur_time, :sim_data, :user_pool, :reversed
     mapping_accessor :sim_time, :sim_time_end,:load_action, :pool_id, :sim_queue
     
     def bot_stats
@@ -109,16 +109,19 @@ class Simulation < MappingObject
         end
     end
     
-    def init(uni,dex,cex, pool ,bot)
-        self.uni = uni
-        self.dex = dex
-        self.cex = cex
-        self.bot = bot
-        self.pool = pool
-        self.user_pool = self.uni.liquidity_pool.filter {|x| x[:sender]=="user"}
+    def init(pool_id)
+        self.uni = UniswapV3.new
+        self.dex = Dex.new()
+        self.cex = Cex.new()
+        self.bot = Bot.new
+        self.pool = Pool.new
+
+        self.user_pool = []
         self.cur_time = 99999999
         self.sim_data = []
         self.sim_queue = []
+        
+        self.data_import(pool_id) 
     end
     
     
@@ -518,77 +521,29 @@ class Simulation < MappingObject
     end
     
     def data_size_up()
-        pool_id = self.pool_id 
-        self.dex.swap =  DataStore.get("uniswap.#{pool_id}.swap")
-        self.pool.swap = DataStore.get("uniswap.#{pool_id}.swap")
-        self.pool.pool = DataStore.get("uniswap.#{pool_id}.pool")
-        pool_config = DataStore.get("uniswap.#{pool_id}")
-
-        block_to_time = DataStore.get("uniswap.#{pool_id}.time_table")
-        block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
-
-        ## check reverse
-        if pool_config[:token0]=="USDT" or pool_config[:token0]=="USDC" or pool_config[:token0]=="ETH" then
-            $logger.call "==reverse pair=="
-            
-            self.dex.swap = self.dex.swap.map {|x|
-                x[:tick] = -1*x[:tick]
-                swap = x[:volume0]
-                x[:volume0] = x[:volume1]
-                x[:volume1] = swap
-                x                
-            }
-
-            self.pool.swap = self.pool.swap.map {|x|
-                x[:tick] = -1*x[:tick]
-                swap = x[:volume0]
-                x[:volume0] = x[:volume1]
-                x[:volume1] = swap
-                x                
-            }
-
-            self.pool.pool = self.pool.pool.map {|x|
-                swap = x[:amount0]
-                x[:amount0] = x[:amount1]
-                x[:amount1] = swap
-                x                
-            }
-
-            self.pool.init_tick = -1*self.pool.init_tick
-        end
-
-        self.dex.swap =  self.dex.swap.map{|v| 
-            price = 1.0001**v[:tick]
-            {
-                id:v[:id],
-                time:block_to_time[v[:block_number]][0],
-                price:self.uni.adjp2p(price),
-                volume0:v[:volume0],
-                volume1:v[:volume1],
-                volume:v[:volume1] + v[:volume0]*price,
-            }
-        }
-
+        $logger.call "==[data_size_up]=="
+        $logger.call "dex.swap = #{self.dex.swap.to_s.size}"
+        $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
+        $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
+        $logger.call "dex.time_table = #{self.dex.time_table.to_s.size}"
+        data_lood_from_redis(pool_id)
+        $logger.call "dex.swap = #{self.dex.swap.to_s.size}"
+        $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
+        $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
+        $logger.call "dex.time_table = #{self.dex.time_table.to_s.size}"
     end
 
     def data_size_down()
+        $logger.call "==[data_size_down]=="
         $logger.call "dex.swap = #{self.dex.swap.to_s.size}"
         $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
         $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
         $logger.call "dex.time_table = #{self.dex.time_table.to_s.size}"
 
-        # self.pool.swap = self.pool.swap.map {|v|
-        #     { id:v[:id],block_number:v[:block_number],tick:v[:tick] }
-        # }
-        self.dex.swap = self.dex.swap.map {|v|
-            { id:v[:id],time:v[:time],price:v[:price],volume:v[:volume] }
-        }
-        
+        self.dex.swap = self.dex.swap.map {|v| { id:v[:id],time:v[:time],price:v[:price],volume:v[:volume] } }
         self.pool.swap = [] 
         self.pool.pool = [] 
-        
-        
-        
+
         $logger.call "dex.swap = #{self.dex.swap.to_s.size}"
         $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
         $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
@@ -596,6 +551,7 @@ class Simulation < MappingObject
 
         self.uni.liquidity_pool = self.uni.liquidity_pool.filter{|x| x[:sender]!=nil }
         self.dex.swap_chart = []
+
         last_time = 0
         volume = 0
         self.dex.swap.map.with_index {|x,i| 
@@ -608,38 +564,16 @@ class Simulation < MappingObject
             end
         }
         $logger.call "dex.swap_chart.size = #{self.dex.swap_chart.size}"
-        
-        
-
     end
 
-
-
-    def data_import(pool_id="")
-        $logger.call "==begin data_import=="
-
-        pool_config = DataStore.get("uniswap.#{pool_id}")
-        pool_config = Simulation.reverse_pool(pool_config)
-        
-        token0 = pool_config[:token0]
-        token1 = pool_config[:token1]
-        token0_decimal = pool_config[:token0_decimal]
-        token1_decimal = pool_config[:token1_decimal]
-        dex_fee = pool_config[:dex_fee]
-        cex_fee = pool_config[:cex_fee]
-
-        self.uni.init(token0,token1,token0_decimal,token1_decimal,nil,dex_fee)
-        self.cex.init(token0,token1,cex_fee)
-        self.pool.init()
-
-        self.pool_id = pool_id
+    def data_lood_from_redis(pool_id)
         self.dex.swap =  DataStore.get("uniswap.#{pool_id}.swap")
         self.pool.swap = DataStore.get("uniswap.#{pool_id}.swap")
         self.pool.pool = DataStore.get("uniswap.#{pool_id}.pool")
         self.pool.init_tick = DataStore.get("uniswap.#{pool_id}.init_tick")
 
         ## check reverse
-        if pool_config[:token0]=="USDT" or pool_config[:token0]=="USDC" or pool_config[:token0]=="ETH" then
+        if self.reversed then
             $logger.call "==reverse pair=="
             
             self.dex.swap = self.dex.swap.map {|x|
@@ -685,18 +619,46 @@ class Simulation < MappingObject
             }
         }
         
-
         self.uni.price = self.dex.swap.last[:price]
+    end
+    
+    def data_init_config(pool_id)
+        pool_config = DataStore.get("uniswap.#{pool_id}")
+        pool_config = reverse_pool(pool_config)
+        
+        token0 = pool_config[:token0]
+        token1 = pool_config[:token1]
+        token0_decimal = pool_config[:token0_decimal]
+        token1_decimal = pool_config[:token1_decimal]
+        dex_fee = pool_config[:dex_fee]
+        cex_fee = pool_config[:cex_fee]
+        
+        self.uni.init(token0,token1,token0_decimal,token1_decimal,nil,dex_fee)
+        self.cex.init(token0,token1,cex_fee)
+        self.pool.init()
+    end
+    
+    def data_init_value()
+        self.pool.reset()
+        self.uni.liquidity_pool = self.pool.calc_pool(-1, [], ->() { self.uni.mark_slice_pool_dirty() } )
+        self.sim_time = dex.count-1
+        self.sim_time_end = dex.count-1
+    end
+
+    def data_import(pool_id="")
+        $logger.call "==begin data_import=="
+
+        self.pool_id = pool_id
+
+        data_init_config(pool_id)
+        data_lood_from_redis(pool_id)
+        data_init_value()
+
         $logger.call "self.uni.price - #{self.uni.price}"
         $logger.call "self.dex.swap - #{self.dex.swap[0,10]}"
         $logger.call "self.pool.pool - #{self.pool.pool[0,10]}"
         $logger.call "self.pool.swap - #{self.pool.swap[0,10]}"
 
-        self.pool.reset()
-        self.uni.liquidity_pool = self.pool.calc_pool(-1, [], ->() { self.uni.mark_slice_pool_dirty() } )
-        self.sim_time = dex.count-1
-        self.sim_time_end = dex.count-1
-        
         $logger.call "==end data_import=="
     end 
     
@@ -910,8 +872,8 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         self.change_time(self.sim_time)
     end
     
-    def self.reverse_pool(pool_config)
-        if pool_config[:token0]=="USDT" or pool_config[:token0]=="USDC" or pool_config[:token0]=="ETH" then
+    def reverse_pool(pool_config)
+        if not (pool_config[:token1]=="USDT" or pool_config[:token1]=="USDC" or pool_config[:token1]=="ETH") then
             swap = pool_config[:token0]
             pool_config[:token0] = pool_config[:token1]
             pool_config[:token1] = swap
@@ -919,6 +881,8 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
             swap = pool_config[:token0_decimal]
             pool_config[:token0_decimal] = pool_config[:token1_decimal]
             pool_config[:token1_decimal] = swap
+            
+            self.reversed = true
         end
         return pool_config
     end

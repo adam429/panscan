@@ -234,6 +234,7 @@ class RenderWrap
     attr_accessor :before_html, :after_html, :before_jsrb, :after_jsrb
     attr_accessor :before_html_erb, :after_html_erb, :before_jsrb_erb, :after_jsrb_erb
 
+
     def self.to_data
         ret = self.instance.data.map do |k,v|
             if (v.class.ancestors.include? MappingObject)==false then
@@ -293,13 +294,12 @@ class RenderWrap
     end
     
     def self.data
-        self.before_html_erb("data.transfer","""<% data = (@raw_ret[:data]) %>\n""")
-        self.before_html_erb("data.transfer_js","""<pre id='data-transfer' style='display:none'><%= @raw_ret[:json] %></pre>\n""")
+        self.before_html_erb("data.transfer","""<% data = (@raw_ret[:data]) %>""")
+        self.before_html_erb("data.transfer_js","""<pre id='data-transfer' style='display:none'><%= @raw_ret[:json] %></pre>""")
         self.load(Task.load("base/render_wrap::jsrb_undata"))
-        self.before_jsrb_erb("data.transfer","""$data = jsrb_undata($document.at_css('#data-transfer').text)\n""")
+        self.before_jsrb_erb("data.transfer","""$data = jsrb_undata($document.at_css('#data-transfer').text)""")
         self.before_html("library.pako","<script src='https://cdn.jsdelivr.net/npm/pako@2.0.4/dist/pako.min.js'></script>")
-        self.before_jsrb("library.base64","require 'base64'\n")
-        self.before_jsrb_erb("logger","$logger = ->(x){ puts(x) }\n")
+        self.before_jsrb("library.base64","require 'base64'")
 
         ret_json = self.jsrb_data
         ret_data = self.instance.data
@@ -322,7 +322,55 @@ class RenderWrap
     def self.jsrb=(val)
         self.instance.jsrb = val
     end
+
+    def self.before_html(id,val)
+        val = "\n#{val}\n"
+        self.instance.before_html.push [id,val] if id==nil
+        self.instance.before_html.push [id,val] if id!=nil and not self.instance.before_html.to_h.has_key?(id)
+    end
+
+    def self.after_html(id,val)
+        val = "\n#{val}\n"
+        self.instance.after_html.push [id,val] if id==nil
+        self.instance.after_html.push [id,val] if id!=nil and not self.instance.after_html.to_h.has_key?(id)
+    end
     
+    def self.before_jsrb(id,val)
+        val = "\n#{val}\n"
+        self.instance.before_jsrb.push [id,val] if id==nil
+        self.instance.before_jsrb.push [id,val] if id!=nil and not self.instance.before_jsrb.to_h.has_key?(id)
+    end
+
+    def self.after_jsrb(id,val)
+        val = "\n#{val}\n"
+        self.instance.after_jsrb.push [id,val] if id==nil
+        self.instance.after_jsrb.push [id,val] if id!=nil and not self.instance.after_jsrb.to_h.has_key?(id)
+    end
+
+    def self.before_html_erb(id,val)
+        val = "\n#{val}\n"
+        self.instance.before_html_erb.push [id,val] if id==nil
+        self.instance.before_html_erb.push [id,val] if id!=nil and not self.instance.before_html_erb.to_h.has_key?(id)
+    end
+
+    def self.after_html_erb(id,val)
+        val = "\n#{val}\n"
+        self.instance.after_html_erb.push [id,val] if id==nil
+        self.instance.after_html_erb.push [id,val] if id!=nil and not self.instance.after_html_erb.to_h.has_key?(id)
+    end
+    
+    def self.before_jsrb_erb(id,val)
+        val = "\n#{val}\n"
+        self.instance.before_jsrb_erb.push [id,val] if id==nil
+        self.instance.before_jsrb_erb.push [id,val] if id!=nil and not self.instance.before_jsrb_erb.to_h.has_key?(id)
+    end
+
+    def self.after_jsrb_erb(id,val)
+        val = "\n#{val}\n"
+        self.instance.after_jsrb_erb.push [id,val] if id==nil
+        self.instance.after_jsrb_erb.push [id,val] if id!=nil and not self.instance.after_jsrb_erb.to_h.has_key?(id)
+    end
+
     def self.render_html(binding)
         html = ERB.new(
             self.instance.before_html_erb.to_h.map {|k,v| v }.join("\n") +
@@ -338,6 +386,7 @@ class RenderWrap
     end
 
     def self.render_jsrb(binding)
+        self.before_jsrb_erb("logger","$logger = ->(x){ puts(x) }")
         jsrb = ERB.new(
             self.instance.before_jsrb_erb.to_h.map {|k,v| v }.join("\n") +
             self.instance.jsrb +
@@ -350,45 +399,4 @@ class RenderWrap
         
         ERB.new(ret).result(binding)
     end
-    
-    def self.before_html(id,val)
-        self.instance.before_html.push [id,val] if id==nil
-        self.instance.before_html.push [id,val] if id!=nil and not self.instance.before_html.to_h.has_key?(id)
-    end
-
-    def self.after_html(id,val)
-        self.instance.after_html.push [id,val] if id==nil
-        self.instance.after_html.push [id,val] if id!=nil and not self.instance.after_html.to_h.has_key?(id)
-    end
-    
-    def self.before_jsrb(id,val)
-        self.instance.before_jsrb.push [id,val] if id==nil
-        self.instance.before_jsrb.push [id,val] if id!=nil and not self.instance.before_jsrb.to_h.has_key?(id)
-    end
-
-    def self.after_jsrb(id,val)
-        self.instance.after_jsrb.push [id,val] if id==nil
-        self.instance.after_jsrb.push [id,val] if id!=nil and not self.instance.after_jsrb.to_h.has_key?(id)
-    end
-
-    def self.before_html_erb(id,val)
-        self.instance.before_html_erb.push [id,val] if id==nil
-        self.instance.before_html_erb.push [id,val] if id!=nil and not self.instance.before_html_erb.to_h.has_key?(id)
-    end
-
-    def self.after_html_erb(id,val)
-        self.instance.after_html_erb.push [id,val] if id==nil
-        self.instance.after_html_erb.push [id,val] if id!=nil and not self.instance.after_html_erb.to_h.has_key?(id)
-    end
-    
-    def self.before_jsrb_erb(id,val)
-        self.instance.before_jsrb_erb.push [id,val] if id==nil
-        self.instance.before_jsrb_erb.push [id,val] if id!=nil and not self.instance.before_jsrb_erb.to_h.has_key?(id)
-    end
-
-    def self.after_jsrb_erb(id,val)
-        self.instance.after_jsrb_erb.push [id,val] if id==nil
-        self.instance.after_jsrb_erb.push [id,val] if id!=nil and not self.instance.after_jsrb_erb.to_h.has_key?(id)
-    end
-
 end

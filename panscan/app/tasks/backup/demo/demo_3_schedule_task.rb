@@ -1,5 +1,6 @@
 __TASK_NAME__ = "demo/demo_3_schedule_task"
-__ENV__ = 'ruby3'
+__ENV__ = 'aliyun'
+
 
 $task.next_schedule_at = Time.now+60
 

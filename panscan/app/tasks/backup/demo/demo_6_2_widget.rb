@@ -1,5 +1,5 @@
 __TASK_NAME__ = "demo/demo_6_2_widget"
-__ENV__ = 'ruby3'
+__ENV__ = 'aliyun'
 
 
 load(Task.load("base/render_wrap"))

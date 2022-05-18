@@ -1,4 +1,5 @@
 __TASK_NAME__ = "demo/demo_2_load_caller"
+__ENV__ = 'aliyun'
 
 
 load(Task.load("demo/load/demo_load_sum::(sum,plus)"))

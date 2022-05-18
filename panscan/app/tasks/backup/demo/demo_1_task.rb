@@ -1,5 +1,5 @@
 __TASK_NAME__ = "demo/demo_1_task"
-__ENV__ = 'base'
+__ENV__ = 'aliyun'
 
 def task(count)
     count.times do |i|

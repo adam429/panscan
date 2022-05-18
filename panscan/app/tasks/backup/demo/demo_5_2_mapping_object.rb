@@ -1,5 +1,5 @@
 __TASK_NAME__ = "demo/demo_5_2_mapping_object"
-__ENV__ = 'ruby3'
+__ENV__ = 'aliyun'
 
 load(Task.load("base/render_wrap"))
 

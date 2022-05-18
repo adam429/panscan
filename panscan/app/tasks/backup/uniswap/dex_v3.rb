@@ -26,9 +26,11 @@ class Dex < MappingObject
     end
 
     # str "2022-02-02T02:02" to time_id
+    # str "2022-02-02 02:02:02" to time_id
     def find_time(str)
-        arr = str.gsub(/T/,"-").gsub(/:/,"-").split("-")
-        time = Time.utc(arr[0],arr[1],arr[2],arr[3],arr[4]).to_i
+        arr = str.gsub(/T/,"-").gsub(/:/,"-").gsub(/ /,"-").split("-")
+        time = Time.utc(arr[0],arr[1],arr[2],arr[3],arr[4]).to_i if arr.size==5
+        time = Time.utc(arr[0],arr[1],arr[2],arr[3],arr[4],arr[5]).to_i if arr.size==6
         ret = nil
         self.time_table.each_with_index {|x,i|
             if x >= time then 
@@ -36,6 +38,7 @@ class Dex < MappingObject
                 break; 
             end 
         }
+        ret = self.time_table.size-1 if ret==nil
         return ret
 
     end

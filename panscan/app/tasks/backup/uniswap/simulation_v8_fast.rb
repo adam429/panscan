@@ -3,7 +3,8 @@ __ENV__ = "ruby3"
 
 load(Task.load("uniswap/simulation_runner_v6"))
 
-def main()
+def main()  
+    $profiler = {}
     # BigDecimal.limit(32)
     # RenderWrap.before_jsrb("library.bigdecimal","require 'bigdecimal'\n require 'bigdecimal/util'\n require 'bigdecimal/math'\n")
     RenderWrap.load(Task.load("base/render_wrap::MappingObject"))

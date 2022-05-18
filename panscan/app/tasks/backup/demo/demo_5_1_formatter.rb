@@ -1,5 +1,5 @@
 __TASK_NAME__ = "demo/demo_5_1_formatter"
-__ENV__ = 'ruby3'
+__ENV__ = 'aliyun'
 
 
 def main()

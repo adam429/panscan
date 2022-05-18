@@ -23,7 +23,7 @@ def main
             epoch = pan_action.contract.call.current_epoch
         
             _log "=== #{Time.now.to_s(:db)} - Bot Address: #{pan_action.bot_address} - #{balance} BNB ==\n"
-            claimable = (epoch-288..epoch).map {|x|
+            claimable = (epoch-1000..epoch).map {|x|
                 claimable = auto_retry(lambda {|x| _log(x.to_s+"\n")},12) { pan_action.contract.call.claimable(x,pan_action.bot_address) }
                 [x,claimable]
             }.filter { |x| x[1] }.map {|x| x[0]}
