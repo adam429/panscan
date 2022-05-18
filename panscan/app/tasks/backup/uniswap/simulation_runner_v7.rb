@@ -183,7 +183,8 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
           <br/><%= slider min:0, max:100, value:0, binding: :add_liquidity_token1 %> <%= input binding: :add_liquidity_token1  %> <br/>
           <hr/>
           <h4>Bot Configure</h4>
-          <%= load_widgets(data[:sim].bot.config_format)  %><br/>
+          bot_config: <%= ['bot_config'] %>
+          <%= load_widgets(data[:sim].bot.config_format, data[:sim].config['bot_config'])  %><br/>
           
 <% end %>
   
