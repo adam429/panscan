@@ -298,7 +298,6 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
       <%= calculated_var %( $data['sim'].config['add_liquidity_token1'] = :add_liquidity_token1  ) %>
       <%= calculated_var %( $data['sim'].config['bot_config'] = get_widgets_value($data['sim'].bot.config_format)  ) %>
 
-      
     EOS
 
 
