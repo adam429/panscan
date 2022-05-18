@@ -188,7 +188,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
           <hr/>
           <h4>Bot Configure</h4>
           bot_config: <%= data[:sim].config['bot_config'] %>
-          <%= load_widgets(data[:sim].bot.config_format, data[:sim].config['bot_config'])  %><br/>
+          <%= load_widgets(data[:sim].bot.config_format, data[:sim].config[:bot_config])  %><br/>
           
 <% end %>
   
