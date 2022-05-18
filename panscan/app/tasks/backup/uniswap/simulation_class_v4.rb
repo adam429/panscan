@@ -87,6 +87,7 @@ class Simulation < MappingObject
 
                     self.uni.clean_liquidity("user");
                     self.uni.add_liquidity(token0,token1,price_a,price_b,"user"); 
+                    self.pool.init()
                     self.pool.reset(self.uni.liquidity_pool)
                     self.uni.liquidity_pool = self.pool.calc_pool(-1, self.uni.liquidity_pool.filter {|x| x[:sender]=='user'}, ->() { self.uni.mark_slice_pool_dirty() } )
                     self.uni.mark_slice_pool_dirty()
