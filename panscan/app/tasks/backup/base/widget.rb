@@ -22,10 +22,10 @@ end
 #             {name: :adj_position_ratio, value:1, min:0, max:2, step:0.1 },
 #         ]
 def load_widgets(widgets,default_value={})
-    $logger.call "widgets"
-    $logger.call widgets
-    $logger.call "default_value"
-    $logger.call default_value
+    # $logger.call "widgets"
+    # $logger.call widgets
+    # $logger.call "default_value"
+    # $logger.call default_value
 
     default_value = {} if default_value==nil
     
