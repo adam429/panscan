@@ -289,11 +289,14 @@ class SwapPriceDex < SwapPriceBase
 end
 
 class SwapPriceCex < SwapPriceBase
-    mapping_accessor :token0base, :token1base, :token0, :token1
+    mapping_accessor :token0base, :token1base, :token0, :token1, :base
 
     def load_from_redis(base,uni,reversed=false)
         self.token0 = uni.token0
         self.token1 = uni.token1
+        self.base = base
+        
+        
         
         
     end
