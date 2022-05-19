@@ -331,7 +331,7 @@ class SwapPriceCex < MappingObject
     end
     
     def interpolate(cur,upper,lower,upper_value,lower_value)
-        return upper_value if upper_value==lower_value
+        return upper_value if (upper_value-lower_value).abs < 1e8
         return ((cur-lower) / (upper-lower).to_f) * (upper_value-lower_value) + lower_value
     end
 
