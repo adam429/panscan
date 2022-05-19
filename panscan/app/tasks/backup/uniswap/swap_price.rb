@@ -336,7 +336,10 @@ class SwapPriceCex < SwapPriceBase
         realtime_low = self.realtime.filter {|x| x[:ts]<=ts}[-1] or 0
         realtime_upper = self.realtime.filter {|x| x[:ts]>=ts}[0] or 0
         
-        (history_low - ts).abs>120
+        history_low = (history_low - ts).abs>120 ? 0 :history_low
+        history_upper = (history_upper - ts).abs>120 ? 0 :history_upper
+        realtime_low = (realtime_low - ts).abs>2 ? 0 :realtime_low
+        realtime_upper = (realtime_upper - ts).abs>2 ? 0 :realtime_upper
         
         $logger.call ts
         $logger.call history_low
