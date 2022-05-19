@@ -63,44 +63,6 @@ class TimeTable < MappingObject
 
 end
 
-class SwapPriceDex < SwapPriceBase
-    def load_from_redis(pool_id,uni,reversed=false)
-        self.swap =  DataStore.get("uniswap.#{pool_id}.swap")
-
-        if reversed then
-            self.swap = self.swap.map {|x|
-                x[:tick] = -1*x[:tick]
-                swap = x[:volume0]
-                x[:volume0] = x[:volume1]
-                x[:volume1] = swap
-                x                
-            }
-        end
-
-        block_to_time = DataStore.get("uniswap.#{pool_id}.time_table")
-        block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
-
-        self.swap =  self.swap.map{|v| 
-            price = 1.0001**v[:tick]
-            {
-                id:v[:id],
-                time:block_to_time[v[:block_number]][0],
-                price:uni.adjp2p(price),
-                volume0:v[:volume0],
-                volume1:v[:volume1],
-                volume:v[:volume1] + v[:volume0]*price,
-            }
-        }
-        self.time_table = self.swap.map {|x| x[:time] }
-    end
-    
-end
-
-class SwapPriceCex < SwapPriceBase
-
-end
-
-
 class SwapPriceBase < MappingObject
     def self.task
         return "uniswap/swap_price"
@@ -292,3 +254,42 @@ class SwapPriceBase < MappingObject
     end
     
 end
+
+class SwapPriceDex < SwapPriceBase
+    def load_from_redis(pool_id,uni,reversed=false)
+        self.swap =  DataStore.get("uniswap.#{pool_id}.swap")
+
+        if reversed then
+            self.swap = self.swap.map {|x|
+                x[:tick] = -1*x[:tick]
+                swap = x[:volume0]
+                x[:volume0] = x[:volume1]
+                x[:volume1] = swap
+                x                
+            }
+        end
+
+        block_to_time = DataStore.get("uniswap.#{pool_id}.time_table")
+        block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
+
+        self.swap =  self.swap.map{|v| 
+            price = 1.0001**v[:tick]
+            {
+                id:v[:id],
+                time:block_to_time[v[:block_number]][0],
+                price:uni.adjp2p(price),
+                volume0:v[:volume0],
+                volume1:v[:volume1],
+                volume:v[:volume1] + v[:volume0]*price,
+            }
+        }
+        self.time_table = self.swap.map {|x| x[:time] }
+    end
+    
+end
+
+class SwapPriceCex < SwapPriceBase
+
+end
+
+
