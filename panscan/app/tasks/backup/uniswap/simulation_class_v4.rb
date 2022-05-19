@@ -570,6 +570,7 @@ class Simulation < MappingObject
               volume = volume + x[:volume]
             end
         }
+        $logger.call "swap_price.swap_chart = #{self.swap_price.swap_chart}"
         $logger.call "swap_price.swap_chart.size = #{self.swap_price.swap_chart.size}"
     end
 
