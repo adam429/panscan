@@ -70,6 +70,7 @@ class Pool< MappingObject
     # calc lp to block_number time
     def calc_pool(block_number,user_pool=[])
         $logger.call "call calc_pool #{block_number} #{user_pool}"
+        $logger.call "cur_liqudity_pool #{self.cur_liquidity_pool}"
         block_number = 9999999999 if block_number==-1
         
         return self.cur_liquidity_pool if block_number==self.cur_blocknumber 

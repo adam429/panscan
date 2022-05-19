@@ -47,6 +47,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.pool.pool = #{sim.pool.pool.first}"
         $logger.call "sim.pool.swap = #{sim.pool.swap.first}"
         $logger.call "sim.uni.liquidity_pool = #{sim.uni.liquidity_pool.first}"
+        # $logger.call "sim.uni.liquidity_pool_all = #{sim.uni.liquidity_pool}"
         $logger.call "sim.uni.price = #{sim.uni.price}"
         $logger.call "sim.uni.token0 = #{sim.uni.token0}"
         $logger.call "sim.uni.token1 = #{sim.uni.token1}"
@@ -57,6 +58,9 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.dex.swap = #{sim.dex.swap.first}"
         $logger.call "sim.dex.time_table = #{sim.dex.time_table.first}"
         $logger.call "sim.bot.config = #{sim.bot.config}"
+        
+        # $logger.call "sim.pool.pool_all = #{sim.pool.pool}"
+        # $logger.call "sim.pool.swap_all = #{sim.pool.swap}"
         
         $task.name = "team/uniswap/simulation_runner_v5" if $task.name=="" or $task.name==nil
         saved_sim_load_action = sim.load_action

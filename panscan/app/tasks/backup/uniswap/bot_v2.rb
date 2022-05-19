@@ -50,7 +50,7 @@ class Bot < MappingObject
         return self.config
     end
     
-    def run(cex, time_id, time_ts, time, price, token0_amt, token1_amt, token0_fee, token1_fee)
+    def run(hedge, time_id, time_ts, time, price, token0_amt, token1_amt, token0_fee, token1_fee)
         config = self.get_config
         
         total_hedge_position = token0_amt * config[:amt_hedge].to_f + token0_fee * config[:fee_hedge].to_f
@@ -60,7 +60,7 @@ class Bot < MappingObject
 
         delta_position = total_hedge_position
         if config[:adj_position_ratio].to_f.abs > 1e-8 then
-             delta_position = total_hedge_position + cex.get_position / config[:adj_position_ratio].to_f             
+             delta_position = total_hedge_position + hedge.get_position / config[:adj_position_ratio].to_f             
         end
         # $logger.call "total_hedge_position = #{total_hedge_position} | cex.get_position = #{cex.get_position} | delta_position = #{delta_position}"
         
@@ -81,12 +81,12 @@ class Bot < MappingObject
                 # short_position = config[:adj_position_ratio].to_f * total_hedge_position + cex.get_position
                 # cex.adj_position( -1 * short_position)
                 
-                fee_short_position = config[:adj_position_ratio].to_f * token0_fee * config[:fee_hedge].to_f + cex.get_position("fee")
-                amt_short_position = config[:adj_position_ratio].to_f * token0_amt * config[:amt_hedge].to_f + cex.get_position("amt")
+                fee_short_position = config[:adj_position_ratio].to_f * token0_fee * config[:fee_hedge].to_f + hedge.get_position("fee")
+                amt_short_position = config[:adj_position_ratio].to_f * token0_amt * config[:amt_hedge].to_f + hedge.get_position("amt")
                 short_position = fee_short_position+amt_short_position
                 
-                cex.adj_position( -1 * fee_short_position, "fee")
-                cex.adj_position( -1 * amt_short_position, "amt")
+                hedge.adj_position( -1 * fee_short_position, "fee")
+                hedge.adj_position( -1 * amt_short_position, "amt")
 
 
                 @last_action[:price] = price

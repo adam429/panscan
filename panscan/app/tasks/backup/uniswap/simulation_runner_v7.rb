@@ -7,8 +7,8 @@ load(Task.load("base/opal_binding"))
 load(Task.load("base/data_store"))
 
 load(Task.load("uniswap/uniswapv3_v3"))
-load(Task.load("uniswap/cex"))
-load(Task.load("uniswap/dex_v3"))
+load(Task.load("uniswap/hedge"))
+load(Task.load("uniswap/swap_price"))
 load(Task.load("uniswap/bot_v2"))
 load(Task.load("uniswap/simulation_class_v4"))
 
@@ -17,8 +17,8 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
     
     RenderWrap.load(Task.load("base/render_wrap::MappingObject"))
     RenderWrap.load(Task.load("uniswap/uniswapv3_v3::(UniswapV3,Pool)"))
-    RenderWrap.load(Task.load("uniswap/dex_v3::Dex"))
-    RenderWrap.load(Task.load("uniswap/cex::Cex"))
+    RenderWrap.load(Task.load("uniswap/swap_price::(SwapPrice,TimeTable)"))
+    RenderWrap.load(Task.load("uniswap/hedge::Hedge"))
     RenderWrap.load(Task.load("uniswap/bot_v2::Bot"))
     RenderWrap.load(Task.load("uniswap/simulation_class_v4::Simulation"))
 
@@ -35,7 +35,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         sim.pool.pool = sim.pool.pool.map {|x| x.map {|k,v| [k.to_sym,v] }.to_h }
         sim.pool.swap = sim.pool.swap.map {|x| x.map {|k,v| [k.to_sym,v] }.to_h }
         sim.pool.cur_liquidity_pool = sim.pool.cur_liquidity_pool.map {|x| x.map {|k,v| [k.to_sym,v] }.to_h }
-        sim.dex.swap = sim.dex.swap.map {|x| x.map {|k,v| [k.to_sym,v] }.to_h }
+        sim.swap_price.swap = sim.swap_price.swap.map {|x| x.map {|k,v| [k.to_sym,v] }.to_h }
         sim.uni.liquidity_pool = sim.uni.liquidity_pool.map {|x| x.map {|k,v| [k.to_sym,v] }.to_h }
         sim.bot.config = sim.bot.config.map {|k,v| [k.to_sym,v] }.to_h 
         sim.config = sim.config.map {|k,v| [k.to_sym,v] }.to_h 
@@ -60,8 +60,8 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.uni.token1_decimal = #{sim.uni.token1_decimal}"
         $logger.call "sim.uni.rate = #{sim.uni.rate}"
         $logger.call "sim.uni.ul_ratio = #{sim.uni.ul_ratio}"
-        $logger.call "sim.dex.swap = #{sim.dex.swap.first}"
-        $logger.call "sim.dex.time_table = #{sim.dex.time_table.first}"
+        $logger.call "sim.swap_price.swap = #{sim.swap_price.swap.first}"
+        $logger.call "sim.time_table.time_table = #{sim.time_table.time_table.first}"
         $logger.call "sim.bot.config = #{sim.bot.config}"
         $logger.call "sim.config = #{sim.config}"
         # sim.data_size_up()
@@ -87,8 +87,8 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.uni.token1_decimal = #{sim.uni.token1_decimal}"
         $logger.call "sim.uni.rate = #{sim.uni.rate}"
         $logger.call "sim.uni.ul_ratio = #{sim.uni.ul_ratio}"
-        $logger.call "sim.dex.swap = #{sim.dex.swap.first}"
-        $logger.call "sim.dex.time_table = #{sim.dex.time_table.first}"
+        $logger.call "sim.swap_price.swap = #{sim.swap_price.swap.first}"
+        $logger.call "sim.time_table.time_table = #{sim.time_table.time_table.first}"
         $logger.call "sim.bot.config = #{sim.bot.config}"
         $logger.call "sim.config = #{sim.config}"
         $logger.call "bot_stats = #{JSON.dump(sim.bot_stats())}"
@@ -187,8 +187,8 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
 <% if data[:load_action]!="run_simulation_queue" then %>
           <h4>Simulation Time</h4>
           Begin Time:<%= text binding: :sim_time_str %>  (<%= text binding: :sim_time %>)
-          <br/><%= slider min:0, max:data[:sim].dex.count-1, value:data[:sim].sim_time, binding: :sim_time %>  |
-          <%= datetime min:data[:sim].dex.time_str_widget(0), max:data[:sim].dex.time_str_widget(data[:sim].dex.count-1), value:data[:sim].dex.time_str_widget(data[:sim].dex.count-1), binding: :sim_time_datetime %>
+          <br/><%= slider min:0, max:data[:sim].time_table.count-1, value:data[:sim].sim_time, binding: :sim_time %>  |
+          <%= datetime min:data[:sim].time_table.time_str_widget_by_id(0), max:data[:sim].time_table.time_str_widget_by_id(data[:sim].time_table.count-1), value:data[:sim].time_table.time_str_widget_by_id(data[:sim].time_table.count-1), binding: :sim_time_datetime %>
           <br/>
 
           [<%= button text:"move begin", action:"sim_move_begin" %> ]
@@ -196,8 +196,8 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
           <br/><br/>
 
           End Time:<%= text binding: :sim_time_end_str %>  (<%= text binding: :sim_time_end %>)
-          <br/><%= slider min:0, max:data[:sim].dex.count-1, value:data[:sim].sim_time_end, binding: :sim_time_end %> |
-          <%= datetime min:data[:sim].dex.time_str_widget(0), max:data[:sim].dex.time_str_widget(data[:sim].dex.count-1), value:data[:sim].dex.time_str_widget(data[:sim].dex.count-1), binding: :sim_time_end_datetime %>
+          <br/><%= slider min:0, max:data[:sim].time_table.count-1, value:data[:sim].sim_time_end, binding: :sim_time_end %> |
+          <%= datetime min:data[:sim].time_table.time_str_widget_by_id(0), max:data[:sim].time_table.time_str_widget_by_id(data[:sim].time_table.count-1), value:data[:sim].time_table.time_str_widget_by_id(data[:sim].time_table.count-1), binding: :sim_time_end_datetime %>
           <br/>
           
           [<%= button text:"move end", action:"sim_end_move_end" %> ]
@@ -207,26 +207,25 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
 <% end %>
           
           <h4>Metrics</h4>
-          <li>Swap TXs = <%= text binding: :total_swaps %> </li>
-          <li>Avg Volume = <%= text binding: ":avg_volume = (:total_volume.to_f / :total_swaps.to_f).round(2)" %> </li>
-          <li>Volume = <%= text binding: :total_volume %> </li>
-          <li>Hourly TXs Mean = <%= text binding: :hourly_mean %> </li>
-          <li>Hourly TXs Deviation = <%= text binding: :hourly_std %> </li>
-          <li>Absolute dPrice% Mean = <%= text binding: :adprice_mean %> </li>
-          <li>Absolute dPrice% Deviation = <%= text binding: :adprice_std %> </li>
-        <%= chart binding: :dist_chart1 %>
-        <% calculated_var ':dist_chart1 = dist_chart(:hour_group.map{|x| {"vals"=>x} },"Hourly TXs")' %>
-        <%= chart binding: :dist_chart2 %>
-        <% calculated_var ':dist_chart2 = dist_chart(:dprice.map{|x| {"vals"=>x} },"Abs dPrice")' %>
-        <%= chart binding: :dist_chart3 %>
-        <% calculated_var ':dist_chart3 = dist_chart(:dprice.filter {|x| x<=1 }.map{|x| {"vals"=>x} },"Abs dPrice")' %>
+            <li>Swap TXs = <%= text binding: :total_swaps %> </li>
+            <li>Avg Volume = <%= text binding: ":avg_volume = (:total_volume.to_f / :total_swaps.to_f).round(2)" %> </li>
+            <li>Volume = <%= text binding: :total_volume %> </li>
+            <li>Hourly TXs Mean = <%= text binding: :hourly_mean %> </li>
+            <li>Hourly TXs Deviation = <%= text binding: :hourly_std %> </li>
+            <li>Absolute dPrice% Mean = <%= text binding: :adprice_mean %> </li>
+            <li>Absolute dPrice% Deviation = <%= text binding: :adprice_std %> </li>
+            <%= chart binding: :dist_chart1 %>
+            <% calculated_var ':dist_chart1 = dist_chart(:hour_group.map{|x| {"vals"=>x} },"Hourly TXs")' %>
+            <%= chart binding: :dist_chart2 %>
+            <% calculated_var ':dist_chart2 = dist_chart(:dprice.map{|x| {"vals"=>x} },"Abs dPrice")' %>
+            <%= chart binding: :dist_chart3 %>
+            <% calculated_var ':dist_chart3 = dist_chart(:dprice.filter {|x| x<=1 }.map{|x| {"vals"=>x} },"Abs dPrice")' %>
           <br/>          
 
         </div>
       </div>
       <div>
-
-
+      
 <% if data[:load_action]!="run_simulation_queue" then %>
       <hr/>
       <b> Simulation </b>          
@@ -272,12 +271,12 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
       <%= calculated_var %( :bot_config = bot_config() ) %>
       <%= calculated_var %( :bot_stats = calc_bot_stats() ) %>
       <%= calculated_var %( :price = $data['sim'].uni.price )  %>
-      <%= calculated_var %( :price_in_range = ($data['sim'].dex.price_in_range_from_to(:price_a.to_f,:price_b.to_f,:sim_time.to_i,:sim_time_end.to_i)*100).round(2) ) %>
+      <%= calculated_var %( :price_in_range = ($data['sim'].swap_price.price_in_range_from_to(:price_a.to_f,:price_b.to_f,:sim_time.to_i,:sim_time_end.to_i)*100).round(2) ) %>
       <%= calculated_var %( :token0 = $data['sim'].uni.token0 ) %>
       <%= calculated_var %( :token1 = $data['sim'].uni.token1 ) %>
       <%= calculated_var %( :liquidity_pool = pool_table() ) %>
-      <%= calculated_var %( :sim_time_str = $data['sim'].dex.time_str(:sim_time.to_i) ) %>
-      <%= calculated_var %( :sim_time_end_str = $data['sim'].dex.time_str(:sim_time_end.to_i) ) %>
+      <%= calculated_var %( :sim_time_str = $data['sim'].time_table.time_str_by_id(:sim_time.to_i) ) %>
+      <%= calculated_var %( :sim_time_end_str = $data['sim'].time_table.time_str_by_id(:sim_time_end.to_i) ) %>
 
 
       <!-- save to ui saver -->
@@ -291,7 +290,10 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
       <%= calculated_var %( $data['sim'].config['add_liquidity_token1'] = :add_liquidity_token1  ) %>
       <%= calculated_var %( $data['sim'].config['bot_config'] = get_widgets_value($data['sim'].bot.config_format)  ) %>
 
+
     EOS
+
+
 
 
     RenderWrap.jsrb= <<~EOS
@@ -363,8 +365,8 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
             $data['sim'].bot.set_config(cur_bot_config)
         
             # load sim_time
-            $data['sim'].sim_time = $data['sim'].dex.find_time(x[:sim_time])
-            $data['sim'].sim_time_end = $data['sim'].dex.find_time(x[:sim_time_end])
+            $data['sim'].sim_time = $data['sim'].time_table.find_id_by_str(x[:sim_time])
+            $data['sim'].sim_time_end = $data['sim'].time_table.find_id_by_str(x[:sim_time_end])
             
             # load liquidity
             $data['sim'].uni.clean_liquidity("user");
@@ -437,9 +439,9 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         calculated_var_update_all()
 
         $data['sim'].uni.clean_liquidity_chart
-        $data['sim'].dex.clean_price_volume_chart
+        $data['sim'].swap_price.clean_price_volume_chart
         # $vars[:liquidity_pool_chart] = $data['sim'].uni.liquidity_chart($vars[:price_a].to_f, $vars[:price_b].to_f, $vars[:swap_price].to_f, $vars[:swap_l].to_f)
-        $vars[:price_volume_chart] = $data['sim'].dex.price_volume_chart($vars[:price_a].to_f, $vars[:price_b].to_f, $vars[:price].to_f, $vars[:sim_time].to_i, $vars[:sim_time_end].to_i)
+        $vars[:price_volume_chart] = $data['sim'].swap_price.price_volume_chart($vars[:price_a].to_f, $vars[:price_b].to_f, $vars[:price].to_f, $vars[:sim_time].to_i, $vars[:sim_time_end].to_i)
         $vars[:sim_chart] = $data['sim'].chart($vars[:price_a].to_f, $vars[:price_b].to_f)
         
         calculated_var_update_all({})
@@ -601,7 +603,7 @@ pool_table: #\{ table \} <br/> """
     end
 
     def sim_move_end
-        $vars[:sim_time]=$data['sim'].dex.count-1
+        $vars[:sim_time]=$data['sim'].time_table.count-1
         calculated_var_update_all()
         $$[:setTimeout].call(->{
             $data['sim'].change_time($vars[:sim_time].to_i)
@@ -610,7 +612,7 @@ pool_table: #\{ table \} <br/> """
     end
     
     def sim_end_move_end
-        $vars[:sim_time_end]=$data['sim'].dex.count-1
+        $vars[:sim_time_end]=$data['sim'].time_table.count-1
 
         calculated_var_update_all()
     end    
@@ -727,17 +729,17 @@ end
       $vars[:price_b] = $data['sim'].uni.price * (100+$vars[:price_b_mul].to_f)/100 
       
     #   $data['sim'].uni.clean_liquidity_chart
-    #   $data['sim'].dex.clean_price_volume_chart
+    #   $data['sim'].swap_price.clean_price_volume_chart
     end
         
     def update_metric()
         $logger.call "update_metric"
         begin_time = $vars[:sim_time].to_i
         end_time = $vars[:sim_time_end].to_i
-        begin_time = $data['sim'].dex.time_table[begin_time]
-        end_time = $data['sim'].dex.time_table[end_time]
+        begin_time = $data['sim'].time_table.find_ts_by_id(begin_time)
+        end_time = $data['sim'].time_table.find_ts_by_id(end_time)
         
-        select_swap =  $data['sim'].dex.swap.filter {|x| begin_time <= x[:time] and x[:time] <= end_time}
+        select_swap = $data['sim'].swap_price.select_swap(begin_time,end_time) 
         select_swap = select_swap.map {|x| x[:hour] = Time.at(x[:time].to_i).to_s[0,13]; x}.map {|x| 
             # volume0 = $data['sim'].uni.adjd2d(x[:volume0],$data['sim'].uni.token0_decimal).to_f
             # volume1 = $data['sim'].uni.adjd2d(x[:volume1],$data['sim'].uni.token1_decimal).to_f
@@ -785,7 +787,7 @@ end
               new_time = $vars['sim_time'].to_i
               $saved_sim_time = $vars['sim_time'] 
 
-              $vars[:sim_time_datetime] = $data[:sim].dex.time_str_widget($vars['sim_time'].to_i)
+              $vars[:sim_time_datetime] = $data[:sim].time_table.time_str_widget_by_id($vars['sim_time'].to_i)
               $saved_sim_time_datetime = $vars[:sim_time_datetime]
               
               
@@ -807,7 +809,7 @@ end
           if $saved_sim_time_end != $vars['sim_time_end'] then
               $saved_sim_time_end = $vars['sim_time_end'] 
               
-              $vars[:sim_time_end_datetime] = $data[:sim].dex.time_str_widget($vars['sim_time_end'].to_i)
+              $vars[:sim_time_end_datetime] = $data[:sim].time_table.time_str_widget_by_id($vars['sim_time_end'].to_i)
               $saved_sim_time_end_datetime = $vars[:sim_time_end_datetime]
 
             #   puts "clean timeout "+$sim_time_end_timeout.to_s
@@ -826,7 +828,7 @@ end
           if $saved_sim_time_datetime != $vars['sim_time_datetime'] then
             $saved_sim_time_datetime = $vars['sim_time_datetime']
             
-            $vars[:sim_time] = $data[:sim].dex.find_time($vars['sim_time_datetime'])
+            $vars[:sim_time] = $data[:sim].swap_price.find_time_by_str($vars['sim_time_datetime'])
             calculated_var_update_all()
     
           end
@@ -834,7 +836,7 @@ end
           if $saved_sim_time_end_datetime != $vars['sim_time_end_datetime'] then
             $saved_sim_time_end_datetime = $vars['sim_time_end_datetime']
             
-            $vars[:sim_time_end] = $data[:sim].dex.find_time($vars['sim_time_end_datetime'])
+            $vars[:sim_time_end] = $data[:sim].time_table.find_id_by_str($vars['sim_time_end_datetime'])
             calculated_var_update_all()
           end
 
@@ -911,8 +913,8 @@ $document.ready do
     $vars[:dprice] = []
 
     # init ui config
-    $vars[:sim_time] = ($data['sim'].sim_time or $data['sim'].dex.count-1)
-    $vars[:sim_time_end] = ($data['sim'].sim_time_end or $data['sim'].dex.count-1)
+    $vars[:sim_time] = ($data['sim'].sim_time or $data['sim'].time_table.count-1)
+    $vars[:sim_time_end] = ($data['sim'].sim_time_end or $data['sim'].time_table.count-1)
     
     $vars[:price_a_mul] = ($data['sim'].config['price_a_mul'] or -20)
     $vars[:price_b_mul] = ($data['sim'].config['price_b_mul'] or 20)

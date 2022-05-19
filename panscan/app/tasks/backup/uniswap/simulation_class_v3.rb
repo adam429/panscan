@@ -804,7 +804,6 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
                      time:time_str,
                      time_str:time_str,
                      price:price.round(8),
-                     volume:volume,
                      token0_amt:token0_amt.round(8),
                      token1_amt:token1_amt.round(8),
                      token0_fee:token0_fee.round(8), #8

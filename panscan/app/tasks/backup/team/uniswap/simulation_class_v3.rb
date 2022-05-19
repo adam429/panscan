@@ -590,6 +590,15 @@ class Simulation < MappingObject
         self.sim_time = dex.count-1
         self.sim_time_end = dex.count-1
         
+        $logger.call "pool.swap= #{self.pool.swap}"
+        $logger.call "pool.pool= #{self.pool.pool}"
+        $logger.call "pool.init_tick= #{self.pool.init_tick}"
+        $logger.call "dex.swap= #{self.dex.swap}"
+        $logger.call "dex.time_table= #{self.dex.time_table}"
+        $logger.call "uni.price= #{self.uni.price}"
+        $logger.call "uni.liquidity_pool= #{self.uni.liquidity_pool}"
+        
+        
         $logger.call "==end data_import=="
     end 
     

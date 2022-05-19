@@ -10,7 +10,7 @@ class Simulation < MappingObject
         return "uniswap/simulation_class_v4"
     end
     
-    mapping_accessor :dex, :cex, :uni, :pool, :bot, :cur_time, :sim_data, :user_pool, :reversed
+    mapping_accessor :hedge, :swap_price, :time_table, :uni, :pool, :bot, :cur_time, :sim_data, :user_pool, :reversed
     mapping_accessor :sim_time, :sim_time_end,:load_action, :pool_id, :sim_queue, :config
     
     def bot_stats
@@ -60,8 +60,8 @@ class Simulation < MappingObject
                     time0 = param[0]
                     time1 = param[1]
                     
-                    self.sim_time = self.dex.find_time(time0)
-                    self.sim_time_end = self.dex.find_time(time1)
+                    self.sim_time = self.time_table.find_id_by_str(time0)
+                    self.sim_time_end = self.time_table.find_id_by_str(time1)
                     
                     self.change_time(self.sim_time)
 
@@ -106,8 +106,9 @@ class Simulation < MappingObject
     
     def init(pool_id)
         self.uni = UniswapV3.new
-        self.dex = Dex.new()
-        self.cex = Cex.new()
+        self.hedge = Hedge.new()
+        self.swap_price = SwapPrice.new()
+        self.time_table = TimeTable.new()
         self.bot = Bot.new
         self.pool = Pool.new
 
@@ -125,9 +126,9 @@ class Simulation < MappingObject
         self.uni.price
     end
     
-    def time
-        self.dex.time_table[self.cur_time][:time]
-    end
+    # def time
+    #     self.time_table.find_ts_by_id(self.cur_time)[:time]
+    # end
     
     def chart(price_a=nil,price_b=nil)
             title = "Simulation Result"
@@ -518,10 +519,10 @@ class Simulation < MappingObject
     
     def data_size_up()
         $logger.call "==[data_size_up]=="
-        $logger.call "dex.swap = #{self.dex.swap.to_s.size}"
+        $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
         $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
         $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
-        $logger.call "dex.time_table = #{self.dex.time_table.to_s.size}"
+        $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
         data_lood_from_redis(pool_id)
         if sim.pool.swap.size>0 then
             block_number = sim.pool.swap[sim.sim_time][:block_number]
@@ -530,47 +531,47 @@ class Simulation < MappingObject
             sim.uni.liquidity_pool = sim.pool.calc_pool(block_number,sim.user_pool)
         end
         
-        $logger.call "dex.swap = #{self.dex.swap.to_s.size}"
+        $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
         $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
         $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
-        $logger.call "dex.time_table = #{self.dex.time_table.to_s.size}"
+        $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
     end
 
     def data_size_down()
         $logger.call "==[data_size_down]=="
-        $logger.call "dex.swap = #{self.dex.swap.to_s.size}"
+        $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
         $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
         $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
-        $logger.call "dex.time_table = #{self.dex.time_table.to_s.size}"
+        $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
 
-        self.dex.swap = self.dex.swap.map {|v| { id:v[:id],time:v[:time],price:v[:price],volume:v[:volume] } }
+        self.swap_price.swap = self.swap_price.swap.map {|v| { id:v[:id],time:v[:time],price:v[:price],volume:v[:volume] } }
         self.pool.swap = [] 
         self.pool.pool = [] 
 
-        $logger.call "dex.swap = #{self.dex.swap.to_s.size}"
+        $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
         $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
         $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
-        $logger.call "dex.time_table = #{self.dex.time_table.to_s.size}"
+        $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
 
         self.uni.liquidity_pool = self.uni.liquidity_pool.filter{|x| x[:sender]!=nil }
-        self.dex.swap_chart = []
+        self.swap_price.swap_chart = []
 
         last_time = 0
         volume = 0
-        self.dex.swap.map.with_index {|x,i| 
+        self.swap_price.swap.map.with_index {|x,i| 
             if x[:time]-last_time>3600 then
-              self.dex.swap_chart.push({x:i, time:x[:time], time_str:Time.at(x[:time]).to_s[0,19], price:x[:price], volume:(x[:volume]+volume) }) 
+              self.swap_price.swap_chart.push({x:i, time:x[:time], time_str:Time.at(x[:time]).to_s[0,19], price:x[:price], volume:(x[:volume]+volume) }) 
               last_time = x[:time]
               volume = 0
             else
               volume = volume + x[:volume]
             end
         }
-        $logger.call "dex.swap_chart.size = #{self.dex.swap_chart.size}"
+        $logger.call "swap_price.swap_chart.size = #{self.swap_price.swap_chart.size}"
     end
 
     def data_lood_from_redis(pool_id)
-        self.dex.swap =  DataStore.get("uniswap.#{pool_id}.swap")
+        self.swap_price.swap =  DataStore.get("uniswap.#{pool_id}.swap")
         self.pool.swap = DataStore.get("uniswap.#{pool_id}.swap")
         self.pool.pool = DataStore.get("uniswap.#{pool_id}.pool")
         self.pool.init_tick = DataStore.get("uniswap.#{pool_id}.init_tick")
@@ -579,7 +580,7 @@ class Simulation < MappingObject
         if self.reversed then
             $logger.call "==reverse pair=="
             
-            self.dex.swap = self.dex.swap.map {|x|
+            self.swap_price.swap = self.swap_price.swap.map {|x|
                 x[:tick] = -1*x[:tick]
                 swap = x[:volume0]
                 x[:volume0] = x[:volume1]
@@ -608,9 +609,10 @@ class Simulation < MappingObject
 
         block_to_time = DataStore.get("uniswap.#{pool_id}.time_table")
         block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
-        self.dex.time_table = self.dex.swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
+        
+        self.time_table.time_table = self.swap_price.time_table = self.swap_price.swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
 
-        self.dex.swap =  self.dex.swap.map{|v| 
+        self.swap_price.swap =  self.swap_price.swap.map{|v| 
             price = 1.0001**v[:tick]
             {
                 id:v[:id],
@@ -622,7 +624,7 @@ class Simulation < MappingObject
             }
         }
         
-        self.uni.price = self.dex.swap.last[:price]
+        self.uni.price = self.swap_price.get_last_price()
     end
     
     def data_init_config(pool_id)
@@ -637,15 +639,15 @@ class Simulation < MappingObject
         cex_fee = pool_config[:cex_fee]
         
         self.uni.init(token0,token1,token0_decimal,token1_decimal,nil,dex_fee)
-        self.cex.init(token0,token1,cex_fee)
+        self.hedge.init(token0,token1,cex_fee)
         self.pool.init()
     end
     
     def data_init_value()
         self.pool.reset()
         self.uni.liquidity_pool = self.pool.calc_pool(-1, [], ->() { self.uni.mark_slice_pool_dirty() } )
-        self.sim_time = dex.count-1
-        self.sim_time_end = dex.count-1
+        self.sim_time = self.time_table.count-1
+        self.sim_time_end = self.time_table.count-1
     end
 
     def data_import(pool_id="")
@@ -658,7 +660,7 @@ class Simulation < MappingObject
         data_init_value()
 
         $logger.call "self.uni.price - #{self.uni.price}"
-        $logger.call "self.dex.swap - #{self.dex.swap[0,10]}"
+        $logger.call "self.swap_price.swap - #{self.swap_price.swap[0,10]}"
         $logger.call "self.pool.pool - #{self.pool.pool[0,10]}"
         $logger.call "self.pool.swap - #{self.pool.swap[0,10]}"
 
@@ -666,9 +668,10 @@ class Simulation < MappingObject
     end 
     
     def change_time(new_time,run=false)
-        price = self.dex.swap[new_time][:price]
-        volume0 = self.dex.swap[new_time][:volume0]
-        volume1 = self.dex.swap[new_time][:volume1]
+        swap = self.swap_price.get_swap_by_id(new_time)
+        price = swap[:price]
+        volume0 = swap[:volume0]
+        volume1 = swap[:volume1]
 
 
 profiler_time1 = Time.now()
@@ -692,7 +695,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         # $logger.call "user_pool = #{self.user_pool}"
         # $logger.call "uni.liquidity_pool = #{self.uni.liquidity_pool.size}"
 
-        self.cex.set_price(price)
+        self.hedge.set_price(price)
         self.cur_time = new_time
     end
     
@@ -708,16 +711,16 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
 
     profiler_time = Time.now()
 
-        time_ts = self.dex.time_table[time]
-        time_str = self.dex.time_str(time)
+        time_ts = self.time_table.find_ts_by_id(time)
+        time_str = self.time_table.time_str_by_id(time)
         price = self.price
         
         dprice = ((@saved_price == 0 ? 1 : price / @saved_price) - 1)*100
         @saved_price = price
         
     profiler_time1 = Time.now()
-        volume0 = self.uni.adjd2d(self.dex.swap[self.cur_time][:volume0],self.uni.token0_decimal).to_f
-        volume1 = self.uni.adjd2d(self.dex.swap[self.cur_time][:volume1],self.uni.token1_decimal).to_f
+        volume0 = self.uni.adjd2d(self.swap_price.get_swap_by_id(self.cur_time)[:volume0],self.uni.token0_decimal).to_f
+        volume1 = self.uni.adjd2d(self.swap_price.get_swap_by_id(self.cur_time)[:volume1],self.uni.token1_decimal).to_f
     $profiler[:uni_math] = ($profiler[:uni_math] or 0) + (Time.now()-profiler_time1)
         
         volume = volume0*price + volume1
@@ -741,16 +744,16 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         ddex_value = (self.sim_data==[]) ? 0 : dex_value.to_f - self.sim_data[0][:dex_value]
         
     profiler_time1 = Time.now()
-        bot_data = self.bot.run(self.cex, time, time_ts, time_str,self.uni.price,token0_amt,token1_amt, token0_fee, token1_fee)
+        bot_data = self.bot.run(self.hedge, time, time_ts, time_str,self.uni.price,token0_amt,token1_amt, token0_fee, token1_fee)
     $profiler[:bot_run] = ($profiler[:bot_run] or 0) + (Time.now()-profiler_time1)
         
         
     profiler_time1 = Time.now()
-        cex_fee = self.cex.get_fee
-        cex_position = self.cex.get_position("amt")
-        cex_value = self.cex.get_pnl("amt")
-        cex_fee_position = self.cex.get_position("fee")
-        cex_fee_value = self.cex.get_pnl("fee")
+        cex_fee = self.hedge.get_fee
+        cex_position = self.hedge.get_position("amt")
+        cex_value = self.hedge.get_pnl("amt")
+        cex_fee_position = self.hedge.get_position("fee")
+        cex_fee_value = self.hedge.get_pnl("fee")
     $profiler[:cex_calc] = ($profiler[:cex_calc] or 0) + (Time.now()-profiler_time1)
         value_diff = cex_value + ddex_value
         value_diff_dex_value = ((self.sim_data==[]) ? 0 : value_diff / self.sim_data[0][:dex_value])*100
@@ -769,7 +772,6 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
                      time:time_str,
                      time_str:time_str,
                      price:price.round(8),
-                     volume:volume,
                      token0_amt:token0_amt.round(8),
                      token1_amt:token1_amt.round(8),
                      token0_fee:token0_fee.round(8), #8
@@ -865,7 +867,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
     
     def simulate(time_start,time_end,after=nil)
         self.sim_data = []
-        self.cex.reset
+        self.hedge.reset
         self.bot.reset
 
         self.clean_fee
