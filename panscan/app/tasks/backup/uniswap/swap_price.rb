@@ -336,25 +336,18 @@ class SwapPriceCex < SwapPriceBase
         realtime_low = ((self.realtime.filter {|x| x[:ts]<=ts}[-1]) or {ts:0})
         realtime_upper = ((self.realtime.filter {|x| x[:ts]>=ts}[0]) or {ts:0})
         
-        # history_low = (history_low[:ts] - ts).abs>120 ? {ts:0} :history_low
-        # history_upper = (history_upper[:ts] - ts).abs>120 ? {ts:0} :history_upper
-        # realtime_low = (realtime_low[:ts] - ts).abs>2 ? {ts:0} :realtime_low
-        # realtime_upper = (realtime_upper[:ts] - ts).abs>2 ? {ts:0} :realtime_upper
+        history_low = (history_low[:ts] - ts).abs>120 ? {ts:0} :history_low
+        history_upper = (history_upper[:ts] - ts).abs>120 ? {ts:0} :history_upper
+        realtime_low = (realtime_low[:ts] - ts).abs>2 ? {ts:0} :realtime_low
+        realtime_upper = (realtime_upper[:ts] - ts).abs>2 ? {ts:0} :realtime_upper
         
         $logger.call ts
         $logger.call history_low
         $logger.call history_upper
         $logger.call realtime_low
         $logger.call realtime_upper
-        # ret = nil
-        # self.time_table.each_with_index {|x,i|
-        #     if x >= ts then 
-        #         ret=i; 
-        #         break; 
-        #     end 
-        # }
-        # ret = self.time_table.size-1 if ret==nil
-        # return self.swap[ret]
+        
+        realtime_price =
     end
     
     def get_swap_by_id(id)
