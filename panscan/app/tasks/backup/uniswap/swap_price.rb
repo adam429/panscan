@@ -288,7 +288,7 @@ class SwapPriceDex < SwapPriceBase
     
 end
 
-class SwapPriceCexSynthesis < SwapPriceBase
+class SwapPriceCexSynthesis 
     mapping_accessor :token0base, :token1base, :token0, :token1, :base
 
     def load_from_redis(exchange,uni,reversed=false)
@@ -303,7 +303,7 @@ class SwapPriceCexSynthesis < SwapPriceBase
     end
 end
 
-class SwapPriceCex < SwapPriceBase
+class SwapPriceCex 
     mapping_accessor :token0, :token1
     mapping_accessor :realtime, :history
 
@@ -357,7 +357,7 @@ class SwapPriceCex < SwapPriceBase
         end
         
         if history_low[:ts]>0 and history_high[:ts]>0 then
-            history_price = interpolate(ts,history_high[:ts],realtime_low[:ts],realtime_high[:price],realtime_low[:price])
+            history_price = interpolate(ts,history_high[:ts],history_low[:ts],history_high[:price],history_low[:price])
             return {price:history_price}
         end
         
