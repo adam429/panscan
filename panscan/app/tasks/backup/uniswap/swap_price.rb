@@ -387,6 +387,6 @@ def main
     $logger.call "realtime: #{Time.at(ethusdt.realtime[0][:ts])} - #{Time.at(ethusdt.realtime[-1][:ts])}"
     $logger.call "history: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
     
-    time = Time.new(2022,05,17,01,02,03).to_i
+    time = Time.new(2022,10,19,01,02,03).to_i
     $logger.call ethusdt.get_swap_by_ts(time)
 end
