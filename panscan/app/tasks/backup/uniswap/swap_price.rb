@@ -367,6 +367,14 @@ class SwapPriceCexSynthesis < MappingObject
         self.token0base.load_from_redis(exchange, token0, base)
         self.token1base.load_from_redis(exchange, token1, base)
     end
+
+    def get_swap_by_ts(ts,currency=nil)
+        if currency then
+        else
+            
+        end
+    end
+
 end
 
 
