@@ -63,13 +63,7 @@ class TimeTable < MappingObject
 
 end
 
-class SwapPriceBase < MappingObject
-    def self.task
-        return "uniswap/swap_price"
-    end
-    
-    mapping_accessor :swap, :swap_chart, :time_table
-    
+class SwapPriceDex < SwapPriceBase
     def load_from_redis(pool_id,uni,reversed=false)
         self.swap =  DataStore.get("uniswap.#{pool_id}.swap")
 
@@ -98,11 +92,51 @@ class SwapPriceBase < MappingObject
             }
         }
         self.time_table = self.swap.map {|x| x[:time] }
-        
-        # $logger.call self.swap[0]
-        # $logger.call self.table_time[0]
-        
     end
+    
+end
+
+class SwapPriceCex < SwapPriceBase
+    def load_from_redis(pool_id,uni,reversed=false)
+        self.swap =  DataStore.get("uniswap.#{pool_id}.swap")
+
+        if reversed then
+            self.swap = self.swap.map {|x|
+                x[:tick] = -1*x[:tick]
+                swap = x[:volume0]
+                x[:volume0] = x[:volume1]
+                x[:volume1] = swap
+                x                
+            }
+        end
+
+        block_to_time = DataStore.get("uniswap.#{pool_id}.time_table")
+        block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
+
+        self.swap =  self.swap.map{|v| 
+            price = 1.0001**v[:tick]
+            {
+                id:v[:id],
+                time:block_to_time[v[:block_number]][0],
+                price:uni.adjp2p(price),
+                volume0:v[:volume0],
+                volume1:v[:volume1],
+                volume:v[:volume1] + v[:volume0]*price,
+            }
+        }
+        self.time_table = self.swap.map {|x| x[:time] }
+    end
+    
+end
+
+
+class SwapPriceBase < MappingObject
+    def self.task
+        return "uniswap/swap_price"
+    end
+    
+    mapping_accessor :swap, :swap_chart, :time_table
+    
 
     def get_swap_by_id(id)
         return self.swap[id]
