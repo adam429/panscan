@@ -305,16 +305,15 @@ end
 
 class SwapPriceCex < SwapPriceBase
     mapping_accessor :token0, :token1
-    mapping_accessor :token0, :token1
+    mapping_accessor :realtime, :history
 
     def load_from_redis(exchange,token0, token1)
-        self.token0 = uni.token0
-        self.token1 = uni.token1
+        self.token0 = token0
+        self.token1 = token1
 
         pairname = self.token0 + self.token1
-        DataStore.get("cex.#{exchange}.#{pair_name}.realtime")
-        
-        
+        self.realtime = DataStore.get("cex.#{exchange}.#{pair_name}.realtime")
+        self.history =DataStore.get("cex.#{exchange}.#{pair_name}.history")
     end
 end
 
@@ -323,4 +322,7 @@ def main
     cex = SwapPriceCex.new
     
     ethusdt = cex.load_from_redis("okex","ETH","USDT")
+    
+    $logger.call ethusdt.realtime[0]
+    $logger.call ethusdt.history[0]
 end
