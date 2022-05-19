@@ -645,7 +645,7 @@ $profiler[:change_price] = ($profiler[:change_price] or 0) + (Time.now()-profile
         # $logger.call "pool.swap.size = #{self.pool.swap.size}"
         
         if self.pool.swap.size>0 then
-            block_number = self.pool.swap[new_time][:block_number]
+            block_number = self.pool.swap[id][:block_number]
             self.user_pool = self.uni.liquidity_pool.filter {|x| x[:sender]=="user"}
 
 
