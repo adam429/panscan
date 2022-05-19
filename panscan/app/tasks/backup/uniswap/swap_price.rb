@@ -347,7 +347,13 @@ class SwapPriceCex < SwapPriceBase
         $logger.call realtime_low
         $logger.call realtime_upper
         
-        realtime_price =
+        realtime_price = 0
+        return {price:realtime_price}
+        
+        history_price = 1
+        return {price:history_price}
+        
+        return {price:nil}
     end
     
     def get_swap_by_id(id)
