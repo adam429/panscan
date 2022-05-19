@@ -631,6 +631,7 @@ class Simulation < MappingObject
     end
 
     def change_time_by_ts(ts,run=false)
+        id = self.time_table.get_id_by_ts(ts)
         swap = self.swap_price.get_swap_by_ts(ts)
         price = swap[:price]
         volume0 = swap[:volume0]
@@ -659,7 +660,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         # $logger.call "uni.liquidity_pool = #{self.uni.liquidity_pool.size}"
 
         self.hedge.set_price(price)
-        self.cur_time = new_time
+        self.cur_time = id
     end
     
     def simulate_tick_logic(time,time_end)
