@@ -331,7 +331,7 @@ class SwapPriceCex
     end
     
     def interpolate(cur,upper,lower,upper_value,lower_value)
-        
+        return ((cur-lower) / (upper-lower).to_f) * (upper_value-lower_value) + lower_value
     end
 
     def get_swap_by_ts(ts)
@@ -364,21 +364,6 @@ class SwapPriceCex
         return {price:nil}
     end
     
-    def get_swap_by_id(id)
-        raise "SwapPriceCex did not support get_swap_by_id"
-    end
-    def get_last_price()
-        raise "SwapPriceCex did not support get_last_price"
-    end
-    def select_swap(begin_time,end_time)
-        raise "SwapPriceCex did not support select_swap"
-    end
-    def price_in_range_from(price_a, price_b, from)
-        raise "SwapPriceCex did not support price_in_range_from"
-    end
-    def price_in_range_from_to(price_a, price_b, from, to)
-        raise "SwapPriceCex did not support price_in_range_from_to"
-    end
 end
 
 
