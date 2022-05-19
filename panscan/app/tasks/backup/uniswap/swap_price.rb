@@ -137,10 +137,6 @@ class SwapPrice < MappingObject
     end
 
     def price_volume_chart(price_a=nil,price_b=nil,cur_price=nil,sim_time=0,sim_time_end=0)
-        $logger.call "==here=="
-        $logger.call sim_time
-        $logger.call sim_time_end
-        $logger.call self.time_table
             return @price_volume_chart if @price_volume_chart 
             title = "Price & Volume"
             
