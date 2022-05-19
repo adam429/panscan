@@ -303,5 +303,10 @@ class SwapPriceCex < SwapPriceBase
     end
 end
 
-
-class SwapPriceCex
+def main
+    $logger.call "hello world!"
+    
+    cex = SwapPriceCex.new
+    
+    cex.load_from_redis()
+end
