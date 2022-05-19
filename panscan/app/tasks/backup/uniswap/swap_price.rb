@@ -91,7 +91,7 @@ class SwapPrice < MappingObject
             {
                 id:v[:id],
                 time:block_to_time[v[:block_number]][0],
-                price:self.uni.adjp2p(price),
+                price:UniswapV3.adjp2p(price),
                 volume0:v[:volume0],
                 volume1:v[:volume1],
                 volume:v[:volume1] + v[:volume0]*price,
