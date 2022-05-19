@@ -371,7 +371,7 @@ class SwapPriceCexSynthesis < MappingObject
     def get_swap_by_ts(ts,currency=nil)
         if currency then
         else
-            
+            return self.token0base(ts) / self.token1base(ts).to_f
         end
     end
 
@@ -411,5 +411,17 @@ def main
 
     cex = SwapPriceCexSynthesis.new
     cex.load_from_redis("okex","APE","ETH","USDT")
+
+    time = Time.new(2022,05,17,01,02,03).to_i
+    $logger.call cex.get_swap_by_ts(time)
+
+    time = Time.new(2022,05,19,01,02,02).to_i
+    $logger.call cex.get_swap_by_ts(time)
+
+    time = Time.new(2021,05,19,01,02,02).to_i
+    $logger.call cex.get_swap_by_ts(time)
+
+    time = Time.new(2023,05,19,01,02,02).to_i
+    $logger.call cex.get_swap_by_ts(time)
 
 end
