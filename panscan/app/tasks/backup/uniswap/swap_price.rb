@@ -344,6 +344,8 @@ def main
     $logger.call ethusdt.token1
     $logger.call ethusdt.realtime[0]
     $logger.call ethusdt.history[0]
+    $logger.call ethusdt.realtime.size
+    $logger.call ethusdt.history.size
     $logger.call "realtime: #{Time.at(ethusdt.realtime[0][:ts])} - #{Time.at(ethusdt.realtime[-1][:ts])}"
     $logger.call "history: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
 
