@@ -571,6 +571,10 @@ class Simulation < MappingObject
     end
 
     def data_lood_from_redis(pool_id)
+        self.swap_price.load_from_redis(pool_id)
+        self.time_table.load_from_redis(pool_id)
+        self.pool.load_from_redis(pool_id)
+        
         self.swap_price.swap =  DataStore.get("uniswap.#{pool_id}.swap")
         self.pool.swap = DataStore.get("uniswap.#{pool_id}.swap")
         self.pool.pool = DataStore.get("uniswap.#{pool_id}.pool")
