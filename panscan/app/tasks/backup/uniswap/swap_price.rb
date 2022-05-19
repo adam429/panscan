@@ -331,11 +331,11 @@ class SwapPriceCex < MappingObject
         realtime_low = (realtime_low[:ts] - ts).abs>2 ? {ts:0} :realtime_low
         realtime_upper = (realtime_upper[:ts] - ts).abs>2 ? {ts:0} :realtime_upper
         
-        $logger.call ts
-        $logger.call history_low
-        $logger.call history_upper
-        $logger.call realtime_low
-        $logger.call realtime_upper
+        # $logger.call ts
+        # $logger.call history_low
+        # $logger.call history_upper
+        # $logger.call realtime_low
+        # $logger.call realtime_upper
         
         if realtime_low[:ts]>0 and realtime_upper[:ts]>0 then
             realtime_price = interpolate(ts,realtime_upper[:ts],realtime_low[:ts],realtime_upper[:price],realtime_low[:price])
@@ -361,7 +361,11 @@ class SwapPriceCexSynthesis < MappingObject
         self.token1 = token1
         self.base = base
 
+        self.token0base = SwapPriceCex.new
+        self.token1base = SwapPriceCex.new
 
+        self.token0base.load_from_redis(exchange, token0, base)
+        self.token1base.load_from_redis(exchange, token1, base)
     end
 end
 
