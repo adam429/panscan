@@ -518,28 +518,28 @@ class Simulation < MappingObject
         
     end
     
-    def data_size_up()
-        $logger.call "==[data_size_up]=="
-        $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
-        $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
-        $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
-        $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
+    # def data_size_up()
+    #     $logger.call "==[data_size_up]=="
+    #     $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
+    #     $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
+    #     $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
+    #     $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
 
-        data_lood_from_redis(pool_id)
-        self.uni.price = self.swap_price.get_last_price()
+    #     data_lood_from_redis(pool_id)
+    #     self.uni.price = self.swap_price.get_last_price()
 
-        if sim.pool.swap.size>0 then
-            block_number = sim.pool.swap[sim.sim_time][:block_number]
-            sim.user_pool = sim.uni.liquidity_pool.filter {|x| x[:sender]=="user"}
-            sim.pool.cur_blocknumber = 9999999999+1
-            sim.uni.liquidity_pool = sim.pool.calc_pool(block_number,sim.user_pool)
-        end
+    #     if sim.pool.swap.size>0 then
+    #         block_number = sim.pool.swap[sim.sim_time][:block_number]
+    #         sim.user_pool = sim.uni.liquidity_pool.filter {|x| x[:sender]=="user"}
+    #         sim.pool.cur_blocknumber = 9999999999+1
+    #         sim.uni.liquidity_pool = sim.pool.calc_pool(block_number,sim.user_pool)
+    #     end
         
-        $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
-        $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
-        $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
-        $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
-    end
+    #     $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
+    #     $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
+    #     $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
+    #     $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
+    # end
 
     def data_size_down()
         $logger.call "==[data_size_down]=="
