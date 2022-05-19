@@ -331,6 +331,7 @@ class SwapPriceCex < MappingObject
     end
     
     def interpolate(cur,upper,lower,upper_value,lower_value)
+        return upper_value if upper_value==lower_value
         return ((cur-lower) / (upper-lower).to_f) * (upper_value-lower_value) + lower_value
     end
 
@@ -351,13 +352,13 @@ class SwapPriceCex < MappingObject
         $logger.call realtime_low
         $logger.call realtime_upper
         
-        if realtime_low[:ts]>0 and realtime_high[:ts]>0 then
-            realtime_price = interpolate(ts,realtime_high[:ts],realtime_low[:ts],realtime_high[:price],realtime_low[:price])
+        if realtime_low[:ts]>0 and realtime_upper[:ts]>0 then
+            realtime_price = interpolate(ts,realtime_upper[:ts],realtime_low[:ts],realtime_upper[:price],realtime_low[:price])
             return {price:realtime_price}
         end
         
-        if history_low[:ts]>0 and history_high[:ts]>0 then
-            history_price = interpolate(ts,history_high[:ts],history_low[:ts],history_high[:price],history_low[:price])
+        if history_low[:ts]>0 and history_upper[:ts]>0 then
+            history_price = interpolate(ts,history_upper[:ts],history_low[:ts],history_upper[:price],history_low[:price])
             return {price:history_price}
         end
         
