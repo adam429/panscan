@@ -288,7 +288,7 @@ class SwapPriceDex < SwapPriceBase
     
 end
 
-class SwapPriceCex < SwapPriceBase
+class SwapPriceCexSynthesis < SwapPriceBase
     mapping_accessor :token0base, :token1base, :token0, :token1, :base
 
     def load_from_redis(exchange,uni,reversed=false)
@@ -303,10 +303,11 @@ class SwapPriceCex < SwapPriceBase
     end
 end
 
+class SwapPriceCex < SwapPriceBase
+end
+
 def main
-    $logger.call "hello world!"
-    
     cex = SwapPriceCex.new
     
-    cex.load_from_redis()
+    cex.load_from_redis("okex",)
 end
