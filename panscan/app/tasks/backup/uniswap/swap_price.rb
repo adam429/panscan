@@ -9,7 +9,7 @@ class TimeTable < MappingObject
 
     mapping_accessor :time_table
     
-    def load_from_redis(pool_id,reversed=false)
+    def load_from_redis(pool_id,uni,reversed=false)
         swap =  DataStore.get("uniswap.#{pool_id}.swap")
 
         block_to_time = DataStore.get("uniswap.#{pool_id}.time_table")
