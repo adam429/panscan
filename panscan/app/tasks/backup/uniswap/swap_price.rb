@@ -347,11 +347,15 @@ class SwapPriceCex < SwapPriceBase
         $logger.call realtime_low
         $logger.call realtime_upper
         
-        realtime_price = 0
-        return {price:realtime_price}
+        if realtime_low[:ts]>0 and realtime_high[:ts]>0 then
+            realtime_price = 0
+            return {price:realtime_price}
+        end
         
-        history_price = 1
-        return {price:history_price}
+        if history_low[:ts]>0 and history_high[:ts]>0 then
+            history_price = 1
+            return {price:history_price}
+        end
         
         return {price:nil}
     end
