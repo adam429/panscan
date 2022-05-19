@@ -64,10 +64,10 @@ class SwapPrice < MappingObject
     mapping_accessor :swap, :swap_chart, :time_table
     
     def load_from_redis(pool_id,reversed==false)
-        self.swap_price.swap =  DataStore.get("uniswap.#{pool_id}.swap")
+        self.swap =  DataStore.get("uniswap.#{pool_id}.swap")
 
         if reversed then
-            self.swap_price.swap = self.swap_price.swap.map {|x|
+            self.swap = self.swap.map {|x|
                 x[:tick] = -1*x[:tick]
                 swap = x[:volume0]
                 x[:volume0] = x[:volume1]
@@ -79,7 +79,7 @@ class SwapPrice < MappingObject
         block_to_time = DataStore.get("uniswap.#{pool_id}.time_table")
         block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
 
-        self.swap_price.swap =  self.swap_price.swap.map{|v| 
+        self.swap =  self.swap.map{|v| 
             price = 1.0001**v[:tick]
             {
                 id:v[:id],
@@ -91,7 +91,7 @@ class SwapPrice < MappingObject
             }
         }
         
-        self.swap_price.time_table = self.swap_price.swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
+        self.time_table = self.swap_price.swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
     end
 
     def get_swap_by_id(id)

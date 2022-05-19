@@ -578,29 +578,6 @@ class Simulation < MappingObject
         self.time_table.load_from_redis(pool_id,self.reversed)
         self.pool.load_from_redis(pool_id,self.reversed)
         
-
-        ## check reverse
-        if self.reversed then
-
-            self.pool.swap = self.pool.swap.map {|x|
-                x[:tick] = -1*x[:tick]
-                swap = x[:volume0]
-                x[:volume0] = x[:volume1]
-                x[:volume1] = swap
-                x                
-            }
-
-            self.pool.pool = self.pool.pool.map {|x|
-                swap = x[:amount0]
-                x[:amount0] = x[:amount1]
-                x[:amount1] = swap
-                x                
-            }
-
-            self.pool.init_tick = -1*self.pool.init_tick
-        end
-
-
         block_to_time = DataStore.get("uniswap.#{pool_id}.time_table")
         block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
         
