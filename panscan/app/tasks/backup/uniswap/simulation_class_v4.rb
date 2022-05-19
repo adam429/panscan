@@ -626,10 +626,12 @@ class Simulation < MappingObject
     end
     
     def change_time_by_id(id,run=false)
+        ts = self.time_table.get_ts_by_id(id)
+        change_time_by_ts(ts)
     end
 
-    def change_time_by_ts(id,run=false)
-        swap = self.swap_price.get_swap_by_id(new_time)
+    def change_time_by_ts(ts,run=false)
+        swap = self.swap_price.get_swap_by_ts(ts)
         price = swap[:price]
         volume0 = swap[:volume0]
         volume1 = swap[:volume1]
