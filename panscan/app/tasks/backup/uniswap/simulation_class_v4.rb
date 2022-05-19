@@ -10,7 +10,7 @@ class Simulation < MappingObject
         return "uniswap/simulation_class_v4"
     end
     
-    mapping_accessor :hedge, :swap_price, :time_table, :uni, :pool, :bot, :cur_time, :sim_data, :user_pool, :reversed
+    mapping_accessor :hedge, :swap_price, :swap_price_cex, :time_table, :uni, :pool, :bot, :cur_time, :sim_data, :user_pool, :reversed
     mapping_accessor :sim_time, :sim_time_end,:load_action, :pool_id, :sim_queue, :config
     
     def bot_stats
@@ -108,6 +108,7 @@ class Simulation < MappingObject
         self.uni = UniswapV3.new
         self.hedge = Hedge.new()
         self.swap_price = SwapPriceDex.new()
+        self.swap_price_cex = SwapPriceCex.new()
         self.time_table = TimeTable.new()
         self.bot = Bot.new
         self.pool = Pool.new
