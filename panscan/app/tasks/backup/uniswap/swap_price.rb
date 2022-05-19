@@ -371,7 +371,7 @@ class SwapPriceCexSynthesis < MappingObject
     def get_swap_by_ts(ts,currency=nil)
         if currency then
         else
-            return self.token0base.get_swap_by_ts(ts) / self.token1base.get_swap_by_ts(ts).to_f
+            return {price: self.token0base.get_swap_by_ts(ts)[:price] / self.token1base.get_swap_by_ts(ts)[:price].to_f}
         end
     end
 
