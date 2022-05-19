@@ -329,6 +329,9 @@ class SwapPriceCex < SwapPriceBase
             }
         }
     end
+    
+    def interpolate()
+    end
 
     def get_swap_by_ts(ts)
         history_low = ((self.history.filter {|x| x[:ts]<=ts}[-1]) or {ts:0})
@@ -349,6 +352,8 @@ class SwapPriceCex < SwapPriceBase
         
         if realtime_low[:ts]>0 and realtime_high[:ts]>0 then
             realtime_price = 0
+            
+            
             return {price:realtime_price}
         end
         
