@@ -10,6 +10,11 @@ class TimeTable < MappingObject
     mapping_accessor :time_table
     
     def load_from_redis(pool_id,reversed==false)
+        block_to_time = DataStore.get("uniswap.#{pool_id}.time_table")
+        block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
+        
+        self.time_table.time_table = self.swap_price.time_table = self.swap_price.swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
+            
     end
     
     def count
