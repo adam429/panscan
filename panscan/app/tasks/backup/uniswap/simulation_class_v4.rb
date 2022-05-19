@@ -523,7 +523,10 @@ class Simulation < MappingObject
         $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
         $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
         $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
+
         data_lood_from_redis(pool_id)
+        self.uni.price = self.swap_price.get_last_price()
+
         if sim.pool.swap.size>0 then
             block_number = sim.pool.swap[sim.sim_time][:block_number]
             sim.user_pool = sim.uni.liquidity_pool.filter {|x| x[:sender]=="user"}
@@ -628,7 +631,6 @@ class Simulation < MappingObject
             }
         }
         
-        self.uni.price = self.swap_price.get_last_price()
     end
     
     def data_init_config(pool_id)
@@ -648,6 +650,7 @@ class Simulation < MappingObject
     end
     
     def data_init_value()
+        
         self.pool.reset()
         self.uni.liquidity_pool = self.pool.calc_pool(-1, [], ->() { self.uni.mark_slice_pool_dirty() } )
         self.sim_time = self.time_table.count-1
