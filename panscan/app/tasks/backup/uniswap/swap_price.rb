@@ -304,9 +304,29 @@ class SwapPriceCexSynthesis < SwapPriceBase
 end
 
 class SwapPriceCex < SwapPriceBase
+    mapping_accessor :token0, :token1
+
+    def load_from_redis(exchange,uni,reversed=false)
+        self.token0 = uni.token0
+        self.token1 = uni.token1
+        self.base = "USDT"
+        
+        pairname = self.token0 + self.base
+        DataStore.get("cex.#{exchange}.#{pair_name}.realtime")
+        
+        
+    end
+end
+
+class Foo
+    attr_accessor :token0, :token1
 end
 
 def main
+    uni = Foo.new
+    uni.token0 = "APE"
+    uni.token1 = "ETH"
+    
     cex = SwapPriceCex.new
     
     cex.load_from_redis("okex",)
