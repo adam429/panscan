@@ -97,7 +97,7 @@ class SwapPrice < MappingObject
                 volume:v[:volume1] + v[:volume0]*price,
             }
         }
-        self.time_table = self.swap.map {|x| x.time }
+        self.time_table = self.swap.map {|x| x[:time] }
         
     end
 
