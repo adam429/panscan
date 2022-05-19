@@ -330,7 +330,8 @@ class SwapPriceCex < SwapPriceBase
         }
     end
     
-    def interpolate()
+    def interpolate(cur,upper,lower,upper_value,lower_value)
+        
     end
 
     def get_swap_by_ts(ts)
@@ -351,14 +352,12 @@ class SwapPriceCex < SwapPriceBase
         $logger.call realtime_upper
         
         if realtime_low[:ts]>0 and realtime_high[:ts]>0 then
-            realtime_price = 0
-            
-            
+            realtime_price = interpolate(ts,realtime_high[:ts],realtime_low[:ts],realtime_high[:price],realtime_low[:price])
             return {price:realtime_price}
         end
         
         if history_low[:ts]>0 and history_high[:ts]>0 then
-            history_price = 1
+            history_price = interpolate(ts,history_high[:ts],realtime_low[:ts],realtime_high[:price],realtime_low[:price])
             return {price:history_price}
         end
         
