@@ -620,6 +620,13 @@ class Simulation < MappingObject
         $logger.call "==end data_import=="
     end 
     
+    
+    def change_time_by_id(id,run_false)
+    end
+
+    def change_time_by_ts(id,run_false)
+    end
+    
     def change_time(new_time,run=false)
         swap = self.swap_price.get_swap_by_id(new_time)
         price = swap[:price]
