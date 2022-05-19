@@ -289,6 +289,7 @@ class SwapPriceDex < SwapPriceBase
 end
 
 class SwapPriceCex < SwapPriceBase
+    mapping_accessor :swap, :swap_chart, :time_table
 
 end
 
