@@ -331,15 +331,16 @@ class SwapPriceCex < SwapPriceBase
     end
 
     def get_swap_by_ts(ts)
-        ret = nil
-        self.time_table.each_with_index {|x,i|
-            if x >= ts then 
-                ret=i; 
-                break; 
-            end 
-        }
-        ret = self.time_table.size-1 if ret==nil
-        return self.swap[ret]
+        self.history
+        # ret = nil
+        # self.time_table.each_with_index {|x,i|
+        #     if x >= ts then 
+        #         ret=i; 
+        #         break; 
+        #     end 
+        # }
+        # ret = self.time_table.size-1 if ret==nil
+        # return self.swap[ret]
     end
     
     def get_swap_by_id(id)
@@ -377,6 +378,6 @@ def main
     $logger.call "realtime: #{Time.at(ethusdt.realtime[0][:ts])} - #{Time.at(ethusdt.realtime[-1][:ts])}"
     $logger.call "history: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
     
-    # time = Time.new(2022,05,)
-    # $logger.call ethusdt.get_swap_by_ts()
+    time = Time.new(2022,05,17,01,02,03).to_i
+    $logger.call ethusdt.get_swap_by_ts(time)
 end
