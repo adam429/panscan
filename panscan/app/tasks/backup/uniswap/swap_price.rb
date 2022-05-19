@@ -331,15 +331,15 @@ class SwapPriceCex < SwapPriceBase
     end
 
     def get_swap_by_ts(ts)
-        history_low = self.history.filter {|x| x[:ts]<=ts}[-1] or 0
-        history_upper = self.history.filter {|x| x[:ts]>=ts}[0] or 0
-        realtime_low = self.realtime.filter {|x| x[:ts]<=ts}[-1] or 0
-        realtime_upper = self.realtime.filter {|x| x[:ts]>=ts}[0] or 0
+        history_low = self.history.filter {|x| x[:ts]<=ts}[-1] or {ts:0}
+        history_upper = self.history.filter {|x| x[:ts]>=ts}[0] or {ts:0}
+        realtime_low = self.realtime.filter {|x| x[:ts]<=ts}[-1] or {ts:0}
+        realtime_upper = self.realtime.filter {|x| x[:ts]>=ts}[0] or {ts:0}
         
-        history_low = (history_low - ts).abs>120 ? 0 :history_low
-        history_upper = (history_upper - ts).abs>120 ? 0 :history_upper
-        realtime_low = (realtime_low - ts).abs>2 ? 0 :realtime_low
-        realtime_upper = (realtime_upper - ts).abs>2 ? 0 :realtime_upper
+        history_low = (history_low[:ts] - ts).abs>120 ? {ts:0} :history_low
+        history_upper = (history_upper[:ts] - ts).abs>120 ? {ts:0} :history_upper
+        realtime_low = (realtime_low[:ts] - ts).abs>2 ? {ts:0} :realtime_low
+        realtime_upper = (realtime_upper[:ts] - ts).abs>2 ? {ts:0} :realtime_upper
         
         $logger.call ts
         $logger.call history_low
@@ -393,5 +393,9 @@ def main
     $logger.call "history: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
     
     time = Time.new(2022,05,17,01,02,03).to_i
+    $logger.call ethusdt.get_swap_by_ts(time)
+
+
+    time = Time.new(2022,05,19,01,02,03).to_i
     $logger.call ethusdt.get_swap_by_ts(time)
 end
