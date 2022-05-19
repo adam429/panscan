@@ -317,14 +317,14 @@ class SwapPriceCex < SwapPriceBase
 
         self.realtime = self.realtime.map { |x|
             {
-                ts:x["ts"],
+                ts:x["ts"]/1000,
                 price:x["mark_price"]
             }
         }
         
         self.history = self.history.map { |x|
             {
-                ts:x["open_time"],
+                ts:x["open_time"]/1000,
                 price:x["open_price"]
             }
         }
@@ -344,9 +344,7 @@ def main
     $logger.call ethusdt.token1
     $logger.call ethusdt.realtime[0]
     $logger.call ethusdt.history[0]
-    $logger.call Time.at(ethusdt.realtime[0][:ts])
-    $logger.call Time.at(ethusdt.realtime[-1][:ts])
-    $logger.call Time.at(ethusdt.history[0][:ts])
-    $logger.call Time.at(ethusdt.history[-1][:ts])
+    $logger.call "realtime: #{Time.at(ethusdt.realtime[0][:ts])} - #{Time.at(ethusdt.realtime[-1][:ts])}"
+    $logger.call "history: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
 
 end
