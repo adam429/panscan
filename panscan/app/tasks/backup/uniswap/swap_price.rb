@@ -288,18 +288,6 @@ class SwapPriceDex < SwapPriceBase
     
 end
 
-class SwapPriceCexSynthesis < MappingObject
-    mapping_accessor :token0base, :token1base, :token0, :token1, :base
-
-    def load_from_redis(exchange, token0, token1, base)
-        self.token0 = token0
-        self.token1 = token1
-        self.base = base
-
-
-    end
-end
-
 class SwapPriceCex < MappingObject
     mapping_accessor :token0, :token1
     mapping_accessor :realtime, :history
@@ -365,6 +353,19 @@ class SwapPriceCex < MappingObject
 end
 
 
+class SwapPriceCexSynthesis < MappingObject
+    mapping_accessor :token0base, :token1base, :token0, :token1, :base
+
+    def load_from_redis(exchange, token0, token1, base)
+        self.token0 = token0
+        self.token1 = token1
+        self.base = base
+
+
+    end
+end
+
+
 load(Task.load("base/data_store"))
 
 def main
@@ -395,4 +396,8 @@ def main
 
     # time = Time.new(2023,05,19,01,02,02).to_i
     # $logger.call ethusdt.get_swap_by_ts(time)
+
+    cex = SwapPriceCexSynthesis.new
+    cex.load_from_redis("okex","APE","ETH","USDT")
+
 end
