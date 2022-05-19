@@ -63,7 +63,7 @@ class TimeTable < MappingObject
 
 end
 
-class SwapPrice < MappingObject
+class SwapPriceBase < MappingObject
     def self.task
         return "uniswap/swap_price"
     end
