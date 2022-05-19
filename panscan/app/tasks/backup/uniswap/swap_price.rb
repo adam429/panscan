@@ -331,8 +331,16 @@ class SwapPriceCex < SwapPriceBase
     end
 
     def get_swap_by_ts(ts)
-        self.history.filter {|x| x[:ts]<=ts}[-1]
-        self.history.filter {|x| x[:ts]>=ts}[0]
+        history_low = self.history.filter {|x| x[:ts]<=ts}[-1]
+        history_upper = self.history.filter {|x| x[:ts]>=ts}[0]
+        realtime_low = self.realtime.filter {|x| x[:ts]<=ts}[-1]
+        realtime_upper = self.realtime.filter {|x| x[:ts]>=ts}[0]
+        
+        $logger.call ts
+        $logger.call history_low
+        $logger.call history_upper
+        $logger.call realtime_low
+        $logger.call realtime_upper
         # ret = nil
         # self.time_table.each_with_index {|x,i|
         #     if x >= ts then 
