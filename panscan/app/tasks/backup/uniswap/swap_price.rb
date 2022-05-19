@@ -109,8 +109,15 @@ class SwapPrice < MappingObject
     end
     
     def get_swap_by_ts(ts)
-        #todo
-        raise "not done"
+        ret = nil
+        self.time_table.each_with_index {|x,i|
+            if x >= ts then 
+                ret=i; 
+                break; 
+            end 
+        }
+        ret = self.time_table.size-1 if ret==nil
+        return self.swap[ret]
     end
     
     def get_last_price()
