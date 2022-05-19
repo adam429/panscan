@@ -313,7 +313,7 @@ class SwapPriceCex < SwapPriceBase
 
         pair_name = self.token0 + self.token1
         self.realtime = DataStore.get("cex.#{exchange}.#{pair_name}.realtime")
-        self.history =DataStore.get("cex.#{exchange}.#{pair_name}.history")
+        self.history = DataStore.get("cex.#{exchange}.#{pair_name}.history")
     end
 end
 
@@ -326,6 +326,6 @@ def main
     
     ethusdt = cex.load_from_redis("okex","ETH","USDT")
     
-    $logger.call ethusdt.realtime[0]
-    $logger.call ethusdt.history[0]
+    $logger.call ethusdt.token0
+    $logger.call ethusdt.token1
 end
