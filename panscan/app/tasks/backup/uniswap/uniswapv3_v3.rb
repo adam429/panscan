@@ -17,9 +17,30 @@ class Pool< MappingObject
     mapping_accessor :cur_blocknumber, :cur_liquidity_pool, :cur_price, :swap_p, :pool_p
 
     def load_from_redis(pool_id,reversed==false)
-        self.pool.swap = DataStore.get("uniswap.#{pool_id}.swap")
-        self.pool.pool = DataStore.get("uniswap.#{pool_id}.pool")
-        self.pool.init_tick = DataStore.get("uniswap.#{pool_id}.init_tick")
+        self.swap = DataStore.get("uniswap.#{pool_id}.swap")
+        self.pool = DataStore.get("uniswap.#{pool_id}.pool")
+        self.init_tick = DataStore.get("uniswap.#{pool_id}.init_tick")
+
+        if reversed then
+
+            self.swap = self.swap.map {|x|
+                x[:tick] = -1*x[:tick]
+                swap = x[:volume0]
+                x[:volume0] = x[:volume1]
+                x[:volume1] = swap
+                x                
+            }
+
+            self.pool = self.pool.map {|x|
+                swap = x[:amount0]
+                x[:amount0] = x[:amount1]
+                x[:amount1] = swap
+                x                
+            }
+
+            self.init_tick = -1*self.init_tick
+        end
+
     end
 
     def initialize()

@@ -91,7 +91,7 @@ class SwapPrice < MappingObject
             }
         }
         
-        self.time_table = self.swap_price.swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
+        self.time_table = self.swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
     end
 
     def get_swap_by_id(id)
