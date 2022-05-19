@@ -86,8 +86,6 @@ class SwapPrice < MappingObject
         block_to_time = DataStore.get("uniswap.#{pool_id}.time_table")
         block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
 
-        self.time_table = self.swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
-
         self.swap =  self.swap.map{|v| 
             price = 1.0001**v[:tick]
             {
@@ -99,6 +97,7 @@ class SwapPrice < MappingObject
                 volume:v[:volume1] + v[:volume0]*price,
             }
         }
+        self.time_table = self.swap.map {|x| x.time }
         
     end
 
