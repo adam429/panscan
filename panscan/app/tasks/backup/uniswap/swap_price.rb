@@ -75,6 +75,22 @@ class SwapPrice < MappingObject
                 x                
             }
         end
+
+        block_to_time = DataStore.get("uniswap.#{pool_id}.time_table")
+        block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
+
+        self.swap_price.swap =  self.swap_price.swap.map{|v| 
+            price = 1.0001**v[:tick]
+            {
+                id:v[:id],
+                time:block_to_time[v[:block_number]][0],
+                price:self.uni.adjp2p(price),
+                volume0:v[:volume0],
+                volume1:v[:volume1],
+                volume:v[:volume1] + v[:volume0]*price,
+            }
+        }
+
     end
 
     def get_swap_by_id(id)

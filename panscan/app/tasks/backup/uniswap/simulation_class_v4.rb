@@ -578,22 +578,12 @@ class Simulation < MappingObject
         self.time_table.load_from_redis(pool_id,self.reversed)
         self.pool.load_from_redis(pool_id,self.reversed)
         
-        self.swap_price.swap =  DataStore.get("uniswap.#{pool_id}.swap")
         self.pool.swap = DataStore.get("uniswap.#{pool_id}.swap")
         self.pool.pool = DataStore.get("uniswap.#{pool_id}.pool")
         self.pool.init_tick = DataStore.get("uniswap.#{pool_id}.init_tick")
 
         ## check reverse
         if self.reversed then
-            $logger.call "==reverse pair=="
-            
-            self.swap_price.swap = self.swap_price.swap.map {|x|
-                x[:tick] = -1*x[:tick]
-                swap = x[:volume0]
-                x[:volume0] = x[:volume1]
-                x[:volume1] = swap
-                x                
-            }
 
             self.pool.swap = self.pool.swap.map {|x|
                 x[:tick] = -1*x[:tick]
@@ -618,19 +608,6 @@ class Simulation < MappingObject
         block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
         
         self.time_table.time_table = self.swap_price.time_table = self.swap_price.swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
-
-        self.swap_price.swap =  self.swap_price.swap.map{|v| 
-            price = 1.0001**v[:tick]
-            {
-                id:v[:id],
-                time:block_to_time[v[:block_number]][0],
-                price:self.uni.adjp2p(price),
-                volume0:v[:volume0],
-                volume1:v[:volume1],
-                volume:v[:volume1] + v[:volume0]*price,
-            }
-        }
-        
     end
     
     def data_init_config(pool_id)
