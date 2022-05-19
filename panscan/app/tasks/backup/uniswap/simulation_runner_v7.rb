@@ -64,7 +64,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.time_table.time_table = #{sim.time_table.time_table.first}"
         $logger.call "sim.bot.config = #{sim.bot.config}"
         $logger.call "sim.config = #{sim.config}"
-        # sim.data_size_up()
+        sim.data_size_up()
         
         sim.run_load_action
         

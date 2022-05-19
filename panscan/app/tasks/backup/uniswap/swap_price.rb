@@ -99,8 +99,8 @@ class SwapPrice < MappingObject
         }
         self.time_table = self.swap.map {|x| x[:time] }
         
-        $logger.call self.swap[0]
-        $logger.call self.table_time[0]
+        # $logger.call self.swap[0]
+        # $logger.call self.table_time[0]
         
     end
 
