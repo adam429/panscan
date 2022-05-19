@@ -576,7 +576,7 @@ class Simulation < MappingObject
 
     def data_lood_from_redis(pool_id)
         self.swap_price.load_from_redis(pool_id,self.uni,self.reversed)
-        self.swap_price_cex.load_from_redis(pool_id,self.uni,self.reversed)
+        self.swap_price_cex.load_from_redis("USDT",self.uni,self.reversed)
         self.time_table.load_from_redis(pool_id,self.uni,self.reversed)
         self.pool.load_from_redis(pool_id,self.uni,self.reversed)
     end
