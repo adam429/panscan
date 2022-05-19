@@ -331,7 +331,8 @@ class SwapPriceCex < SwapPriceBase
     end
 
     def get_swap_by_ts(ts)
-        self.history
+        self.history.filter {|x| x[:ts]<=ts}[-1]
+        self.history.filter {|x| x[:ts]>=ts}[0]
         # ret = nil
         # self.time_table.each_with_index {|x,i|
         #     if x >= ts then 
