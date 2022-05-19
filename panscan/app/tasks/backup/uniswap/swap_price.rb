@@ -9,6 +9,9 @@ class TimeTable < MappingObject
 
     mapping_accessor :time_table
     
+    def load_from_redis(pool_id,reversed==false)
+    end
+    
     def count
         self.time_table.count
     end
@@ -60,6 +63,20 @@ class SwapPrice < MappingObject
     
     mapping_accessor :swap, :swap_chart, :time_table
     
+    def load_from_redis(pool_id,reversed==false)
+        self.swap_price.swap =  DataStore.get("uniswap.#{pool_id}.swap")
+
+        if reversed then
+            self.swap_price.swap = self.swap_price.swap.map {|x|
+                x[:tick] = -1*x[:tick]
+                swap = x[:volume0]
+                x[:volume0] = x[:volume1]
+                x[:volume1] = swap
+                x                
+            }
+        end
+    end
+
     def get_swap_by_id(id)
         return self.swap[id]
     end
