@@ -578,9 +578,6 @@ class Simulation < MappingObject
         self.time_table.load_from_redis(pool_id,self.reversed)
         self.pool.load_from_redis(pool_id,self.reversed)
         
-        self.pool.swap = DataStore.get("uniswap.#{pool_id}.swap")
-        self.pool.pool = DataStore.get("uniswap.#{pool_id}.pool")
-        self.pool.init_tick = DataStore.get("uniswap.#{pool_id}.init_tick")
 
         ## check reverse
         if self.reversed then
@@ -608,6 +605,7 @@ class Simulation < MappingObject
         block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
         
         self.time_table.time_table = self.swap_price.time_table = self.swap_price.swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
+        
     end
     
     def data_init_config(pool_id)
