@@ -291,7 +291,7 @@ end
 class SwapPriceCexSynthesis < MappingObject
     mapping_accessor :token0base, :token1base, :token0, :token1, :base
 
-    def load_from_redis(exchange,uni,reversed=false)
+    def load_from_redis(exchange,,token0, token1, bas)
         self.token0 = uni.token0
         self.token1 = uni.token1
         self.base = "USDT"
@@ -372,29 +372,30 @@ load(Task.load("base/data_store"))
 
 def main
     DataStore.init()
-    ethusdt = SwapPriceCex.new
+
+    # ethusdt = SwapPriceCex.new
     
-    ethusdt.load_from_redis("okex","ETH","USDT")
+    # ethusdt.load_from_redis("okex","ETH","USDT")
 
-    $logger.call ethusdt.token0
-    $logger.call ethusdt.token1
-    $logger.call ethusdt.realtime[0]
-    $logger.call ethusdt.history[0]
-    $logger.call ethusdt.realtime.size
-    $logger.call ethusdt.history.size
-    $logger.call "realtime: #{Time.at(ethusdt.realtime[0][:ts])} - #{Time.at(ethusdt.realtime[-1][:ts])}"
-    $logger.call "history: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
+    # $logger.call ethusdt.token0
+    # $logger.call ethusdt.token1
+    # $logger.call ethusdt.realtime[0]
+    # $logger.call ethusdt.history[0]
+    # $logger.call ethusdt.realtime.size
+    # $logger.call ethusdt.history.size
+    # $logger.call "realtime: #{Time.at(ethusdt.realtime[0][:ts])} - #{Time.at(ethusdt.realtime[-1][:ts])}"
+    # $logger.call "history: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
 
 
-    time = Time.new(2022,05,17,01,02,03).to_i
-    $logger.call ethusdt.get_swap_by_ts(time)
+    # time = Time.new(2022,05,17,01,02,03).to_i
+    # $logger.call ethusdt.get_swap_by_ts(time)
 
-    time = Time.new(2022,05,19,01,02,02).to_i
-    $logger.call ethusdt.get_swap_by_ts(time)
+    # time = Time.new(2022,05,19,01,02,02).to_i
+    # $logger.call ethusdt.get_swap_by_ts(time)
 
-    time = Time.new(2021,05,19,01,02,02).to_i
-    $logger.call ethusdt.get_swap_by_ts(time)
+    # time = Time.new(2021,05,19,01,02,02).to_i
+    # $logger.call ethusdt.get_swap_by_ts(time)
 
-    time = Time.new(2023,05,19,01,02,02).to_i
-    $logger.call ethusdt.get_swap_by_ts(time)
+    # time = Time.new(2023,05,19,01,02,02).to_i
+    # $logger.call ethusdt.get_swap_by_ts(time)
 end
