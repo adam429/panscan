@@ -291,15 +291,12 @@ end
 class SwapPriceCexSynthesis < MappingObject
     mapping_accessor :token0base, :token1base, :token0, :token1, :base
 
-    def load_from_redis(exchange,,token0, token1, bas)
-        self.token0 = uni.token0
-        self.token1 = uni.token1
-        self.base = "USDT"
-        
-        pairname = self.token0 + self.base
-        DataStore.get("cex.#{exchange}.#{pair_name}.realtime")
-        
-        
+    def load_from_redis(exchange, token0, token1, base)
+        self.token0 = token0
+        self.token1 = token1
+        self.base = base
+
+
     end
 end
 
