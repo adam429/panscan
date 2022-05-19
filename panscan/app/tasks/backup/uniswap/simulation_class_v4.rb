@@ -107,7 +107,7 @@ class Simulation < MappingObject
     def init(pool_id)
         self.uni = UniswapV3.new
         self.hedge = Hedge.new()
-        self.swap_price = SwapPrice.new()
+        self.swap_price = SwapPriceDex.new()
         self.time_table = TimeTable.new()
         self.bot = Bot.new
         self.pool = Pool.new
