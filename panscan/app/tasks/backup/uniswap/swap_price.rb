@@ -357,22 +357,22 @@ class SwapPriceCexSynthesis < MappingObject
     mapping_accessor :token0base, :token1base, :token0, :token1, :base
 
     def load_from_redis(exchange, token0, token1, base)
-        self.token0 = token0
-        self.token1 = token1
-        self.base = base
+        # self.token0 = token0
+        # self.token1 = token1
+        # self.base = base
 
-        self.token0base = SwapPriceCex.new
-        self.token1base = SwapPriceCex.new
+        # self.token0base = SwapPriceCex.new()
+        # self.token1base = SwapPriceCex.new()
 
-        self.token0base.load_from_redis(exchange, token0, base)
-        self.token1base.load_from_redis(exchange, token1, base)
+        # self.token0base.load_from_redis(exchange, token0, base)
+        # self.token1base.load_from_redis(exchange, token1, base)
     end
 
     def get_swap_by_ts(ts,currency=nil)
-        if currency then
-        else
-            return self.token0base(ts) / self.token1base(ts).to_f
-        end
+        # if currency then
+        # else
+        #     return self.token0base(ts) / self.token1base(ts).to_f
+        # end
     end
 
 end
