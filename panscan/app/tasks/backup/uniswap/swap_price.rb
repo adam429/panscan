@@ -314,10 +314,19 @@ class SwapPriceCex < SwapPriceBase
         pair_name = self.token0 + self.token1
         self.realtime = DataStore.get("cex.#{exchange}.#{pair_name}.realtime")
         self.history = DataStore.get("cex.#{exchange}.#{pair_name}.history")
+
+        self.realtime = self.realtime.map { |x|
+            {
+                ts:x["ts"],
+                price:x["mark_price"]
+            }
+        }
         
         self.history = self.history.map { |x|
-            x["ts"]=x["open_time"]
-            x
+            {
+                ts:x["open_time"],
+                price:x["open_price"]
+            }
         }
     end
 end
@@ -335,4 +344,7 @@ def main
     $logger.call ethusdt.token1
     $logger.call ethusdt.realtime[0]
     $logger.call ethusdt.history[0]
+    $logger.call ethusdt[0]
+    $logger.call ethusdt.history[0]
+    
 end
