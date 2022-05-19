@@ -296,7 +296,7 @@ class SwapPriceCex < SwapPriceBase
         self.token1 = uni.token1
         self.base = "USDT"
         
-        pairname = 
+        pairname = self.token0 + self.base
         DataStore.get("cex.#{exchange}.#{pair_name}.realtime")
         
         
@@ -304,3 +304,4 @@ class SwapPriceCex < SwapPriceBase
 end
 
 
+class SwapPriceCex
