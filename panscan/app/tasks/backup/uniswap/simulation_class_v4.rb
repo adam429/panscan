@@ -650,7 +650,7 @@ class Simulation < MappingObject
     end
     
     def data_init_value()
-        
+        self.uni.price = self.swap_price.get_last_price()
         self.pool.reset()
         self.uni.liquidity_pool = self.pool.calc_pool(-1, [], ->() { self.uni.mark_slice_pool_dirty() } )
         self.sim_time = self.time_table.count-1
