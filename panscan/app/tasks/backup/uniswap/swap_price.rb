@@ -289,8 +289,11 @@ class SwapPriceDex < SwapPriceBase
 end
 
 class SwapPriceCex < SwapPriceBase
-    mapping_accessor :swap, :swap_chart, :time_table
+    mapping_accessor :token0base, :token1base
 
+    def load_from_redis(pool_id,uni,reversed=false)
+        uni.token0        
+    end
 end
 
 
