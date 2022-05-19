@@ -395,7 +395,12 @@ def main
     time = Time.new(2022,05,17,01,02,03).to_i
     $logger.call ethusdt.get_swap_by_ts(time)
 
+    time = Time.new(2022,05,19,01,02,02).to_i
+    $logger.call ethusdt.get_swap_by_ts(time)
 
-    time = Time.new(2022,05,19,01,02,03).to_i
+    time = Time.new(2021,05,19,01,02,02).to_i
+    $logger.call ethusdt.get_swap_by_ts(time)
+
+    time = Time.new(2023,05,19,01,02,02).to_i
     $logger.call ethusdt.get_swap_by_ts(time)
 end
