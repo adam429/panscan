@@ -329,6 +329,46 @@ class SwapPriceCex < SwapPriceBase
             }
         }
     end
+
+
+    def get_swap_by_id(id)
+        raise "SwapPriceCex did not support get_swap_by_id"
+    end
+    
+    def get_swap_by_ts(ts)
+        ret = nil
+        self.time_table.each_with_index {|x,i|
+            if x >= ts then 
+                ret=i; 
+                break; 
+            end 
+        }
+        ret = self.time_table.size-1 if ret==nil
+        return self.swap[ret]
+    end
+    
+    def get_last_price()
+        return swap.last[:price]        
+    end
+    
+    def select_swap(begin_time,end_time)
+        self.swap.filter {|x| begin_time <= x[:time] and x[:time] <= end_time}        
+    end
+
+    # calc price_in_range percentage
+    def price_in_range_from(price_a, price_b, from)
+        select_price = swap[from,swap.size]
+        select_price.filter {|x| price_a <= x[:price] and x[:price] <= price_b }.count / select_price.count.to_f
+    end
+
+    # calc price_in_range percentage
+    def price_in_range_from_to(price_a, price_b, from, to)
+        return 0 if to<from
+        select_price = swap[from,to-from+1]
+        select_price.filter {|x| price_a <= x[:price] and x[:price] <= price_b }.count / select_price.count.to_f
+    end
+
+
 end
 
 
