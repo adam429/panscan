@@ -571,7 +571,6 @@ class Simulation < MappingObject
             end
         }
         $logger.call "swap_price.swap_chart = #{self.swap_price.swap_chart}"
-        $logger.call "swap_price.swap_chart.size = #{self.swap_price.swap_chart.size}"
     end
 
     def data_lood_from_redis(pool_id)
