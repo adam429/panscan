@@ -311,14 +311,17 @@ class SwapPriceCex < SwapPriceBase
         self.token0 = token0
         self.token1 = token1
 
-        pairname = self.token0 + self.token1
+        pair_name = self.token0 + self.token1
         self.realtime = DataStore.get("cex.#{exchange}.#{pair_name}.realtime")
         self.history =DataStore.get("cex.#{exchange}.#{pair_name}.history")
     end
 end
 
 
+load(Task.load("base/data_store"))
+
 def main
+    DataStore.init()
     cex = SwapPriceCex.new
     
     ethusdt = cex.load_from_redis("okex","ETH","USDT")
