@@ -322,10 +322,12 @@ load(Task.load("base/data_store"))
 
 def main
     DataStore.init()
-    cex = SwapPriceCex.new
+    ethusdt = SwapPriceCex.new
     
-    ethusdt = cex.load_from_redis("okex","ETH","USDT")
-    
+    ethusdt.load_from_redis("okex","ETH","USDT")
+
     $logger.call ethusdt.token0
     $logger.call ethusdt.token1
+    $logger.call ethusdt.realtime[0]
+    $logger.call ethusdt.history[0]
 end
