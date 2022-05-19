@@ -17,7 +17,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
     
     RenderWrap.load(Task.load("base/render_wrap::MappingObject"))
     RenderWrap.load(Task.load("uniswap/uniswapv3_v3::(UniswapV3,Pool)"))
-    RenderWrap.load(Task.load("uniswap/swap_price::(SwapPrice,TimeTable)"))
+    RenderWrap.load(Task.load("uniswap/swap_price::(SwapPriceDex,SwapPriceCex,SwapPriceBase,TimeTable)"))
     RenderWrap.load(Task.load("uniswap/hedge::Hedge"))
     RenderWrap.load(Task.load("uniswap/bot_v2::Bot"))
     RenderWrap.load(Task.load("uniswap/simulation_class_v4::Simulation"))
