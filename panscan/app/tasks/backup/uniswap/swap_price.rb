@@ -288,7 +288,7 @@ class SwapPriceDex < SwapPriceBase
     
 end
 
-class SwapPriceCexSynthesis 
+class SwapPriceCexSynthesis < MappingObject
     mapping_accessor :token0base, :token1base, :token0, :token1, :base
 
     def load_from_redis(exchange,uni,reversed=false)
@@ -303,7 +303,7 @@ class SwapPriceCexSynthesis
     end
 end
 
-class SwapPriceCex 
+class SwapPriceCex < MappingObject
     mapping_accessor :token0, :token1
     mapping_accessor :realtime, :history
 
@@ -383,16 +383,19 @@ def main
     $logger.call ethusdt.history.size
     $logger.call "realtime: #{Time.at(ethusdt.realtime[0][:ts])} - #{Time.at(ethusdt.realtime[-1][:ts])}"
     $logger.call "history: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
+
+
+    ethusdt.interpolate(5,0,10,12,13)
     
-    time = Time.new(2022,05,17,01,02,03).to_i
-    $logger.call ethusdt.get_swap_by_ts(time)
+    # time = Time.new(2022,05,17,01,02,03).to_i
+    # $logger.call ethusdt.get_swap_by_ts(time)
 
-    time = Time.new(2022,05,19,01,02,02).to_i
-    $logger.call ethusdt.get_swap_by_ts(time)
+    # time = Time.new(2022,05,19,01,02,02).to_i
+    # $logger.call ethusdt.get_swap_by_ts(time)
 
-    time = Time.new(2021,05,19,01,02,02).to_i
-    $logger.call ethusdt.get_swap_by_ts(time)
+    # time = Time.new(2021,05,19,01,02,02).to_i
+    # $logger.call ethusdt.get_swap_by_ts(time)
 
-    time = Time.new(2023,05,19,01,02,02).to_i
-    $logger.call ethusdt.get_swap_by_ts(time)
+    # time = Time.new(2023,05,19,01,02,02).to_i
+    # $logger.call ethusdt.get_swap_by_ts(time)
 end
