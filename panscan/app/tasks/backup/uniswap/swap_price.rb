@@ -314,6 +314,11 @@ class SwapPriceCex < SwapPriceBase
         pair_name = self.token0 + self.token1
         self.realtime = DataStore.get("cex.#{exchange}.#{pair_name}.realtime")
         self.history = DataStore.get("cex.#{exchange}.#{pair_name}.history")
+        
+        self.history = self.history.map { |x|
+            x["ts"]=x["open_time"]
+            x
+        }
     end
 end
 
