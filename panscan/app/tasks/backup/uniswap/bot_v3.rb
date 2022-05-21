@@ -79,7 +79,7 @@ class Bot < MappingObject
         return self.config
     end
     
-    def run(hedge, time_id, time_ts, time, price, token0_amt, token1_amt, token0_fee, token1_fee)
+    def run(hedge,  time_ts, time, price, token0_amt, token1_amt, token0_fee, token1_fee)
         config = self.get_config
         
         total_hedge_position = (config[:amt_hedge]=="true" ? token0_amt : 0 ) + (config[:fee_hedge]=="true" ? token0_fee : 0 )

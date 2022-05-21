@@ -727,7 +727,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         ddex_value = (self.sim_data==[]) ? 0 : dex_value.to_f - self.sim_data[0][:dex_value]
         
     profiler_time1 = Time.now()
-        bot_data = self.bot.run(self.hedge, time, time_ts, time_str,self.uni.price,token0_amt,token1_amt, token0_fee, token1_fee)
+        bot_data = self.bot.run(self.hedge, time_ts, time_str,self.uni.price,token0_amt,token1_amt, token0_fee, token1_fee)
     $profiler[:bot_run] = ($profiler[:bot_run] or 0) + (Time.now()-profiler_time1)
         
         
