@@ -498,6 +498,28 @@ class UniswapV3 < MappingObject
         change_price(self.price)
     end
     
+    def change_assets_by_price(new_price)
+        # change token0 token1 assets
+        self.liquidity_pool.map! do |pool|
+            if pool[:sender]!=nil then
+                price_a = pool[:price_a].to_f
+                price_b = pool[:price_b].to_f
+                price = self.price.to_f
+                
+                if price<price_a then
+                    price = price_a
+                end
+                if price>price_b then
+                    price = price_b
+                end
+                vx,vy = self.lp2xy(pool[:l],price,price_a,price_b)
+                pool[:token0]=vx.to_f
+                pool[:token1]=vy.to_f
+            end
+            pool
+        end
+    end
+    
     def change_price(new_price,volume0=0,volume1=0,run=false,change_fee=false)
 profiler_time2 = Time.now()
 # $logger.call "change_price"
