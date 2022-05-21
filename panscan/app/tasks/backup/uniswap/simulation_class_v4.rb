@@ -16,8 +16,8 @@ class Timer
     end
 
     def run() 
-        (sim_time..sim_time_end).each do |t|
-            yield(t)
+        (sim_time..sim_time_end).each do |id|
+            yield(ts)
         end
     end
 end
