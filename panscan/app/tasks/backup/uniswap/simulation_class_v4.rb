@@ -752,7 +752,8 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
 
     $profiler[:calc_metric] = ($profiler[:calc_metric] or 0) + (Time.now()-profiler_time)
 
-        sim_data_item = {id:time_ts, 
+        sim_data_item = {id:self.cur_time,
+                     time_ts:time_ts,
                      time:time_str,
                      time_str:time_str,
                      price:price.round(8),
