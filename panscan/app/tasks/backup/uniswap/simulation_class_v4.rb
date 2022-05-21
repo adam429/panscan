@@ -747,11 +747,11 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         
         roi = ((self.sim_data==[]) ? 0 :  total_pnl / self.sim_data[0][:dex_value])*100
         unhedged_roi = ((self.sim_data==[]) ? 0 :  unhedged_pnl / self.sim_data[0][:dex_value])*100
-        column = [:time,:price,:token0_amt,:token1_amt,:token0_fee,:token1_fee,:total_fee, :dex_value, :ddex_value, :cex_position, :cex_value,:value_diff, :cex_fee_position, :cex_fee_value, :dprice_percent,:value_diff_dex_value_percent,:cex_fee,:total_pnl,:roi_percent,:unhedged_pnl,:unhedged_roi_percent, :bot_output,:volume0,:volume1,:volume,:ul_ratio]
+        # column = [:time,:price,:token0_amt,:token1_amt,:token0_fee,:token1_fee,:total_fee, :dex_value, :ddex_value, :cex_position, :cex_value,:value_diff, :cex_fee_position, :cex_fee_value, :dprice_percent,:value_diff_dex_value_percent,:cex_fee,:total_pnl,:roi_percent,:unhedged_pnl,:unhedged_roi_percent, :bot_output,:volume0,:volume1,:volume,:ul_ratio]
 
     $profiler[:calc_metric] = ($profiler[:calc_metric] or 0) + (Time.now()-profiler_time)
 
-        sim_data_item = {id:time, 
+        sim_data_item = {id:time_ts, 
                      time:time_str,
                      time_str:time_str,
                      price:price.round(8),
