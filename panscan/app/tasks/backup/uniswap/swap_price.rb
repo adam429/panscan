@@ -44,6 +44,14 @@ class TimeTable < MappingObject
         time = Time.utc(arr[0],arr[1],arr[2],arr[3],arr[4],arr[5]).to_i if arr.size==6
         find_id_by_ts(time)
     end
+
+    def find_ts_by_str(str)
+        arr = str.gsub(/T/,"-").gsub(/:/,"-").gsub(/ /,"-").split("-")
+        time = Time.utc(arr[0],arr[1],arr[2],arr[3],arr[4]).to_i if arr.size==5
+        time = Time.utc(arr[0],arr[1],arr[2],arr[3],arr[4],arr[5]).to_i if arr.size==6
+        time
+    end
+
     
     # look up time_table
     def find_ts_by_id(id)
