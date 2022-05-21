@@ -672,17 +672,16 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         change_time_by_id(id,run)
     end
     
-    def simulate_tick_logic(time)
+    def simulate_tick_logic(time_ts)
 
     profiler_time = Time.now()
-        self.change_time_by_ts(time,true)
+        self.change_time_by_ts((time_ts),true)
     $profiler[:change_time] = ($profiler[:change_time] or 0) + (Time.now()-profiler_time)
     
     
     profiler_time = Time.now()
 
-        time_ts = self.time_table.find_ts_by_id(time)
-        time_str = self.time_table.time_str_by_id(time)
+        time_str = self.time_table.time_str_by_ts(time)
 
         uni_price = self.uni.price
         cex_price = nil
