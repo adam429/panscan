@@ -474,7 +474,7 @@ class SwapPriceCexSynthesis < MappingObject
         self.swap_chart = []
         
         # time_interval = sim.swap_price.time_interval
-        time_interval = [1647519652,1647519652+3600*5]
+        time_interval = [1647519652,1647519652+3600*24*60]
         require 'parallel'
 
         $logger.call "[#{Time.now}] == begin gen cex swap_chart =="
