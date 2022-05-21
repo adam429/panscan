@@ -808,8 +808,8 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         # sim_status = "#{Time.now} : Simulation Progress [#{time_end-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
         # $logger.call(sim_status)
         
-        timer.run { |t|
-            simulate_tick_logic(t)
+        timer.run { |ts|
+            simulate_tick_logic(ts)
         }
 
         self.change_time(self.sim_time)
