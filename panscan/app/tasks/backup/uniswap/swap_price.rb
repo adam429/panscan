@@ -2,7 +2,7 @@ __TASK_NAME__ = "uniswap/swap_price"
 __ENV__ = 'ruby3'
 # load(Task.load("base/render_wrap"))   
 
-CHART_TIME_INTERVAL = 3600*24
+CHART_TIME_INTERVAL = 3600
 
 class TimeTable < MappingObject
     def self.task
