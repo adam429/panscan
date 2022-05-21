@@ -189,10 +189,10 @@ def simulation_runner(pool_id,exchange,sim_data,out_of_service=false)
           <br/>
           
           <hr/>
-          <h4>CEX Price </h4>
-          <%= chart binding: :price_chart_cex %><br/>
 
 <% end %>
+          <h4>CEX Price </h4>
+          <%= chart binding: :price_chart_cex %><br/>
           <h4>Metrics</h4>
             <li>Swap TXs = <%= text binding: :total_swaps %> </li>
             <li>Avg Volume = <%= text binding: ":avg_volume = (:total_volume.to_f / :total_swaps.to_f).round(2)" %> </li>
