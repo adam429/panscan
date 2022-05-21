@@ -31,7 +31,24 @@ class Timer
             sim_status = "#{Time.now} : Simulation Progress [#{sim_time_end-sim_time} / #{sim_time_end-sim_time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
             $logger.call(sim_status)
         end
+
+        if time_source=="t2" then
+
+            (sim_time_ts..sim_time_end_ts).step(1).each do |id|
+                if (id-sim_time) % 100==0 then
+                    sim_status = "#{Time.now} : Simulation Progress [#{id-sim_time} / #{sim_time_end-sim_time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
+                    $logger.call(sim_status)
+                end
+                ts = @sim.time_table.find_ts_by_id(id)
+                yield(ts)
+            end
+
+            sim_status = "#{Time.now} : Simulation Progress [#{sim_time_end-sim_time} / #{sim_time_end-sim_time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
+            $logger.call(sim_status)
+        end
+
     end
+    
 end
 
 class Simulation < MappingObject
