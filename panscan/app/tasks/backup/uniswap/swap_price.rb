@@ -392,9 +392,10 @@ class SwapPriceCex < MappingObject
     def get_swap_by_ts(ts)
         return 1 if token0==token1 
         return 1 if self.history==nil or self.realtime==nil
+    
+        history_upper = (self.history.bsearch {|x| x[:ts]>=ts } or {ts:0})
 
         history_low = ((self.history.filter {|x| x[:ts]<=ts}[-1]) or {ts:0})
-        history_upper = ((self.history.filter {|x| x[:ts]>=ts}[0]) or {ts:0})
         realtime_low = ((self.realtime.filter {|x| x[:ts]<=ts}[-1]) or {ts:0})
         realtime_upper = ((self.realtime.filter {|x| x[:ts]>=ts}[0]) or {ts:0})
         
