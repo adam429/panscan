@@ -356,6 +356,8 @@ class SwapPriceCex < MappingObject
         if token0==token1 or exchange=="dummy" then
             self.realtime = []
             self.history = []
+            self.realtime_reverse = []
+            self.history_reverse = []
             return
         else    
             pair_name = self.token0 + self.token1
@@ -369,6 +371,8 @@ class SwapPriceCex < MappingObject
                         price:x["mark_price"]
                     }
                 }
+                
+                self.realtime_reverse = self.realtime.reverse
             else
                 $logger.call "[data import error] - cex.#{exchange}.#{pair_name}.realtime"
             end
@@ -380,9 +384,13 @@ class SwapPriceCex < MappingObject
                         price:x["open_price"]
                     }
                 }
+                
+                self.history_reverse = self.history.reverse
             else
                 $logger.call "[data import error] - cex.#{exchange}.#{pair_name}.history"
             end
+            
+            
         end
     end
     
@@ -394,7 +402,6 @@ class SwapPriceCex < MappingObject
     def get_swap_by_ts(ts)
         return 1 if token0==token1 
         return 1 if self.history==nil or self.realtime==nil
-    
 
         history_low = (self.history_reverse.bsearch {|x| x[:ts]<=ts } or {ts:0})
         history_upper = (self.history.bsearch {|x| x[:ts]>=ts } or {ts:0})
