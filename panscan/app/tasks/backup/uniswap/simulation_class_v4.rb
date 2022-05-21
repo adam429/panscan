@@ -682,7 +682,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
 
     def change_time_by_ts(ts,run=false)
         id = self.time_table.find_id_by_ts(ts)
-        change_time_by_id(id,run,ts)
+        change_time_by_idts(id,run,ts)
     end
     
     def simulate_tick_logic(time_ts)
