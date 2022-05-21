@@ -509,12 +509,12 @@ $call_calculated_var_update_all = ->() {
 }
 
 gen_table = ->() {
-        column = [:time,:price,:token0_amt,:token1_amt,:token0_fee,:token1_fee,:total_fee, 
+        column = [:id, :time_ts, :time,:price,:token0_amt,:token1_amt,:token0_fee,:token1_fee,:total_fee, 
               :dex_value, :ddex_value, :cex_position, :cex_value,:value_diff,:cex_fee_position, :cex_fee_value,
               :dprice_percent,:value_diff_dex_value_percent,
               :cex_fee,:total_pnl,:roi_percent,:unhedged_pnl,:unhedged_roi_percent, 
               :bot_output,:observation,:trigger,:time_buffer,:volume0,:volume1,:volume,:ul_ratio]
-        round = [nil,8,2,2,8,8,8,
+        round = [nil,nil,nil,8,2,2,8,8,8,
                  2,2,2,2,2,8,8,
                  2,2,
                  4,2,2,2,2,
@@ -523,7 +523,7 @@ gen_table = ->() {
 }
 
 gen_download = ->() {
-        column = [:time,:price,:token0_amt,:token1_amt,:token0_fee,:token1_fee,:total_fee, :dex_value, :ddex_value, :cex_position, :cex_value,:value_diff, :cex_fee_position, :cex_fee_value, :dprice_percent,:value_diff_dex_value_percent,:cex_fee,:total_pnl,:roi_percent,:unhedged_pnl,:unhedged_roi_percent, :bot_output,:volume0,:volume1,:volume,:ul_ratio]
+        column = [:id, :time_ts, :time,:price,:token0_amt,:token1_amt,:token0_fee,:token1_fee,:total_fee, :dex_value, :ddex_value, :cex_position, :cex_value,:value_diff, :cex_fee_position, :cex_fee_value, :dprice_percent,:value_diff_dex_value_percent,:cex_fee,:total_pnl,:roi_percent,:unhedged_pnl,:unhedged_roi_percent, :bot_output,:volume0,:volume1,:volume,:ul_ratio]
     Element['#export_data_csv'].html = format_csv_table($data['sim'].sim_data, data_column)
 }
 
