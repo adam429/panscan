@@ -17,7 +17,7 @@ class Timer
     end
 
     def run() 
-        $logger.call " time_source = #{t1}"
+        $logger.call " time_source = #{t1} | sim_time = #{sim_time} | sim_time_end = #{sim_time_end} | sim_time_ts = #{sim_time_ts} | sim_time_end_ts = #{sim_time_end_ts} | "
         if time_source=="t1" then
         
             (sim_time..sim_time_end).each do |id|
