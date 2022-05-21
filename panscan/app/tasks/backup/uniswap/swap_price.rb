@@ -388,7 +388,7 @@ class SwapPriceCex < MappingObject
         return upper_value if (upper_value-lower_value).abs < 1e8
         return ((cur-lower) / (upper-lower).to_f) * (upper_value-lower_value) + lower_value
     end
-
+    
     def get_swap_by_ts(ts)
         return 1 if token0==token1 
         return 1 if self.history==nil or self.realtime==nil
@@ -415,6 +415,34 @@ class SwapPriceCex < MappingObject
         
         return nil
     end
+
+
+    # def get_swap_by_ts(ts)
+    #     return 1 if token0==token1 
+    #     return 1 if self.history==nil or self.realtime==nil
+
+    #     history_low = ((self.history.filter {|x| x[:ts]<=ts}[-1]) or {ts:0})
+    #     history_upper = ((self.history.filter {|x| x[:ts]>=ts}[0]) or {ts:0})
+    #     realtime_low = ((self.realtime.filter {|x| x[:ts]<=ts}[-1]) or {ts:0})
+    #     realtime_upper = ((self.realtime.filter {|x| x[:ts]>=ts}[0]) or {ts:0})
+        
+    #     history_low = (history_low[:ts] - ts).abs>120 ? {ts:0} :history_low
+    #     history_upper = (history_upper[:ts] - ts).abs>120 ? {ts:0} :history_upper
+    #     realtime_low = (realtime_low[:ts] - ts).abs>2 ? {ts:0} :realtime_low
+    #     realtime_upper = (realtime_upper[:ts] - ts).abs>2 ? {ts:0} :realtime_upper
+        
+    #     if realtime_low[:ts]>0 and realtime_upper[:ts]>0 then
+    #         realtime_price = interpolate(ts,realtime_upper[:ts],realtime_low[:ts],realtime_upper[:price],realtime_low[:price])
+    #         return realtime_price
+    #     end
+        
+    #     if history_low[:ts]>0 and history_upper[:ts]>0 then
+    #         history_price = interpolate(ts,history_upper[:ts],history_low[:ts],history_upper[:price],history_low[:price])
+    #         return history_price
+    #     end
+        
+    #     return nil
+    # end
 
 end
 
