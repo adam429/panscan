@@ -668,7 +668,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         change_time_by_id(id,run)
     end
     
-    def simulate_tick_logic(time,time_end)
+    def simulate_tick_logic(time)
 
     profiler_time = Time.now()
         self.change_time_by_id(time,true)
@@ -804,7 +804,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         # $logger.call(sim_status)
         
         timer.run { |t|
-            simulate_tick_logic(t,time_end)
+            simulate_tick_logic(t)
         }
         
 
