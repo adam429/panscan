@@ -681,7 +681,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
     
     profiler_time = Time.now()
 
-        time_str = self.time_table.time_str_by_ts(time)
+        time_str = self.time_table.time_str_by_ts(time_ts)
 
         uni_price = self.uni.price
         cex_price = nil
