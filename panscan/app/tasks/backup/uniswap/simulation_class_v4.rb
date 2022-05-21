@@ -780,7 +780,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         self.sim_data.push(sim_data_item)
     end
     
-    def simulate(time_start,time_end)
+    def simulate(timer)
         self.sim_data = []
         self.hedge.reset
         self.bot.reset
@@ -792,6 +792,9 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         sim_status = "#{Time.now} : Simulation Progress [#{time-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
         $logger.call(sim_status)
         
+        timer.run { |x|
+            
+        }
         (time..time_end).each do |t| 
             if t % 100==0 then
                 sim_status = "#{Time.now} : Simulation Progress [#{t-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
