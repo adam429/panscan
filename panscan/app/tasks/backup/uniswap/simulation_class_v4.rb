@@ -651,9 +651,8 @@ class Simulation < MappingObject
         change_time_by_id(id,run)
     end
     
-    def change_time_by_id(id,run=false)
+    def change_time_by_id(id,run=false,ts)
         return if self.cur_time==id
-        ts = self.time_table.find_ts_by_id(id)
         self.swap_price_cex.change_time(ts)
         
         swap = self.swap_price.get_swap_by_id(id)
@@ -682,7 +681,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
 
     def change_time_by_ts(ts,run=false)
         id = self.time_table.find_id_by_ts(ts)
-        change_time_by_id(id,run)
+        change_time_by_id(id,run,ts)
     end
     
     def simulate_tick_logic(time_ts)
