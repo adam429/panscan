@@ -15,8 +15,9 @@ class Timer
         @time_source = time_source
     end
 
-    def run() 
+    def run(sim) 
         (sim_time..sim_time_end).each do |id|
+            ts = sim.time_table.find_ts_by_id(id)
             yield(ts)
         end
     end
