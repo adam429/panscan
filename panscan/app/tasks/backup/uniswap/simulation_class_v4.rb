@@ -762,44 +762,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         self.sim_data.push(sim_data_item)
     end
     
-    # run simulation from time to time_end
-    # exec after after finish
-    def simulate_tick(time, time_end,after)
-        if time>time_end then
-            after.call(self.sim_data) if after
-            return
-        end
-
-        if RUBY_ENGINE == 'opal' then
-            # run simulation in frontend
-            $$[:setTimeout].call(->{ 
-                sim_status = "#{time} / #{time_end}"
-                $logger.call sim_status
-
-                Element['#sim_status'].html = sim_status
-                simulate_tick_logic(time,time_end)
-                simulate_tick(time+1,time_end,after)
-            },1)    
-        else
-
-            # run simulation in backend  
-            sim_status = "#{Time.now} : Simulation Progress [#{time-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
-            $logger.call(sim_status)
-            
-            (time..time_end).each do |t| 
-                if t % 100==0 then
-                    sim_status = "#{Time.now} : Simulation Progress [#{t-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
-                    $logger.call(sim_status)
-                end
-                simulate_tick_logic(t,time_end)
-            end
-            
-            sim_status = "#{Time.now} : Simulation Progress [#{time_end-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
-            $logger.call(sim_status)
-        end
-    end
-    
-    def simulate(time_start,time_end,after=nil)
+    def simulate(time_start,time_end)
         self.sim_data = []
         self.hedge.reset
         self.bot.reset
@@ -807,7 +770,21 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         self.clean_fee
         @saved_price  = 0
         
-        simulate_tick(time_start,time_end,after)
+        # run simulation in backend  
+        sim_status = "#{Time.now} : Simulation Progress [#{time-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
+        $logger.call(sim_status)
+        
+        (time..time_end).each do |t| 
+            if t % 100==0 then
+                sim_status = "#{Time.now} : Simulation Progress [#{t-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
+                $logger.call(sim_status)
+            end
+            simulate_tick_logic(t,time_end)
+        end
+        
+        sim_status = "#{Time.now} : Simulation Progress [#{time_end-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
+        $logger.call(sim_status)
+
         self.change_time(self.sim_time)
     end
     
