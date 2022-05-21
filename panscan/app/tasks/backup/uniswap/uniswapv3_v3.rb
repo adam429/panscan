@@ -504,7 +504,7 @@ class UniswapV3 < MappingObject
             if pool[:sender]!=nil then
                 price_a = pool[:price_a].to_f
                 price_b = pool[:price_b].to_f
-                price = self.price.to_f
+                price = new_price
                 
                 if price<price_a then
                     price = price_a
@@ -647,24 +647,25 @@ $profiler[:slice_liquidity_pool] = ($profiler[:slice_liquidity_pool] or 0) + (Ti
         self.price = new_price
 
         # change token0 token1 assets
-        self.liquidity_pool.map! do |pool|
-            if pool[:sender]!=nil then
-                price_a = pool[:price_a].to_f
-                price_b = pool[:price_b].to_f
-                price = self.price.to_f
+        change_assets_by_price(new_price)
+        # self.liquidity_pool.map! do |pool|
+        #     if pool[:sender]!=nil then
+        #         price_a = pool[:price_a].to_f
+        #         price_b = pool[:price_b].to_f
+        #         price = self.price.to_f
                 
-                if price<price_a then
-                    price = price_a
-                end
-                if price>price_b then
-                    price = price_b
-                end
-                vx,vy = self.lp2xy(pool[:l],price,price_a,price_b)
-                pool[:token0]=vx.to_f
-                pool[:token1]=vy.to_f
-            end
-            pool
-        end
+        #         if price<price_a then
+        #             price = price_a
+        #         end
+        #         if price>price_b then
+        #             price = price_b
+        #         end
+        #         vx,vy = self.lp2xy(pool[:l],price,price_a,price_b)
+        #         pool[:token0]=vx.to_f
+        #         pool[:token1]=vy.to_f
+        #     end
+        #     pool
+        # end
     end
     
     def clean_liquidity_chart
