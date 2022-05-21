@@ -318,7 +318,7 @@ end
 
 class SwapPriceCex < MappingObject
     mapping_accessor :token0, :token1
-    mapping_accessor :realtime, :history
+    mapping_accessor :realtime, :history, :realtime_reverse, :history_reverse
     
     def self.task
         return "uniswap/swap_price"
@@ -327,6 +327,8 @@ class SwapPriceCex < MappingObject
     def data_size_down(sim)
         self.realtime = []
         self.history = []
+        self.realtime_reverse = []
+        self.history_reverse = []
         return 
     end
 
@@ -399,9 +401,6 @@ class SwapPriceCex < MappingObject
         realtime_low = (self.realtime_reverse.bsearch {|x| x[:ts]<=ts } or {ts:0})
         realtime_upper = (self.realtime.bsearch {|x| x[:ts]>=ts } or {ts:0})
 
-        realtime_low = ((self.realtime.filter {|x| x[:ts]<=ts}[-1]) or {ts:0})
-        realtime_upper = ((self.realtime.filter {|x| x[:ts]>=ts}[0]) or {ts:0})
-        
         history_low = (history_low[:ts] - ts).abs>120 ? {ts:0} :history_low
         history_upper = (history_upper[:ts] - ts).abs>120 ? {ts:0} :history_upper
         realtime_low = (realtime_low[:ts] - ts).abs>2 ? {ts:0} :realtime_low
