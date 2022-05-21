@@ -684,7 +684,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
     end
 
     def change_time_by_ts(ts,run=false)
-        id = self.time_table.get_id_by_ts(ts)
+        id = self.time_table.find_id_by_ts(ts)
         change_time_by_id(id,run)
     end
     
