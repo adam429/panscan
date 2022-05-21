@@ -469,7 +469,7 @@ def simulation_runner(pool_id,exchange,sim_data,out_of_service=false)
         end
     end
     
-    def create_task(params)
+    def create_task(params,&block)
         HTTP.post("/task/create/#{$task.id}", payload:params) do |res0|
             if res0.ok? then
                 ret = res0.json["id"].to_s
@@ -477,7 +477,7 @@ def simulation_runner(pool_id,exchange,sim_data,out_of_service=false)
                 yield(ret)
             else
                 $logger.call "network error, retry in 1s"
-                $$[:setTimeout].call(->{ create_task(params) },1000)
+                $$[:setTimeout].call(->{ create_task(params,&block) },1000)
             end
         end
         return         
