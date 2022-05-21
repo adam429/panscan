@@ -803,7 +803,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         self.bot.reset
 
         self.clean_fee
-                    self.cur_time = 99999999
+        self.cur_time = 99999999
         @saved_price  = 0
         
         # run simulation in backend  
