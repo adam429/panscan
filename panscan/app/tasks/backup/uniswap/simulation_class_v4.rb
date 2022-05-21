@@ -19,11 +19,8 @@ class Timer
     def run() 
         if time_source=="t1" then
 
-            sim_status = "#{Time.now} : Simulation Progress [#{sim_time-sim_time} / #{sim_time_end-sim_time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
-            $logger.call(sim_status)
-
             (sim_time..sim_time_end).each do |id|
-                if id % 100==0 then
+                if (id-sim_time) % 100==0 then
                     sim_status = "#{Time.now} : Simulation Progress [#{id-sim_time} / #{sim_time_end-sim_time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
                     $logger.call(sim_status)
                 end
