@@ -24,14 +24,14 @@ class Timer
 
             (sim_time..sim_time_end).each do |id|
                 if id % 100==0 then
-                    sim_status = "#{Time.now} : Simulation Progress [#{id-sim_time} / #{sim_time_end-id}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
+                    sim_status = "#{Time.now} : Simulation Progress [#{id-sim_time} / #{sim_time_end-sim_time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
                     $logger.call(sim_status)
                 end
                 ts = @sim.time_table.find_ts_by_id(id)
                 yield(ts)
             end
 
-            sim_status = "#{Time.now} : Simulation Progress [#{sim_time-sim_time} / #{sim_time_end-sim_time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
+            sim_status = "#{Time.now} : Simulation Progress [#{sim_time_end-sim_time} / #{sim_time_end-sim_time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
             $logger.call(sim_status)
         end
     end
