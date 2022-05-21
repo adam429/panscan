@@ -588,7 +588,7 @@ class Simulation < MappingObject
 
 
         data_lood_from_redis(self.pool_id,self.exchange)
-        self.uni.price = self.swap_price.get_last_price()
+        # self.uni.price = self.swap_price.get_last_price()
 
         # if sim.pool.swap.size>0 then
         #     block_number = sim.pool.swap[sim.sim_time][:block_number]
