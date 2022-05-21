@@ -5,13 +5,17 @@ load(Task.load("base/render_wrap"))
 require 'objspace'
 
 
+class Timer 
+end
+
 class Simulation < MappingObject
     def self.task
         return "uniswap/simulation_class_v4"
     end
     
     mapping_accessor :hedge, :swap_price, :swap_price_cex, :time_table, :uni, :pool, :bot, :cur_time, :sim_data, :user_pool, :reversed
-    mapping_accessor :sim_time, :sim_time_end,:load_action, :pool_id, :exchange, :sim_queue, :config
+    mapping_accessor :sim_time, :sim_time_end, :sim_time_ts, :sim_time_end_ts
+    mapping_accessor :load_action, :pool_id, :exchange, :sim_queue, :config
     
     def sim_time_ts
         return self.time_table.find_ts_by_id(self.sim_time.to_i)
