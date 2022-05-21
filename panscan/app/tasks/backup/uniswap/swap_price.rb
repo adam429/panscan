@@ -9,7 +9,7 @@ class TimeTable < MappingObject
         return "uniswap/swap_price"
     end
 
-    mapping_accessor :time_table
+    mapping_accessor :time_table,:time_table_reverse
     
     def load_from_redis(pool_id,uni,reversed=false)
         swap =  DataStore.get("uniswap.#{pool_id}.swap")
@@ -18,6 +18,7 @@ class TimeTable < MappingObject
         block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
         
         self.time_table = swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
+        self.time_table_reverse = self.time_table.reverse
             
     end
     
@@ -63,7 +64,7 @@ class TimeTable < MappingObject
     end
     
     def find_id_by_ts(ts)
-        return self.time_table.bsearch_index {|x| x>=ts}
+        return self.time_table_reverse.bsearch_index {|x| x<=ts}
         # ret = nil
         # self.time_table.each_with_index {|x,i|
         #     if x >= ts then 
