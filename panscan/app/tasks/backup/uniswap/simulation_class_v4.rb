@@ -6,7 +6,13 @@ require 'objspace'
 
 
 class Timer 
-    def init()
+    attr_accessor :sim_time, :sim_time_end, :sim_time_ts, :sim_time_end_ts, :time_source
+    def init(sim_time, sim_time_end, sim_time_ts, sim_time_end_ts, time_source)
+        @sim_time = sim_time
+        @sim_time_end = sim_time_end
+        @sim_time_ts = sim_time_ts
+        @sim_time_end_ts = sim_time_end_ts
+        @time_source = time_source
     end
 
     
