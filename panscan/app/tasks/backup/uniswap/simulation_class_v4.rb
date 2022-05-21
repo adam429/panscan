@@ -6,6 +6,10 @@ require 'objspace'
 
 
 class Timer 
+    def init()
+    end
+
+    
 end
 
 class Simulation < MappingObject
@@ -112,7 +116,9 @@ class Simulation < MappingObject
                 if cmd =~ /run_simulation_queue/ then
                     $logger.call "==[run_simulation_queue]=="
 
-                    self.simulate(self.sim_time,self.sim_time_end)
+                    timer = Timer.new
+                    timer.init(self.sim_time,self.sim_time_end)
+                    self.simulate(timer)
                     $logger.call "bot_stats = #{JSON.dump(self.bot_stats())}"
                     self.load_action = "run_simulation_queue"
                 end
