@@ -29,6 +29,10 @@ class TimeTable < MappingObject
     def time_str_by_id(id)
         return Time.at(self.time_table[id]).utc.to_s[0,19] if self.time_table[id]
     end
+
+    def time_str_by_ts(ts)
+        return Time.at(ts).utc.to_s[0,19]
+    end
     
     # time_id to "2022-02-02T02:02" format    
     def time_str_widget_by_id(id)
