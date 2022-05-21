@@ -71,6 +71,8 @@ class Simulation < MappingObject
                     
                     self.sim_time = self.time_table.find_id_by_str(time0)
                     self.sim_time_end = self.time_table.find_id_by_str(time1)
+                    self.time0  = self.time_table.find_ts_by_str(time0)
+                    self.time1  = self.time_table.find_ts_by_str(time0)
                     
                     self.change_time(self.sim_time)
 
