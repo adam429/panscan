@@ -15,7 +15,11 @@ class Timer
         @time_source = time_source
     end
 
-    
+    def run() 
+        (sim_time..sim_time_end).each do |t|
+            yield(t)
+        end
+    end
 end
 
 class Simulation < MappingObject
@@ -671,7 +675,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
     def simulate_tick_logic(time)
 
     profiler_time = Time.now()
-        self.change_time_by_id(time,true)
+        self.change_time_by_ts(time,true)
     $profiler[:change_time] = ($profiler[:change_time] or 0) + (Time.now()-profiler_time)
     
     
@@ -806,7 +810,6 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         timer.run { |t|
             simulate_tick_logic(t)
         }
-        
 
         self.change_time(self.sim_time)
     end
