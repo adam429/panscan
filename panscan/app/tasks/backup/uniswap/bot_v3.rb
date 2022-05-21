@@ -45,7 +45,7 @@ class Bot < MappingObject
                 {select:{name: :fee_hedge, value:self.config[:fee_hedge], option:["True","False"], option_value:["true","false"] }}, 
                 {select:{name: :observation_price, value:self.config[:observation_price], option:["Cex","Uniswap"], option_value:["cex","uniswap"] }}, 
                 {select:{name: :settlement_price, value:self.config[:settlement_price], option:["Cex","Uniswap"], option_value:["cex","uniswap"] }}, 
- #               {select:{name: :hedge_method, value:self.config[:hedge_method], option:["h1 - use TOKEN0/USDT hedge as if it is TOKEN0/TOKEN1", "h2 - use TOKEN0/TOKEN1 hedge", "h3 - use synthesis TOKEN0/TOKEN1 hedge (TOKEN0/USDT + TOKEN1/USDT)"], option_value:["h1","h2","h3"] }}, 
+                {select:{name: :hedge_method, value:self.config[:hedge_method], option:["h1 - use TOKEN0/USDT hedge as if it is TOKEN0/TOKEN1", "h2 - use TOKEN0/TOKEN1 hedge", "h3 - use synthesis TOKEN0/TOKEN1 hedge (TOKEN0/USDT + TOKEN1/USDT)"], option_value:["h1","h2","h3"] }}, 
             ]}},
 
 
@@ -53,7 +53,7 @@ class Bot < MappingObject
             {group: {name: "==Trigger==", widgets:[
                 {slider:{name: :trigger_position, value:self.config[:trigger_position], min:0, max:10, step:0.1 }}, 
                 {slider:{name: :trigger_price, value:self.config[:trigger_price], min:0, max:10, step:0.1 }}, 
-#                {slider:{name: :trigger_time_buffer, value:self.config[:trigger_time_buffer], min:0, max:120, step:1 }}, 
+                {slider:{name: :trigger_time_buffer, value:self.config[:trigger_time_buffer], min:0, max:120, step:1 }}, 
             ]}},
 
             {group: {name: "==Action==", widgets:[
