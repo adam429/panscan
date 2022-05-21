@@ -26,14 +26,14 @@ class Bot < MappingObject
     
     def config_format
         [
-            {name: :amt_hedge, value:self.config[:amt_hedge], min:0, max:1, step:1 }, 
-            {name: :fee_hedge, value:self.config[:fee_hedge], min:0, max:1, step:1 }, 
+            {slider:{name: :amt_hedge, value:self.config[:amt_hedge], min:0, max:1, step:1 }}, 
+            {slider:{name: :fee_hedge, value:self.config[:fee_hedge], min:0, max:1, step:1 }}, 
 
-            {name: :trigger_position, value:self.config[:trigger_position], min:0, max:10, step:0.1 }, 
-            {name: :trigger_price, value:self.config[:trigger_price], min:0, max:10, step:0.1 }, 
-            {name: :trigger_time_buffer, value:self.config[:trigger_time_buffer], min:0, max:120, step:1 }, 
+            {slider:{name: :trigger_position, value:self.config[:trigger_position], min:0, max:10, step:0.1 }}, 
+            {slider:{name: :trigger_price, value:self.config[:trigger_price], min:0, max:10, step:0.1 }}, 
+            {slider:{name: :trigger_time_buffer, value:self.config[:trigger_time_buffer], min:0, max:120, step:1 }}, 
 
-            {name: :adj_position_ratio, value:self.config[:adj_position_ratio], min:0, max:2, step:0.1 },
+            {slider:{name: :adj_position_ratio, value:self.config[:adj_position_ratio], min:0, max:2, step:0.1 }},
         ]        
     end
     

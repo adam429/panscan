@@ -710,10 +710,17 @@ document.getElementById("show-btn").addEventListener("click", function(){
     
     def get_widgets_value(widgets)
        ret = {}
-       widgets.map { |x|
-           value = { x[:name] => $vars[x[:name]].to_f }
-           ret = ret.merge(value)
+
+       widgets.map { |ww|
+           type = ww.to_a[0][0]
+           x = ww.to_a[0][1]
+
+           if x[:name] then
+               value = { x[:name] => ( (type==:slider) ? ($vars[x[:name]].to_f) : ($vars[x[:name]]) )  }
+               ret = ret.merge(value)
+           end
        }
+       
        return ret
     end
     

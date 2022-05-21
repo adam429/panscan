@@ -618,8 +618,12 @@ class Simulation < MappingObject
     def data_import(pool_id="")
         $logger.call "==begin data_import=="
 
+        base_pool_config = DataStore.get("uniswap.#{pool_id}")
         pool_config = DataStore.get("uniswap.#{pool_id}")
         pool_config = Simulation.reverse_pool(pool_config)
+        
+        $logger.call(base_pool_config)
+        $logger.call(pool_config)
         
         token0 = pool_config[:token0]
         token1 = pool_config[:token1]
@@ -639,7 +643,7 @@ class Simulation < MappingObject
         self.pool.init_tick = DataStore.get("uniswap.#{pool_id}.init_tick")
 
         ## check reverse
-        if pool_config[:token0]=="USDT" or pool_config[:token0]=="USDC" or pool_config[:token0]=="ETH" then
+        if base_pool_config[:token0]=="USDT" or base_pool_config[:token0]=="USDC" or base_pool_config[:token0]=="ETH" then
             $logger.call "==reverse pair=="
             
             self.dex.swap = self.dex.swap.map {|x|

@@ -5,7 +5,8 @@ load(Task.load("uniswap/simulation_runner_v7"))
 
 def main()
     pool_id = "__pool__"
+    exchange = "__exchange__"
     sim_data = "__sim_data__"
 
-    simulation_runner(pool_id,sim_data,false)
+    simulation_runner(pool_id,exchange,sim_data,false)
 end

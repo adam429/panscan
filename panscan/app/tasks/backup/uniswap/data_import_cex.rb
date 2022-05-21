@@ -8,18 +8,23 @@ load(Task.load("base/data_store"))
 
 def main()
     DataStore.init()
-    $task.next_schedule_at = Time.now+24*60*60
+    $task.next_schedule_at = Time.now+60*60
     
     swaps = ["ETH-USDT","APE-USDT"]
+    # exchange = ["okex","binance"]
+    exchange = ["binance"]
     
-    swaps.each do |swap_name|
+    exchange.each do |exchange_name|
+      swaps.each do |swap_name|
         redis_name = swap_name.gsub(/-/,"")
         
-        endpoint = "http://uniswap-v3-tool.funji.club:1924/api/v1/history/okx/kline/#{swap_name}-SWAP/?start_ts=0&end_ts=9999999999999"
+        endpoint = "http://uniswap-v3-tool.funji.club:1924/api/v1/history/#{exchange_name}/kline/#{swap_name}-SWAP/?start_ts=0&end_ts=9999999999999"
     
         url = endpoint
         conn = Faraday.new( url: url )
         response = conn.get() 
+        $logger.call url
+        $logger.call response.body
         data = JSON.parse(response.body)["data"]["data"]
         
         $logger.call "cex.okex.#{redis_name}.history  len=#{data.size}"
@@ -28,7 +33,7 @@ def main()
         DataStore.set("cex.okex.#{redis_name}.history",data)
     
     
-        endpoint = "http://uniswap-v3-tool.funji.club:1924/api/v1/history/okx/mark_price/#{swap_name}-SWAP/?start_ts=0&end_ts=9999999999999"
+        endpoint = "http://uniswap-v3-tool.funji.club:1924/api/v1/history/#{exchange_name}/mark_price/#{swap_name}-SWAP/?start_ts=0&end_ts=9999999999999"
     
         url = endpoint
         conn = Faraday.new( url: url )
@@ -39,7 +44,7 @@ def main()
         $logger.call "cex.okex.#{redis_name}.realtime  size=#{data.to_s.size}"
         $logger.call "cex.okex.#{redis_name}.realtime  first=#{data.first}"
         DataStore.set("cex.okex.#{redis_name}.realtime",data)
-        
+      end
     end
 
     nil

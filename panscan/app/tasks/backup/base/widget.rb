@@ -29,10 +29,40 @@ def load_widgets(widgets,default_value={})
 
     default_value = {} if default_value==nil
     
-    widgets.map { |w|
-        val = w[:value]
-        val = default_value[w[:name]] if default_value[w[:name]]
-        "#{w[:name].to_s}: #{text binding: w[:name].to_sym} <br/> #{slider step:w[:step] ,min:w[:min], max:w[:max], value:val, binding: w[:name].to_sym}  #{ input value:val, binding: w[:name].to_sym} <br/> "
+    widgets.map { |ww|
+        type = ww.to_a[0][0]
+        w = ww.to_a[0][1]
+        
+
+        if type==:rule then
+            ret = "<hr/> "
+        end
+
+        if type==:text then
+            ret = "#{w}"
+        end
+
+        if type==:group then
+            id = "group_#{SecureRandom.hex(2)}"
+            ret = %(
+                #{w[:name]} <a href='#/' onclick='var x = document.getElementById("#{id}"); if (x.style.display === "none") { x.style.display = "block"; } else { x.style.display = "none"; }'>▼</a><br/><br/>
+                <div id='#{id}' style='padding-left:20px' >#{load_widgets(w[:widgets],default_value)}</div>
+            )
+        end
+
+        if type==:select then
+            val = w[:value]
+            val = default_value[w[:name]] if default_value[w[:name]]
+            ret = "#{w[:name].to_s}:  #{select option:w[:option] ,option_value:w[:option_value], value:val, binding: w[:name].to_sym} (#{text binding: w[:name].to_sym}) <br/> "
+        end
+        
+        if type==:slider
+            val = w[:value]
+            val = default_value[w[:name]] if default_value[w[:name]]
+            ret = "#{w[:name].to_s}: #{text binding: w[:name].to_sym} <br/> #{slider step:w[:step] ,min:w[:min], max:w[:max], value:val, binding: w[:name].to_sym}  #{ input value:val, binding: w[:name].to_sym} <br/> "
+        end
+        
+        ret
     }.join("<br/>")
 end
 

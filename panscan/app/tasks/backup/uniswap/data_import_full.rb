@@ -87,7 +87,7 @@ def main()
             raise "remote task abort"
         end
 
-        $task.next_schedule_at = Time.now+24*60*60
+        $task.next_schedule_at = Time.now+60*60
         
     else
 

@@ -16,6 +16,11 @@ class Pool< MappingObject
     mapping_accessor :init_tick,:pool,:swap, :block_number
     mapping_accessor :cur_blocknumber, :cur_liquidity_pool, :cur_price, :swap_p, :pool_p
 
+    def data_size_down 
+        self.swap = [] 
+        self.pool = [] 
+    end        
+
     def load_from_redis(pool_id,uni,reversed=false)
         self.swap = DataStore.get("uniswap.#{pool_id}.swap")
         self.pool = DataStore.get("uniswap.#{pool_id}.pool")
@@ -234,6 +239,10 @@ class UniswapV3 < MappingObject
         return nil
     end
     
+    def data_size_down 
+        self.liquidity_pool = self.liquidity_pool.filter{|x| x[:sender]!=nil }
+    end        
+
     def mark_slice_pool_dirty
         return @slice_pool_dirty = true
     end

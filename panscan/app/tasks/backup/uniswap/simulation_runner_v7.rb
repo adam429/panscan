@@ -1,5 +1,8 @@
 __TASK_NAME__ = "uniswap/simulation_runner_v7"
 
+if RUBY_ENGINE=='ruby' then
+    require 'parallel'
+end
 
 load(Task.load("base/render_wrap"))
 load(Task.load("base/widget"))
@@ -9,17 +12,17 @@ load(Task.load("base/data_store"))
 load(Task.load("uniswap/uniswapv3_v3"))
 load(Task.load("uniswap/hedge"))
 load(Task.load("uniswap/swap_price"))
-load(Task.load("uniswap/bot_v2"))
+load(Task.load("uniswap/bot_v3"))
 load(Task.load("uniswap/simulation_class_v4"))
 
-def simulation_runner(pool_id,sim_data,out_of_service=false)
+def simulation_runner(pool_id,exchange,sim_data,out_of_service=false)
     $profiler = {}
     
     RenderWrap.load(Task.load("base/render_wrap::MappingObject"))
     RenderWrap.load(Task.load("uniswap/uniswapv3_v3::(UniswapV3,Pool)"))
-    RenderWrap.load(Task.load("uniswap/swap_price::(SwapPriceDex,SwapPriceCex,SwapPriceBase,TimeTable)"))
+    RenderWrap.load(Task.load("uniswap/swap_price"))
     RenderWrap.load(Task.load("uniswap/hedge::Hedge"))
-    RenderWrap.load(Task.load("uniswap/bot_v2::Bot"))
+    RenderWrap.load(Task.load("uniswap/bot_v3::Bot"))
     RenderWrap.load(Task.load("uniswap/simulation_class_v4::Simulation"))
 
     RenderWrap.load(Task.load("base/timeout_each::timeout_each"))
@@ -48,7 +51,6 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.load_action = #{sim.load_action}"
         $logger.call "sim.sim_data = #{sim.sim_data.first}"
         $logger.call "sim.user_pool = #{sim.user_pool}"
-        $logger.call "sim.pool.cur_liquidity_pool = #{sim.pool.cur_liquidity_pool}"
         $logger.call "sim.pool.init_tick = #{sim.pool.init_tick}"
         $logger.call "sim.pool.pool = #{sim.pool.pool.first}"
         $logger.call "sim.pool.swap = #{sim.pool.swap.first}"
@@ -64,42 +66,18 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         $logger.call "sim.time_table.time_table = #{sim.time_table.time_table.first}"
         $logger.call "sim.bot.config = #{sim.bot.config}"
         $logger.call "sim.config = #{sim.config}"
-        # sim.data_size_up()
+        sim.data_size_up()
         
         sim.run_load_action
         
         sim.data_size_down()
-        $logger.call "sim.pool_id = #{sim.pool_id}"
-        $logger.call "sim.sim_time = #{sim.sim_time}"
-        $logger.call "sim.sim_time_end = #{sim.sim_time_end}"
-        $logger.call "sim.load_action = #{sim.load_action}"
-        $logger.call "sim.sim_data = #{sim.sim_data.first}"
-        $logger.call "sim.user_pool = #{sim.user_pool}"
-        $logger.call "sim.pool.cur_liquidity_pool = #{sim.pool.cur_liquidity_pool}"
-        $logger.call "sim.pool.init_tick = #{sim.pool.init_tick}"
-        $logger.call "sim.pool.pool = #{sim.pool.pool.first}"
-        $logger.call "sim.pool.swap = #{sim.pool.swap.first}"
-        $logger.call "sim.uni.liquidity_pool = #{sim.uni.liquidity_pool.first}"
-        $logger.call "sim.uni.price = #{sim.uni.price}"
-        $logger.call "sim.uni.token0 = #{sim.uni.token0}"
-        $logger.call "sim.uni.token1 = #{sim.uni.token1}"
-        $logger.call "sim.uni.token0_decimal = #{sim.uni.token0_decimal}"
-        $logger.call "sim.uni.token1_decimal = #{sim.uni.token1_decimal}"
-        $logger.call "sim.uni.rate = #{sim.uni.rate}"
-        $logger.call "sim.uni.ul_ratio = #{sim.uni.ul_ratio}"
-        $logger.call "sim.swap_price.swap = #{sim.swap_price.swap.first}"
-        $logger.call "sim.time_table.time_table = #{sim.time_table.time_table.first}"
-        $logger.call "sim.bot.config = #{sim.bot.config}"
-        $logger.call "sim.config = #{sim.config}"
-        $logger.call "bot_stats = #{JSON.dump(sim.bot_stats())}"
-
     rescue =>e
         $logger.call "== Error on Loading Object =="
         $logger.call e.message
         e.backtrace.each { |line| $logger.call line }
         $logger.call "== Create a new one =="
         sim = Simulation.new
-        sim.init(pool_id)
+        sim.init(pool_id,exchange)
         sim.data_size_down()
     end
     
@@ -107,6 +85,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
     all_pools.sort! {|x,y| "#{x[:token0]}/#{x[:token1]}" <=> "#{y[:token0]}/#{y[:token1]}"}
     pool_option = [""]+ all_pools.map {|p| "#{p[:token0]}/#{p[:token1]} - #{p[:dex_fee]*100}%"}
     pool_option_value = [""]+ all_pools.map {|p| p[:pool]}
+    exchange_option = ["dummy","okex"]
 
     RenderWrap.html= <<~EOS
         <% if data[:out_of_service] %>
@@ -125,7 +104,8 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         
 <% if data[:load_action]!="run_simulation_queue" then %>
         <%= select binding: :pool, :option=>data[:pool_option],:option_value=>data[:pool_option_value],:value=>data[:sim].pool_id  %> 
-        [<%= button text:"init", action:%( update_task({"update_params"=>{"pool"=> :pool ,"sim_data"=>"-"}}) ) %>]  | 
+        <%= select binding: :exchange, :option=>data[:exchange_option],:option_value=>data[:exchange_option],:value=>data[:sim].exchange  %> 
+        [<%= button text:"init", action:%( update_task({"update_params"=>{"pool"=> :pool, "exchange"=>:exchange ,"sim_data"=>"-"}}) ) %>]  | 
         [<%= button text:"save", action:%( update_task({"update_params"=>{"sim_data"=>$data['sim'].to_encode_str()}}) ) %>]
         <%= text binding: :status %> | [<%= button text:"update chart", action:"update_chart()" %>] | [ <a href="/task/output/<%= $task.tid %>">status page</a> ]
         <br/><br/>
@@ -151,11 +131,16 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
 <% else %>
       <h1>Simulation Result</h1>
 <% end %>
-      <li>Token: <%= text binding: :token0 %>/<%= text binding: :token1 %> =  <%= text binding: :price %> (Rate: <%= data[:sim].uni.rate %>)</li>
     
       <div id="container">
         <div>
-          <h4>Liquidity Pool & Price & Volume </h4>
+          <li>Uniswap: (Rate: <%= data[:sim].uni.rate %>) <%= text binding: :token0 %>/<%= text binding: :token1 %> = <%= text binding: :price %> @ <%= text binding: :sim_time_str %>  </li>
+          <br/>
+          <li>CEX: <%= text binding: :token0 %>/<%= text binding: :token1 %> = <%= text binding: :price_token0token1 %>  @ <%= text binding: :price_time_str %> </li>
+          <li>CEX: <%= text binding: :token0 %>/<%= text binding: :token_base %> = <%= text binding: :price_token0base %> </li>  
+          <li>CEX: <%= text binding: :token1 %>/<%= text binding: :token_base %> = <%= text binding: :price_token1base %> </li>
+
+          <h4>Uniswap Price & Volume </h4>
           <%= chart binding: :price_volume_chart %><br/>
 
           <hr/>
@@ -186,7 +171,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
         <div>
 <% if data[:load_action]!="run_simulation_queue" then %>
           <h4>Simulation Time</h4>
-          Begin Time:<%= text binding: :sim_time_str %>  (<%= text binding: :sim_time %>)
+          Begin Time:<%= text binding: :sim_time_str %>  ( <%= input binding: :sim_time  %> )
           <br/><%= slider min:0, max:data[:sim].time_table.count-1, value:data[:sim].sim_time, binding: :sim_time %>  |
           <%= datetime min:data[:sim].time_table.time_str_widget_by_id(0), max:data[:sim].time_table.time_str_widget_by_id(data[:sim].time_table.count-1), value:data[:sim].time_table.time_str_widget_by_id(data[:sim].time_table.count-1), binding: :sim_time_datetime %>
           <br/>
@@ -195,7 +180,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
           [<%= button text:"move end", action:"sim_move_end" %> ]
           <br/><br/>
 
-          End Time:<%= text binding: :sim_time_end_str %>  (<%= text binding: :sim_time_end %>)
+          End Time:<%= text binding: :sim_time_end_str %>  ( <%= input binding: :sim_time_end  %> ) 
           <br/><%= slider min:0, max:data[:sim].time_table.count-1, value:data[:sim].sim_time_end, binding: :sim_time_end %> |
           <%= datetime min:data[:sim].time_table.time_str_widget_by_id(0), max:data[:sim].time_table.time_str_widget_by_id(data[:sim].time_table.count-1), value:data[:sim].time_table.time_str_widget_by_id(data[:sim].time_table.count-1), binding: :sim_time_end_datetime %>
           <br/>
@@ -204,8 +189,10 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
           <br/>
           
           <hr/>
+          <h4>CEX Price </h4>
+          <%= chart binding: :price_chart_cex %><br/>
+
 <% end %>
-          
           <h4>Metrics</h4>
             <li>Swap TXs = <%= text binding: :total_swaps %> </li>
             <li>Avg Volume = <%= text binding: ":avg_volume = (:total_volume.to_f / :total_swaps.to_f).round(2)" %> </li>
@@ -268,15 +255,25 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
 
       
       </div>
+      <%= calculated_var %( :sim_time_str = $data['sim'].time_table.time_str_by_id(:sim_time.to_i) ) %>
+      <%= calculated_var %( :sim_time_end_str = $data['sim'].time_table.time_str_by_id(:sim_time_end.to_i) ) %>
+
       <%= calculated_var %( :bot_config = bot_config() ) %>
       <%= calculated_var %( :bot_stats = calc_bot_stats() ) %>
       <%= calculated_var %( :price = $data['sim'].uni.price )  %>
       <%= calculated_var %( :price_in_range = ($data['sim'].swap_price.price_in_range_from_to(:price_a.to_f,:price_b.to_f,:sim_time.to_i,:sim_time_end.to_i)*100).round(2) ) %>
+      
       <%= calculated_var %( :token0 = $data['sim'].uni.token0 ) %>
       <%= calculated_var %( :token1 = $data['sim'].uni.token1 ) %>
+      <%= calculated_var %( :token_base = $data['sim'].swap_price_cex.base ) %>
+      <%= calculated_var %( :price_token0base = $data['sim'].swap_price_cex.price_token0base ) %>
+      <%= calculated_var %( :price_token1base = $data['sim'].swap_price_cex.price_token1base ) %>
+      <%= calculated_var %( :price_token0token1 = $data['sim'].swap_price_cex.price_token0token1 ) %>
+      <%= calculated_var %( :price_time_str = $data['sim'].swap_price_cex.price_time_str ) %>
+      
+
+
       <%= calculated_var %( :liquidity_pool = pool_table() ) %>
-      <%= calculated_var %( :sim_time_str = $data['sim'].time_table.time_str_by_id(:sim_time.to_i) ) %>
-      <%= calculated_var %( :sim_time_end_str = $data['sim'].time_table.time_str_by_id(:sim_time_end.to_i) ) %>
 
 
       <!-- save to ui saver -->
@@ -356,7 +353,7 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
             cur_bot_config = x
 
             # load pool data
-            $data['sim'].load_action = ["init_pool@#\{x[:pool_id]\}",
+            $data['sim'].load_action = ["init_pool@#\{x[:pool_id]\},#\{x[:cex_data_source]\}",
                                         "change_time@#\{x[:sim_time]\},#\{x[:sim_time_end]\}",
                                         "add_liqudity@#\{x[:price_a_mul]\},#\{x[:price_b_mul]\},#\{x[:total_token]\}",
                                         "run_simulation_queue"].join("|")
@@ -440,8 +437,10 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
 
         $data['sim'].uni.clean_liquidity_chart
         $data['sim'].swap_price.clean_price_volume_chart
+        $data['sim'].swap_price_cex.clean_price_chart
         # $vars[:liquidity_pool_chart] = $data['sim'].uni.liquidity_chart($vars[:price_a].to_f, $vars[:price_b].to_f, $vars[:swap_price].to_f, $vars[:swap_l].to_f)
         $vars[:price_volume_chart] = $data['sim'].swap_price.price_volume_chart($vars[:price_a].to_f, $vars[:price_b].to_f, $vars[:price].to_f, $vars[:sim_time].to_i, $vars[:sim_time_end].to_i)
+        $vars[:price_chart_cex] = $data['sim'].swap_price_cex.price_chart($data['sim'].time_table.find_ts_by_id($vars[:sim_time].to_i), $data['sim'].time_table.find_ts_by_id($vars[:sim_time_end].to_i))
         $vars[:sim_chart] = $data['sim'].chart($vars[:price_a].to_f, $vars[:price_b].to_f)
         
         calculated_var_update_all({})
@@ -477,7 +476,8 @@ def simulation_runner(pool_id,sim_data,out_of_service=false)
                 
                 yield(ret)
             else
-                $logger.call res0
+                $logger.call "network error, retry in 1s"
+                $$[:setTimeout].call(->{ create_task(params) },1000)
             end
         end
         return         
@@ -563,10 +563,23 @@ document.getElementById("show-btn").addEventListener("click", function(){
 
     def get_widgets_value(widgets)
        ret = {}
-       widgets.map { |x|
-           value = { x[:name] => $vars[x[:name]].to_f }
-           ret = ret.merge(value)
+
+       widgets.map { |ww|
+           type = ww.to_a[0][0]
+           x = ww.to_a[0][1]
+
+           if type=="group" then
+               ret = ret.merge(get_widgets_value(x[:widgets]))
+           else
+               if x[:name] then
+                   value = { x[:name] => ( (type==:slider) ? ($vars[x[:name]].to_f) : ($vars[x[:name]]) )  }
+                   ret = ret.merge(value)
+               end
+           end
+       
        }
+       
+
        return ret
     end
     
@@ -598,6 +611,8 @@ pool_table: #\{ table \} <br/> """
         
         $$[:setTimeout].call(->{
             $data['sim'].change_time($vars[:sim_time].to_i)
+            
+            
             calculated_var_update_all()
         },10)
     end
@@ -642,8 +657,8 @@ pool_table: #\{ table \} <br/> """
           }
       
           if $vars[:column_display] then
-              column = [:id,:action,:pool,:amt_hedge,:fee_hedge,:trigger_position,:trigger_price,:trigger_time_buffer,:adj_position_ratio,:sim_time,:sim_time_end,:price_a,:price_b,:price_a_mul,:price_b_mul,:token0,:token1,:total_token,:task_id,:status_page,:view_page,:total_pnl, :roi_percent, :dex_fee, :cex_fee, :value_diff]
-              round = [nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,8,8,2,2,4,4,4,nil,nil,nil,4, 4, 4, 4, 4]
+              column = [:id,:action,:pool,:cex_data_source, :base_currency, :time_source, :observation_price, :settlement_price, :hedge_method, :amt_hedge,:fee_hedge,:trigger_position,:trigger_price,:trigger_time_buffer,:adj_position_ratio,:sim_time,:sim_time_end,:price_a,:price_b,:price_a_mul,:price_b_mul,:token0,:token1,:total_token,:task_id,:status_page,:view_page,:total_pnl, :roi_percent, :dex_fee, :cex_fee, :value_diff]
+              round = [nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,8,8,2,2,4,4,4,nil,nil,nil,4, 4, 4, 4, 4]
           else
               column = [:id,:action,:pool,:task_id,:status_page,:view_page,:total_pnl, :roi_percent, :dex_fee, :cex_fee, :value_diff]
               round = [nil,nil,nil,nil,nil,nil,4, 4, 4, 4, 4]
@@ -960,6 +975,7 @@ end
 
     RenderWrap[:load_action]=sim.load_action
     RenderWrap[:sim]=sim
+    RenderWrap[:exchange_option] = exchange_option
     RenderWrap[:pool_option] = pool_option
     RenderWrap[:pool_option_value] = pool_option_value
     RenderWrap[:out_of_service]=out_of_service

@@ -11,7 +11,15 @@ class Simulation < MappingObject
     end
     
     mapping_accessor :hedge, :swap_price, :swap_price_cex, :time_table, :uni, :pool, :bot, :cur_time, :sim_data, :user_pool, :reversed
-    mapping_accessor :sim_time, :sim_time_end,:load_action, :pool_id, :sim_queue, :config
+    mapping_accessor :sim_time, :sim_time_end,:load_action, :pool_id, :exchange, :sim_queue, :config
+    
+    def sim_time_ts
+        return self.time_table.find_ts_by_id(self.sim_time.to_i)
+    end
+
+    def sim_time_end_ts
+        return self.time_table.find_ts_by_id(self.sim_time_end.to_i)
+    end
     
     def bot_stats
         if self.sim_data!=nil and self.sim_data!=[] then
@@ -43,15 +51,16 @@ class Simulation < MappingObject
                     param.shift
                     param = param.join("@").split(",")
                     pool_id = param[0]
+                    exchange = param[1]
                     
-                    $logger.call "==[load_action]== init_pool #{pool_id}"
+                    $logger.call "==[load_action]== init_pool #{pool_id} #{exchange}"
                     
                     self.user_pool = []
                     self.cur_time = 99999999
                     self.sim_data = []
                     self.sim_queue = []
                     self.config = {}
-                    self.data_import(pool_id)
+                    self.data_import(pool_id,exchange)
                 end
                 if cmd =~ /change_time/ then
                     param = cmd.split("@")
@@ -98,17 +107,18 @@ class Simulation < MappingObject
                     $logger.call "==[run_simulation_queue]=="
 
                     self.simulate(self.sim_time,self.sim_time_end)
+                    $logger.call "bot_stats = #{JSON.dump(self.bot_stats())}"
                     self.load_action = "run_simulation_queue"
                 end
             end
         end
     end
     
-    def init(pool_id)
+    def init(pool_id,exchange)
         self.uni = UniswapV3.new
         self.hedge = Hedge.new()
         self.swap_price = SwapPriceDex.new()
-        self.swap_price_cex = SwapPriceCex.new()
+        self.swap_price_cex = SwapPriceCexSynthesis.new()
         self.time_table = TimeTable.new()
         self.bot = Bot.new
         self.pool = Pool.new
@@ -119,7 +129,7 @@ class Simulation < MappingObject
         self.sim_queue = []
         self.config = {}
         
-        self.data_import(pool_id) 
+        self.data_import(pool_id,exchange) 
     end
     
     
@@ -518,70 +528,49 @@ class Simulation < MappingObject
         
     end
     
-    # def data_size_up()
-    #     $logger.call "==[data_size_up]=="
-    #     $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
-    #     $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
-    #     $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
-    #     $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
+    def data_size_up()
+        $logger.call "[#{Time.now}] ==begin data_size_up=="
+        # $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
+        # $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
+        # $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
+        # $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
 
-    #     data_lood_from_redis(pool_id)
-    #     self.uni.price = self.swap_price.get_last_price()
 
-    #     if sim.pool.swap.size>0 then
-    #         block_number = sim.pool.swap[sim.sim_time][:block_number]
-    #         sim.user_pool = sim.uni.liquidity_pool.filter {|x| x[:sender]=="user"}
-    #         sim.pool.cur_blocknumber = 9999999999+1
-    #         sim.uni.liquidity_pool = sim.pool.calc_pool(block_number,sim.user_pool)
-    #     end
+        data_lood_from_redis(self.pool_id,self.exchange)
+        self.uni.price = self.swap_price.get_last_price()
+
+        # if sim.pool.swap.size>0 then
+        #     block_number = sim.pool.swap[sim.sim_time][:block_number]
+        #     sim.user_pool = sim.uni.liquidity_pool.filter {|x| x[:sender]=="user"}
+        #     sim.pool.cur_blocknumber = 9999999999+1
+        #     sim.uni.liquidity_pool = sim.pool.calc_pool(block_number,sim.user_pool)
+        # end
         
-    #     $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
-    #     $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
-    #     $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
-    #     $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
-    # end
-
-    def data_size_down()
-        $logger.call "==[data_size_down]=="
-        $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
-        $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
-        $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
-        $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
-
-        self.swap_price.swap = self.swap_price.swap.map {|v| { id:v[:id],time:v[:time],price:v[:price],volume:v[:volume] } }
-        self.pool.swap = [] 
-        self.pool.pool = [] 
-
-        $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
-        $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
-        $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
-        $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
-
-        self.uni.liquidity_pool = self.uni.liquidity_pool.filter{|x| x[:sender]!=nil }
-        self.swap_price.swap_chart = []
-
-        last_time = 0
-        volume = 0
-        self.swap_price.swap.map.with_index {|x,i| 
-            if x[:time]-last_time>3600 then
-              self.swap_price.swap_chart.push({x:i, time:x[:time], time_str:Time.at(x[:time]).to_s[0,19], price:x[:price], volume:(x[:volume]+volume) }) 
-              last_time = x[:time]
-              volume = 0
-            else
-              volume = volume + x[:volume]
-            end
-        }
-        $logger.call "swap_price.swap_chart = #{self.swap_price.swap_chart}"
+        # $logger.call "swap_price.swap = #{self.swap_price.swap.to_s.size}"
+        # $logger.call "pool.swap = #{self.pool.swap.to_s.size}"
+        # $logger.call "pool.pool = #{self.pool.pool.to_s.size}"
+        # $logger.call "time_table.time_table = #{self.time_table.time_table.to_s.size}"
+        $logger.call "[#{Time.now}] ==end data_size_up=="
     end
 
-    def data_lood_from_redis(pool_id)
+    def data_size_down()
+        $logger.call "[#{Time.now}] ==begin data_size_down=="
+
+        self.swap_price.data_size_down()
+        self.swap_price_cex.data_size_down(self)
+        self.pool.data_size_down()
+        self.uni.data_size_down()
+        $logger.call "[#{Time.now}] ==end data_size_down=="
+    end
+
+    def data_lood_from_redis(pool_id,exchange)
         self.swap_price.load_from_redis(pool_id,self.uni,self.reversed)
-        self.swap_price_cex.load_from_redis("okex",self.uni,self.reversed) 
+        self.swap_price_cex.load_from_redis(exchange,uni.token0,uni.token1,"USDT") 
         self.time_table.load_from_redis(pool_id,self.uni,self.reversed)
         self.pool.load_from_redis(pool_id,self.uni,self.reversed)
     end
     
-    def data_init_config(pool_id)
+    def data_init_config(pool_id,exchange)
         pool_config = DataStore.get("uniswap.#{pool_id}")
         pool_config = reverse_pool(pool_config)
         
@@ -605,21 +594,22 @@ class Simulation < MappingObject
         self.sim_time_end = self.time_table.count-1
     end
 
-    def data_import(pool_id="")
-        $logger.call "==begin data_import=="
+    def data_import(pool_id="",exchange="okex")
+        $logger.call "[#{Time.now}] ==begin data_import=="
 
         self.pool_id = pool_id
+        self.exchange = exchange
 
-        data_init_config(pool_id)
-        data_lood_from_redis(pool_id)
+        data_init_config(pool_id,exchange)
+        data_lood_from_redis(pool_id,exchange)
         data_init_value()
 
-        $logger.call "self.uni.price - #{self.uni.price}"
-        $logger.call "self.swap_price.swap - #{self.swap_price.swap[0,10]}"
-        $logger.call "self.pool.pool - #{self.pool.pool[0,10]}"
-        $logger.call "self.pool.swap - #{self.pool.swap[0,10]}"
+        # $logger.call "self.uni.price - #{self.uni.price}"
+        # $logger.call "self.swap_price.swap - #{self.swap_price.swap[0,10]}"
+        # $logger.call "self.pool.pool - #{self.pool.pool[0,10]}"
+        # $logger.call "self.pool.swap - #{self.pool.swap[0,10]}"
 
-        $logger.call "==end data_import=="
+        $logger.call "[#{Time.now}] ==end data_import=="
     end 
     
     
@@ -628,6 +618,9 @@ class Simulation < MappingObject
     end
     
     def change_time_by_id(id,run=false)
+        ts = self.time_table.find_ts_by_id(id)
+        self.swap_price_cex.change_time(ts)
+        
         swap = self.swap_price.get_swap_by_id(id)
         price = swap[:price]
         volume0 = swap[:volume0]
@@ -638,8 +631,7 @@ profiler_time1 = Time.now()
         self.uni.change_price(price,volume0,volume1,run)
 $profiler[:change_price] = ($profiler[:change_price] or 0) + (Time.now()-profiler_time1)
         
-        # $logger.call "pool.swap.size = #{self.pool.swap.size}"
-        
+
         if self.pool.swap.size>0 then
             block_number = self.pool.swap[id][:block_number]
             self.user_pool = self.uni.liquidity_pool.filter {|x| x[:sender]=="user"}
@@ -650,8 +642,6 @@ profiler_time1 = Time.now()
 $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time1)
         end
 
-
-        self.hedge.set_price(price)
         self.cur_time = id
     end
 
@@ -661,20 +651,36 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
     end
     
     def simulate_tick_logic(time,time_end)
-        # $logger.call "====== time = #{time}"
 
-# $logger.call "lp1 = #{self.uni.liquidity_pool.filter{|x| x[:sender]!=nil}}"
     profiler_time = Time.now()
-        self.change_time(time,true)
+        self.change_time_by_id(time,true)
     $profiler[:change_time] = ($profiler[:change_time] or 0) + (Time.now()-profiler_time)
-# $logger.call "lp2 = #{self.uni.liquidity_pool.filter{|x| x[:sender]!=nil}}"
-
-
+    
+    
     profiler_time = Time.now()
 
         time_ts = self.time_table.find_ts_by_id(time)
         time_str = self.time_table.time_str_by_id(time)
-        price = self.price
+
+        uni_price = self.uni.price
+        cex_price = nil
+        
+        if self.bot.config[:observation_price] == "uniswap" then
+            price = uni_price
+        end
+        if self.bot.config[:observation_price] == "cex" then
+            cex_price = self.swap_price_cex.get_swap_by_ts(time_ts) if cex_price==nil  # lazy eval
+            price = cex_price
+        end
+
+        if self.bot.config[:settlement_price] == "uniswap" then
+            self.hedge.set_price(uni_price)
+        end
+        if self.bot.config[:settlement_price] == "cex" then
+            cex_price = self.swap_price_cex.get_swap_by_ts(time_ts) if cex_price==nil # lazy eval
+            self.hedge.set_price(cex_price)
+        end
+
         
         dprice = ((@saved_price == 0 ? 1 : price / @saved_price) - 1)*100
         @saved_price = price
@@ -688,11 +694,6 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         
         lp =  self.uni.liquidity_pool.filter{|x| x[:sender]!=nil}
         ul_ratio = self.uni.ul_ratio
-
-        # $logger.call "lp.size = #{lp.size}"
-        # $logger.call "ul_ratio = #{ul_ratio}"
-
-# $logger.call "lp3 = #{self.uni.liquidity_pool.filter{|x| x[:sender]!=nil}}"
 
         token0_amt = lp.map {|x| x[:token0]}.sum 
         token1_amt = lp.map {|x| x[:token1]}.sum
@@ -757,34 +758,6 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
                      volume1:volume1.round(8),   
                      ul_ratio:ul_ratio.round(8), #4
                     }.merge(bot_data)
-        # sim_data_item = {id:time, 
-        #              time:time_str,
-        #              time_str:time_str,
-        #              price:price.round(8),
-        #              volume:volume,
-        #              token0_amt:token0_amt.round(2),
-        #              token1_amt:token1_amt.round(2),
-        #              token0_fee:token0_fee.round(8), #8
-        #              token1_fee:token1_fee.round(8), #8
-        #              total_fee: total_fee.round(8), #8
-        #              dex_value: dex_value.round(2),
-        #              ddex_value: ddex_value.round(2),
-        #              cex_position:cex_position.round(2),
-        #              cex_value:cex_value.round(2),
-        #              value_diff: value_diff.round(2),
-        #              dprice_percent: dprice.round(2),
-        #              value_diff_dex_value_percent:value_diff_dex_value.round(2),
-        #              cex_fee:cex_fee.round(4),
-        #              total_pnl: total_pnl.round(2),
-        #              roi_percent:roi.round(2),
-        #              unhedged_pnl:unhedged_pnl.round(2),
-        #              unhedged_roi_percent:unhedged_roi.round(2),
-        #              volume:volume.round(2),
-        #              volume0:volume0.round(2),   
-        #              volume1:volume1.round(2),   
-        #              ul_ratio:ul_ratio.round(8), #4
-        #             }.merge(bot_data)
-                    
 
         self.sim_data.push(sim_data_item)
     end

@@ -1,6 +1,8 @@
 __TASK_NAME__ = "uniswap/swap_price"
+__ENV__ = 'ruby3'
+# load(Task.load("base/render_wrap"))   
 
-load(Task.load("base/render_wrap"))
+CHART_TIME_INTERVAL = 3600*24
 
 class TimeTable < MappingObject
     def self.task
@@ -26,7 +28,6 @@ class TimeTable < MappingObject
     # time_id to "2022-02-02 02:02:02" format    
     def time_str_by_id(id)
         return Time.at(self.time_table[id]).utc.to_s[0,19] if self.time_table[id]
-        time.to_s
     end
     
     # time_id to "2022-02-02T02:02" format    
@@ -67,24 +68,47 @@ class SwapPriceBase < MappingObject
     def self.task
         return "uniswap/swap_price"
     end
-    
+
     mapping_accessor :swap, :swap_chart, :time_table
+
+    def time_interval
+        return [self.time_table[0],self.time_table[-1]]
+    end
     
+    def data_size_down()
+        self.swap = self.swap.map {|v| { id:v[:id],time:v[:time],price:v[:price],volume:v[:volume] } }
+        self.swap_chart = []
+
+        last_time = 0
+        volume = 0
+        self.swap.map.with_index {|x,i| 
+            if x[:time]-last_time>CHART_TIME_INTERVAL then
+              self.swap_chart.push({x:i, time:x[:time], time_str:Time.at(x[:time]).to_s[0,19], price:x[:price], volume:(x[:volume]+volume) }) 
+              last_time = x[:time]
+              volume = 0
+            else
+              volume = volume + x[:volume]
+            end
+        }
+    end
 
     def get_swap_by_id(id)
         return self.swap[id]
     end
     
     def get_swap_by_ts(ts)
-        ret = nil
-        self.time_table.each_with_index {|x,i|
-            if x >= ts then 
-                ret=i; 
-                break; 
-            end 
-        }
-        ret = self.time_table.size-1 if ret==nil
-        return self.swap[ret]
+        # ret = nil
+        # self.time_table.each_with_index {|x,i|
+        #     if x >= ts then 
+        #         ret=i; 
+        #         break; 
+        #     end 
+        # }
+        # ret = self.time_table.size-1 if ret==nil
+        # return self.swap[ret]
+        
+        # return self.swap.filter {|x| x[:time]>ts}[0]
+        raise "here"
     end
     
     def get_last_price()
@@ -173,7 +197,7 @@ class SwapPriceBase < MappingObject
                                     "tooltip": [{"field": "time_str"}, {"field": "price"}]
                                   }
                                 }
-                           ]
+                          ]
                     },
         
                     {
@@ -256,6 +280,10 @@ class SwapPriceBase < MappingObject
 end
 
 class SwapPriceDex < SwapPriceBase
+    def self.task
+        return "uniswap/swap_price"
+    end
+
     def load_from_redis(pool_id,uni,reversed=false)
         self.swap =  DataStore.get("uniswap.#{pool_id}.swap")
 
@@ -291,28 +319,69 @@ end
 class SwapPriceCex < MappingObject
     mapping_accessor :token0, :token1
     mapping_accessor :realtime, :history
+    
+    def self.task
+        return "uniswap/swap_price"
+    end
+
+    def data_size_down(sim)
+        self.realtime = []
+        self.history = []
+        return 
+    end
+
+    def time_interval()
+        if token0==token1 then
+            return [0,9999999999]
+        else
+            return [ [realtime[0][:ts],history[0][:ts]].min, [realtime[-1][:ts],history[-1][:ts]].max ]
+        end
+    end
+    
+    def data_range()
+        if token0==token1 then
+            return {realtime:[0,9999999999],history:[0,9999999999]}
+        else
+            return {realtime:[realtime[0][:ts],realtime[-1][:ts]],history:[history[0][:ts],history[-1][:ts]]}
+        end
+    end
+
 
     def load_from_redis(exchange,token0, token1)
         self.token0 = token0
         self.token1 = token1
-
-        pair_name = self.token0 + self.token1
-        self.realtime = DataStore.get("cex.#{exchange}.#{pair_name}.realtime")
-        self.history = DataStore.get("cex.#{exchange}.#{pair_name}.history")
-
-        self.realtime = self.realtime.map { |x|
-            {
-                ts:x["ts"]/1000,
-                price:x["mark_price"]
-            }
-        }
         
-        self.history = self.history.map { |x|
-            {
-                ts:x["open_time"]/1000,
-                price:x["open_price"]
-            }
-        }
+        if token0==token1 or exchange=="dummy" then
+            self.realtime = []
+            self.history = []
+            return
+        else    
+            pair_name = self.token0 + self.token1
+            self.realtime = DataStore.get("cex.#{exchange}.#{pair_name}.realtime")
+            self.history = DataStore.get("cex.#{exchange}.#{pair_name}.history")
+    
+            if self.realtime!=nil then
+                self.realtime = self.realtime.map { |x|
+                    {
+                        ts:x["ts"]/1000,
+                        price:x["mark_price"]
+                    }
+                }
+            else
+                $logger.call "[data import error] - cex.#{exchange}.#{pair_name}.realtime"
+            end
+            
+            if self.history!=nil then
+                self.history = self.history.map { |x|
+                    {
+                        ts:x["open_time"]/1000,
+                        price:x["open_price"]
+                    }
+                }
+            else
+                $logger.call "[data import error] - cex.#{exchange}.#{pair_name}.history"
+            end
+        end
     end
     
     def interpolate(cur,upper,lower,upper_value,lower_value)
@@ -321,6 +390,9 @@ class SwapPriceCex < MappingObject
     end
 
     def get_swap_by_ts(ts)
+        return 1 if token0==token1 
+        return 1 if self.history==nil or self.realtime==nil
+
         history_low = ((self.history.filter {|x| x[:ts]<=ts}[-1]) or {ts:0})
         history_upper = ((self.history.filter {|x| x[:ts]>=ts}[0]) or {ts:0})
         realtime_low = ((self.realtime.filter {|x| x[:ts]<=ts}[-1]) or {ts:0})
@@ -331,30 +403,55 @@ class SwapPriceCex < MappingObject
         realtime_low = (realtime_low[:ts] - ts).abs>2 ? {ts:0} :realtime_low
         realtime_upper = (realtime_upper[:ts] - ts).abs>2 ? {ts:0} :realtime_upper
         
-        # $logger.call ts
-        # $logger.call history_low
-        # $logger.call history_upper
-        # $logger.call realtime_low
-        # $logger.call realtime_upper
-        
         if realtime_low[:ts]>0 and realtime_upper[:ts]>0 then
             realtime_price = interpolate(ts,realtime_upper[:ts],realtime_low[:ts],realtime_upper[:price],realtime_low[:price])
-            return {price:realtime_price}
+            return realtime_price
         end
         
         if history_low[:ts]>0 and history_upper[:ts]>0 then
             history_price = interpolate(ts,history_upper[:ts],history_low[:ts],history_upper[:price],history_low[:price])
-            return {price:history_price}
+            return history_price
         end
         
-        return {price:nil}
+        return nil
     end
-    
+
 end
 
 
 class SwapPriceCexSynthesis < MappingObject
+
+    def self.task
+        return "uniswap/swap_price"
+    end
+
     mapping_accessor :token0base, :token1base, :token0, :token1, :base
+    mapping_accessor :price_token0base,:price_token1base,:price_token0token1,:price_time_str, :swap_chart
+    mapping_accessor :cur_token0base, :cur_token1base, :cur_token0token1
+    
+    def time_interval()
+        token0_interval = token0base.time_interval
+        token1_interval = token1base.time_interval
+        time_min = [token0_interval[0],token1_interval[0]].min
+        time_max = [token0_interval[1],token1_interval[1]].max
+        
+        time_min = [token0_interval[0],token1_interval[0]].max if time_min==0
+        time_max = [token0_interval[1],token1_interval[1]].min if time_max==9999999999
+        return [ time_min , time_max ]
+    end
+
+    def change_time(ts)
+        swap = swap_chart.filter {|x| x["time"]>ts}[0]
+        if swap!=nil then
+            self.price_token1base = swap["price_token1base"]
+            self.price_token0base = swap["price_token0base"]
+            self.price_token0token1 = swap["price_token0token1"]
+            self.price_time_str = swap["time_str"]
+        end
+        # self.price_token1base = get_swap_by_ts(ts,self.token1+self.base)
+        # self.price_token0base = get_swap_by_ts(ts,self.token0+self.base)
+        # self.price_token0token1 = get_swap_by_ts(ts,self.token0+self.token1)
+    end
 
     def load_from_redis(exchange, token0, token1, base)
         self.token0 = token0
@@ -366,62 +463,312 @@ class SwapPriceCexSynthesis < MappingObject
 
         self.token0base.load_from_redis(exchange, token0, base)
         self.token1base.load_from_redis(exchange, token1, base)
+        
+        self.cur_token0base = self.token0+self.base
+        self.cur_token1base = self.token1+self.base
+        self.cur_token0token1 = self.token0+self.token1
+        
+    end
+    
+    def data_size_down(sim)
+        self.swap_chart = []
+        
+        time_interval = sim.swap_price.time_interval
+        # time_interval = [1647519652,1647519652+3600*5]
+
+        $logger.call "[#{Time.now}] == begin gen cex swap_chart =="
+        # $logger.call time_interval
+        # self.swap_chart = (time_interval[0]..time_interval[1]).step(3600*24*3).map.with_index {|ts,i| 
+        
+        # require 'parallel'
+        
+        self.swap_chart = Parallel.map( (time_interval[0]..time_interval[1]).step(CHART_TIME_INTERVAL).to_a, in_processes: 4) { |ts|
+            {
+                 time:ts, 
+                 time_str:Time.at(ts).to_s[0,19], 
+                 price_token0base: get_swap_by_ts(ts,cur_token0base),
+                 price_token1base: get_swap_by_ts(ts,cur_token1base),
+                 price_token0token1: get_swap_by_ts(ts,cur_token0token1),
+            } 
+        } 
+        $logger.call "[#{Time.now}] == end den cex swap_chart =="
+        # $logger.call "self.swap_chart = #{self.swap_chart[0,10]}"
+        
+
+        token0base.data_size_down(sim)
+        token1base.data_size_down(sim)
+    end
+
+    def inverse(t)
+        return nil if t==nil
+        return 1/t
     end
 
     def get_swap_by_ts(ts,currency=nil)
-        if currency then
-        else
-            return {price: self.token0base.get_swap_by_ts(ts)[:price] / self.token1base.get_swap_by_ts(ts)[:price].to_f}
+        currency=self.cur_token0token1 if currency==nil
+        if currency==self.cur_token0token1 then
+            token0base_price = self.token0base.get_swap_by_ts(ts)
+            token1base_price = self.token1base.get_swap_by_ts(ts)
+            return nil if token0base_price==nil or token1base_price==nil
+            return token0base_price / token1base_price.to_f
+        end
+        if currency==self.cur_token0base then
+            return self.token0base.get_swap_by_ts(ts)
+        end
+        if currency==self.cur_token1base then
+            return self.token1base.get_swap_by_ts(ts)
+        end
+        if currency==self.base+self.token0 then
+            return inverse(self.token0base.get_swap_by_ts(ts))
+        end
+        if currency==self.base+self.token1 then
+            return inverse(self.token1base.get_swap_by_ts(ts))
+        end
+        if currency==self.token1+self.token0 then
+            return inverse(get_swap_by_ts(ts,self.cur_token0token1))
         end
     end
 
+    def clean_price_chart
+        return @price_chart = nil
+    end
+
+
+    def price_chart(sim_time_ts=0,sim_time_end_ts=0)
+            # $logger.call "price_chart"
+            # $logger.call "sim_time_ts = #{sim_time_ts}"
+            # $logger.call "sim_time_end_ts = #{sim_time_end_ts}"
+            # $logger.call "self.swap_chart.size = #{self.swap_chart.size}"
+            # $logger.call "self.swap_chart.first = #{self.swap_chart.first}"
+            return @price_chart if @price_chart 
+            title = "CEX Price"
+            
+            # data = swap.map.with_index {|x,i| {x:i, time:x[:time], time_str:Time.at(x[:time]).to_s[0,19], price:x[:price], volume:x[:volume] } }
+            data = self.swap_chart
+            p1_min_price = data.map {|x| x[:price_token0base]}.filter{|x| x!=nil}.min
+            p1_max_price = data.map {|x| x[:price_token0base]}.filter{|x| x!=nil}.max
+            p1_min_price = (p1_min_price or 0)*0.7
+            p1_max_price = (p1_max_price or 0)*1.3
+            p1_title = self.cur_token0base
+
+            p2_min_price = data.map {|x| x[:price_token1base]}.filter{|x| x!=nil}.min
+            p2_max_price = data.map {|x| x[:price_token1base]}.filter{|x| x!=nil}.max
+            p2_min_price = (p2_min_price or 0)*0.7
+            p2_max_price = (p2_max_price or 0)*1.3
+            p2_title = self.cur_token1base
+
+            p3_min_price = data.map {|x| x[:price_token0token1]}.filter{|x| x!=nil}.min
+            p3_max_price = data.map {|x| x[:price_token0token1]}.filter{|x| x!=nil}.max
+            p3_min_price = (p3_min_price or 0)*0.7
+            p3_max_price = (p3_max_price or 0)*1.3
+            p3_title = self.cur_token0token1
+
+            @price_chart ={
+                  "data": {
+                    "values": data
+                  },
+                  "vconcat": [
+                        {
+                          "title": p1_title,
+                          "width": 500,
+                          "height": 100,
+                          "layer":[
+                                {
+                                  "mark": {"type": "line", "line": true,"interpolate": "step-after"},
+                                  "encoding": {
+                                    "x": {"field": "time", "type": "temporal"},
+                                    "y": {"field": "price_token0base", "type": "quantitative", "scale": {"domain": [p1_min_price,p1_max_price]} },
+                                    "tooltip": [
+                                      {"field": "time_str"},
+                                      {"field": "price_token0base"}
+                                    ]
+                                  }
+                                },
+                                {
+                                  "mark": "rule",
+                                  "encoding": {
+                                    "x": {
+                                      "datum": sim_time_ts,
+                                      "type": "temporal"
+                                    },
+                                    "color": {"value": "red"},
+                                    "size": {"value": 1},
+                                    "tooltip": [{"field": "time_str"}, {"field": "price_token0base"}]
+                                  }
+                                },
+                                {
+                                  "mark": "rule",
+                                  "encoding": {
+                                    "x": {
+                                      "datum": sim_time_end_ts,
+                                      "type": "temporal"
+                                    },
+                                    "color": {"value": "red"},
+                                    "size": {"value": 1},
+                                    "tooltip": [{"field": "time_str"}, {"field": "price_token0base"}]
+                                  }
+                                }
+                          ]
+                        },
+                        {
+                          "title": p2_title,
+                          "width": 500,
+                          "height": 100,
+                          "layer":[
+                                {
+                                  "mark": {"type": "line", "line": true,"interpolate": "step-after"},
+                                  "encoding": {
+                                    "x": {"field": "time", "type": "temporal"},
+                                    "y": {"field": "price_token1base", "type": "quantitative", "scale": {"domain": [p2_min_price,p2_max_price]} },
+                                    "tooltip": [
+                                      {"field": "time_str"},
+                                      {"field": "price_token1base"}
+                                    ]
+                                  }
+                                },
+                                {
+                                  "mark": "rule",
+                                  "encoding": {
+                                    "x": {
+                                      "datum": sim_time_ts,
+                                      "type": "temporal"
+                                    },
+                                    "color": {"value": "red"},
+                                    "size": {"value": 1},
+                                    "tooltip": [{"field": "time_str"}, {"field": "price_token1base"}]
+                                  }
+                                },
+                                {
+                                  "mark": "rule",
+                                  "encoding": {
+                                    "x": {
+                                      "datum": sim_time_end_ts,
+                                      "type": "temporal"
+                                    },
+                                    "color": {"value": "red"},
+                                    "size": {"value": 1},
+                                    "tooltip": [{"field": "time_str"}, {"field": "price_token1base"}]
+                                  }
+                                }
+                             ]
+                        },
+                        {
+                          "title": p3_title,
+                          "width": 500,
+                          "height": 100,
+                          "layer":[
+                                {
+                                  "mark": {"type": "line", "line": true,"interpolate": "step-after"},
+                                  "encoding": {
+                                    "x": {"field": "time", "type": "temporal"},
+                                    "y": {"field": "price_token0token1", "type": "quantitative", "scale": {"domain": [p3_min_price,p3_max_price]} },
+                                    "tooltip": [
+                                      {"field": "time_str"},
+                                      {"field": "price_token0token1"}
+                                    ]
+                                  }
+                                },
+                                {
+                                  "mark": "rule",
+                                  "encoding": {
+                                    "x": {
+                                      "datum": sim_time_ts,
+                                      "type": "temporal"
+                                    },
+                                    "color": {"value": "red"},
+                                    "size": {"value": 1},
+                                    "tooltip": [{"field": "time_str"}, {"field": "price_token0token1"}]
+                                  }
+                                },
+                                {
+                                  "mark": "rule",
+                                  "encoding": {
+                                    "x": {
+                                      "datum": sim_time_end_ts,
+                                      "type": "temporal"
+                                    },
+                                    "color": {"value": "red"},
+                                    "size": {"value": 1},
+                                    "tooltip": [{"field": "time_str"}, {"field": "price_token0token1"}]
+                                  }
+                                }
+                          ]
+                        }
+                  ]
+                }        
+                
+    end
 end
 
 
-load(Task.load("base/data_store"))
 
 def main
+    load(Task.load("base/data_store"))
+
     DataStore.init()
 
-    # ethusdt = SwapPriceCex.new
+    ethusdt = SwapPriceCex.new
     
-    # ethusdt.load_from_redis("okex","ETH","USDT")
+    ethusdt.load_from_redis("okex","ETH","USDT")
 
-    # $logger.call ethusdt.token0
-    # $logger.call ethusdt.token1
-    # $logger.call ethusdt.realtime[0]
-    # $logger.call ethusdt.history[0]
-    # $logger.call ethusdt.realtime.size
-    # $logger.call ethusdt.history.size
-    # $logger.call "realtime: #{Time.at(ethusdt.realtime[0][:ts])} - #{Time.at(ethusdt.realtime[-1][:ts])}"
-    # $logger.call "history: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
+    $logger.call "token0 = #{ethusdt.token0}"
+    $logger.call "token1 = #{ethusdt.token1}"
+    $logger.call "realtime = #{ethusdt.realtime[0]}"
+    $logger.call "history = #{ethusdt.history[0]}"
+    $logger.call "realtime.size = #{ethusdt.realtime.size}"
+    $logger.call "history.size = #{ethusdt.history.size}"
+    $logger.call "realtime.range: #{Time.at(ethusdt.realtime[0][:ts])} - #{Time.at(ethusdt.realtime[-1][:ts])}"
+    $logger.call "history.range: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
 
+    $logger.call "ETH/USDT"
+    time = Time.new(2022,05,17,01,02,03).to_i
+    $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
 
-    # time = Time.new(2022,05,17,01,02,03).to_i
-    # $logger.call ethusdt.get_swap_by_ts(time)
+    time = Time.new(2022,05,19,01,02,02).to_i
+    $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
 
-    # time = Time.new(2022,05,19,01,02,02).to_i
-    # $logger.call ethusdt.get_swap_by_ts(time)
+    time = Time.new(2021,05,19,01,02,02).to_i
+    $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
 
-    # time = Time.new(2021,05,19,01,02,02).to_i
-    # $logger.call ethusdt.get_swap_by_ts(time)
-
-    # time = Time.new(2023,05,19,01,02,02).to_i
-    # $logger.call ethusdt.get_swap_by_ts(time)
+    time = Time.new(2023,05,19,01,02,02).to_i
+    $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
 
     cex = SwapPriceCexSynthesis.new
     cex.load_from_redis("okex","APE","ETH","USDT")
 
+    $logger.call "APE/ETH"
     time = Time.new(2022,05,17,01,02,03).to_i
-    $logger.call cex.get_swap_by_ts(time)
+    $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
 
     time = Time.new(2022,05,19,01,02,02).to_i
-    $logger.call cex.get_swap_by_ts(time)
+    $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
 
     time = Time.new(2021,05,19,01,02,02).to_i
-    $logger.call cex.get_swap_by_ts(time)
+    $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
 
     time = Time.new(2023,05,19,01,02,02).to_i
-    $logger.call cex.get_swap_by_ts(time)
+    $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
 
+
+    time = Time.new(2022,05,19,01,02,02).to_i
+    $logger.call cex.get_swap_by_ts(time,"APEETH")
+    $logger.call cex.get_swap_by_ts(time,"APEUSDT")
+    $logger.call cex.get_swap_by_ts(time,"ETHUSDT")
+    $logger.call cex.get_swap_by_ts(time,"ETHAPE")
+    $logger.call cex.get_swap_by_ts(time,"USDTAPE")
+    $logger.call cex.get_swap_by_ts(time,"USDTETH")
+    
+    $logger.call " == time_interval =="
+    $logger.call cex.time_interval
+    $logger.call cex.token0base.time_interval
+    $logger.call cex.token1base.time_interval
+
+
+    $logger.call " == data_range =="
+
+    $logger.call cex.token0base.data_range    
+    $logger.call cex.token1base.data_range    
+
+    $logger.call " == data_size_down =="
+    cex.data_size_down(nil)
 end

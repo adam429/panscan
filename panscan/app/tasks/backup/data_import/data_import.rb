@@ -88,14 +88,14 @@ def main()
               _log "#{task_name}\n"
               
               concurrent_limit(remote_task) {
-                  remote_task << Task.run_remote("data_import/block_data_import",{block_begin:begin_param,block_end:end_param},$logger)
+                  remote_task << Task.run_remote("data_import/block_data_import",{block_begin:begin_param,block_end:end_param},Time.at(0),$logger)
               }
             }
     
             ## step2 - epoch_data_import
             _log "#{Time.now.to_s(:db)} - epoch_data_import\n"
             concurrent_limit(remote_task) {
-              remote_task << Task.run_remote("data_import/epoch_data_import",{epoch_min:db_last_epoch+1,epoch_max:last_epoch-2},$logger)    
+              remote_task << Task.run_remote("data_import/epoch_data_import",{epoch_min:db_last_epoch+1,epoch_max:last_epoch-2},Time.at(0),$logger)    
             }
         
             ## wait all task done
@@ -115,7 +115,7 @@ def main()
     
             remote_task = []
              _log "#{Time.now.to_s(:db)} - epoch_data_calc\n"
-            remote_task << Task.run_remote("data_import/epoch_data_calc",{},$logger)    
+            remote_task << Task.run_remote("data_import/epoch_data_calc",{},Time.at(0),$logger)    
         
         
             remote_task = Task.wait_until_done(remote_task)
@@ -140,7 +140,7 @@ def main()
               _log "#{task_name}\n"
               
               concurrent_limit(remote_task,4) {
-                  remote_task << Task.run_remote("data_import/transfer_data_import",{block_begin:begin_param,block_end:end_param},$logger)
+                  remote_task << Task.run_remote("data_import/transfer_data_import",{block_begin:begin_param,block_end:end_param},Time.at(0),$logger)
               }
             }
     
@@ -164,7 +164,7 @@ def main()
 
             concurrent_limit(remote_task) {
             #   remote_task << Task.run_remote("data_import/bot_stats_calc_diff",{})    
-              remote_task << Task.run_remote("data_import/bot_stats_calc",{},$logger)    
+              remote_task << Task.run_remote("data_import/bot_stats_calc",{},Time.at(0),$logger)    
             }
 
             remote_task = Task.wait_until_done(remote_task)
