@@ -117,7 +117,7 @@ class Simulation < MappingObject
                     $logger.call "==[run_simulation_queue]=="
 
                     timer = Timer.new
-                    timer.init(self.sim_time,self.sim_time_end)
+                    timer.init(self.sim_time,self.sim_time_end,self.sim_time_ts,self.sim_time_end_ts,self.bot.config[:time_source])
                     self.simulate(timer)
                     $logger.call "bot_stats = #{JSON.dump(self.bot_stats())}"
                     self.load_action = "run_simulation_queue"
