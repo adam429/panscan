@@ -648,10 +648,11 @@ class Simulation < MappingObject
     
     
     def change_time(id,run=false)
-        change_time_by_id(id,run)
+        change_time_by_idts(id,run,ts)
+        ts = self.time_table.find_ts_by_id(id)
     end
     
-    def change_time_by_id(id,run=false,ts)
+    def change_time_by_idts(id,run=false,ts)
         return if self.cur_time==id
         self.swap_price_cex.change_time(ts)
         
