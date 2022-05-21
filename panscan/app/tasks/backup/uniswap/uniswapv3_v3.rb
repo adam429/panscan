@@ -506,6 +506,10 @@ class UniswapV3 < MappingObject
                 price_b = pool[:price_b].to_f
                 price = new_price
                 
+                $logger price
+                $logger price_a
+                $logger price_b
+                
                 if price<price_a then
                     price = price_a
                 end
