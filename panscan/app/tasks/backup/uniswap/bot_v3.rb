@@ -37,7 +37,7 @@ class Bot < MappingObject
             {group: {name: "==Basic Config==", widgets:[
                 {select:{name: :cex_data_source, value:self.config[:cex_data_source], option:["Okex"], option_value:["okex"] }}, 
                 {select:{name: :base_currency, value:self.config[:base_currency], option:["ETH","USD"], option_value:["ETH","USD"] }}, 
-                {select:{name: :time_source, value:self.config[:time_source], option:["t1 - Uniswap Discrete Tick Time","t2 - Absoulte Continuous Time (51)" ], option_value:["t1","t2"] }}, 
+                {select:{name: :time_source, value:self.config[:time_source], option:["t1 - Uniswap Discrete Tick Time","t2 - Absoulte Continuous Time (1s)" ], option_value:["t1","t2"] }}, 
             ]}},
             
             {group: {name: "==Hedge Config==", widgets:[
