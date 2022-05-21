@@ -648,8 +648,8 @@ class Simulation < MappingObject
     
     
     def change_time(id,run=false)
-        change_time_by_idts(id,run,ts)
         ts = self.time_table.find_ts_by_id(id)
+        change_time_by_idts(id,run,ts)
     end
     
     def change_time_by_idts(id,run=false,ts)
@@ -803,6 +803,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         self.bot.reset
 
         self.clean_fee
+                    self.cur_time = 99999999
         @saved_price  = 0
         
         # run simulation in backend  
