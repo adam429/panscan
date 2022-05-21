@@ -669,10 +669,10 @@ class Simulation < MappingObject
     end
     
     def change_time_by_idts(id,run=false,ts)
-        if self.cur_time==id then
-            
-            
-        end
+        cex_price = 
+        self.uni.change_price(cex_price,0,0,false)
+
+        return if self.cur_time==id 
         self.swap_price_cex.change_time(ts)
         
         swap = self.swap_price.get_swap_by_id(id)
