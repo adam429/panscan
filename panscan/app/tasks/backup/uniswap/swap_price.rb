@@ -1,6 +1,6 @@
 __TASK_NAME__ = "uniswap/swap_price"
 __ENV__ = 'ruby3'
-# load(Task.load("base/render_wrap"))   
+load(Task.load("base/render_wrap"))   
 
 CHART_TIME_INTERVAL = 3600*24
 
@@ -473,14 +473,14 @@ class SwapPriceCexSynthesis < MappingObject
     def data_size_down(sim)
         self.swap_chart = []
         
-        time_interval = sim.swap_price.time_interval
-        # time_interval = [1647519652,1647519652+3600*5]
+        # time_interval = sim.swap_price.time_interval
+        time_interval = [1647519652,1647519652+3600*5]
+        require 'parallel'
 
         $logger.call "[#{Time.now}] == begin gen cex swap_chart =="
         # $logger.call time_interval
         # self.swap_chart = (time_interval[0]..time_interval[1]).step(3600*24*3).map.with_index {|ts,i| 
         
-        # require 'parallel'
         
         self.swap_chart = Parallel.map( (time_interval[0]..time_interval[1]).step(CHART_TIME_INTERVAL).to_a, in_processes: 4) { |ts|
             {
