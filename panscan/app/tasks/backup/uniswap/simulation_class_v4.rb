@@ -669,8 +669,10 @@ class Simulation < MappingObject
     end
     
     def change_time_by_idts(id,run=false,ts)
-        cex_price = 
-        self.uni.change_price(cex_price,0,0,false)
+        if self.bot.config[:observation_price] == "cex" then
+            cex_price = self.swap_price_cex.get_swap_by_ts(time_ts) 
+            self.uni.change_price(cex_price,0,0,false)
+        end
 
         return if self.cur_time==id 
         self.swap_price_cex.change_time(ts)
