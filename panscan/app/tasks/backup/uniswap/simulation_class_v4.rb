@@ -16,9 +16,13 @@ class Timer
     end
 
     def run(sim) 
-        (sim_time..sim_time_end).each do |id|
-            ts = sim.time_table.find_ts_by_id(id)
-            yield(ts)
+        if time_source=="t1" then
+            sim_status = "#{Time.now} : Simulation Progress [#{time-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
+            $logger.call(sim_status)
+            (sim_time..sim_time_end).each do |id|
+                ts = sim.time_table.find_ts_by_id(id)
+                yield(ts)
+            end
         end
     end
 end
