@@ -6,27 +6,31 @@ require 'objspace'
 
 
 class Timer 
-    attr_accessor :sim_time, :sim_time_end, :sim_time_ts, :sim_time_end_ts, :time_source
-    def init(sim_time, sim_time_end, sim_time_ts, sim_time_end_ts, time_source)
+    attr_accessor :sim_time, :sim_time_end, :sim_time_ts, :sim_time_end_ts, :time_source, :sim
+    def init(sim_time, sim_time_end, sim_time_ts, sim_time_end_ts, time_source, sim)
         @sim_time = sim_time
         @sim_time_end = sim_time_end
         @sim_time_ts = sim_time_ts
         @sim_time_end_ts = sim_time_end_ts
         @time_source = time_source
+        @sim = sim
     end
 
-    def run(sim) 
+    def run() 
         if time_source=="t1" then
+
             sim_status = "#{Time.now} : Simulation Progress [#{sim_time-sim_time} / #{sim_time_end-sim_time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
             $logger.call(sim_status)
+
             (sim_time..sim_time_end).each do |id|
                 if id % 100==0 then
                     sim_status = "#{Time.now} : Simulation Progress [#{id-sim_time} / #{sim_time_end-id}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
                     $logger.call(sim_status)
                 end
-                ts = sim.time_table.find_ts_by_id(id)
+                ts = @sim.time_table.find_ts_by_id(id)
                 yield(ts)
             end
+
             sim_status = "#{Time.now} : Simulation Progress [#{sim_time-sim_time} / #{sim_time_end-sim_time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
             $logger.call(sim_status)
         end
@@ -138,7 +142,7 @@ class Simulation < MappingObject
                     $logger.call "==[run_simulation_queue]=="
 
                     timer = Timer.new
-                    timer.init(self.sim_time,self.sim_time_end,self.sim_time_ts,self.sim_time_end_ts,self.bot.config[:time_source])
+                    timer.init(self.sim_time,self.sim_time_end,self.sim_time_ts,self.sim_time_end_ts,self.bot.config[:time_source],self)
                     self.simulate(timer)
                     $logger.call "bot_stats = #{JSON.dump(self.bot_stats())}"
                     self.load_action = "run_simulation_queue"
