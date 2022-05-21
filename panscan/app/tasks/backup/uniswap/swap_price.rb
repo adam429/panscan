@@ -63,15 +63,16 @@ class TimeTable < MappingObject
     end
     
     def find_id_by_ts(ts)
-        ret = nil
-        self.time_table.each_with_index {|x,i|
-            if x >= ts then 
-                ret=i; 
-                break; 
-            end 
-        }
-        ret = self.time_table.size-1 if ret==nil
-        return ret
+        self.time_table.bsearch_index {|x| x>ts}
+        # ret = nil
+        # self.time_table.each_with_index {|x,i|
+        #     if x >= ts then 
+        #         ret=i; 
+        #         break; 
+        #     end 
+        # }
+        # ret = self.time_table.size-1 if ret==nil
+        # return ret
     end
 
 end
