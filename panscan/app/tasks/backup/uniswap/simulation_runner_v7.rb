@@ -219,8 +219,9 @@ def simulation_runner(pool_id,exchange,sim_data,out_of_service=false)
       <%= select binding: :sim_pool, :option=>["==All Pools=="]+data[:pool_option],:option_value=>["==All Pools=="]+data[:pool_option_value],:value=>data[:sim].pool_id  %> 
 
 
-      [<%= button text:"add to simulation queue", action:"add_to_sim_queue" %> ]
-      [<%= button text:"run simulation queue", action:"run_sim_queue" %> ]  <br/></br>
+      [<%= button text:"add to simulation queue", action:"add_to_sim_queue" %> ] | 
+      [<%= button text:"run simulation queue - all", action:"run_sim_queue('all')" %> ]  
+      [<%= button text:"run simulation queue - new", action:"run_sim_queue('new')" %> ]  <br/></br>
 
       [<%= button text:"hide input column", action:":column_display = false" %> ]
       [<%= button text:"show input column", action:":column_display = true" %> ] 
@@ -335,20 +336,24 @@ def simulation_runner(pool_id,exchange,sim_data,out_of_service=false)
     end
     
     
-    def run_sim_queue
+    def run_sim_queue(range='all')
         puts "run_sim_queue"
         
+        sim_queue_range = $data['sim'].sim_queue.filter {|x| x[:pool]!="removed" } if range=="all"
+        sim_queue_range = $data['sim'].sim_queue.filter {|x| x[:pool]!="removed" and x[:task_id]==nil } if range=="new"
+        
         $data['sim'].sim_queue = $data['sim'].sim_queue.map do |x|
-            [:task_id,:status_page,:view_page,:total_pnl, :roi_percent, :dex_fee, :cex_fee, :value_diff].each do |y|
-                x[y] = nil
+            if x[:pool]!="removed" and (( range=="new" and  x[:task_id]==nil )  or range=="all") then
+                [:task_id,:status_page,:view_page,:total_pnl, :roi_percent, :dex_fee, :cex_fee, :value_diff].each do |y|
+                    x[y] = nil
+                end
             end
-            
             x
         end
         
         $data['sim'].change_time($vars[:sim_time].to_i)
         
-        timeout_each($data['sim'].sim_queue.filter {|x| x[:pool]!="removed" },0,->(x) {
+        timeout_each(sim_queue_range,0,->(x) {
             $logger.call x 
             cur_bot_config = x
 
@@ -417,7 +422,7 @@ def simulation_runner(pool_id,exchange,sim_data,out_of_service=false)
                 action.call(res.json)
                 
                 if res.json["status"]=="run" or res.json["status"]=="open" then
-                    $$[:setTimeout].call(->{ update_task_status(task_id,action) },1000)
+                    $$[:setTimeout].call(->{ update_task_status(task_id,action) },1)
                 end
             else    
                 $logger.call "network error, retry in 1s"
@@ -460,7 +465,7 @@ def simulation_runner(pool_id,exchange,sim_data,out_of_service=false)
                 if res.json["status"]=="close" then
                     $$.location.reload()
                 elsif res.json["status"]=="run" or res.json["status"]=="open" then
-                    $$[:setTimeout].call(->{ wait_close() },1000)
+                    $$[:setTimeout].call(->{ wait_close() },1)
                 end
             else    
                 $logger.call "network error, retry in 1s"
@@ -493,7 +498,7 @@ def simulation_runner(pool_id,exchange,sim_data,out_of_service=false)
             if res0.ok? then
                 HTTP.get("/task/status/#{$task.id}/open") do |res1|
                   if res1.ok? then
-                    $$[:setTimeout].call(->{ wait_close() },1000)
+                    $$[:setTimeout].call(->{ wait_close() },1)
                   end        
                 end
             else    
@@ -509,12 +514,12 @@ $call_calculated_var_update_all = ->() {
 }
 
 gen_table = ->() {
-        column = [:id, :time_ts, :time,:price,:token0_amt,:token1_amt,:token0_fee,:token1_fee,:total_fee, 
+        column = [:id, :time_ts, :time,:price, :uni_price,:cex_price,:token0_amt,:token1_amt,:token0_fee,:token1_fee,:total_fee, 
               :dex_value, :ddex_value, :cex_position, :cex_value,:value_diff,:cex_fee_position, :cex_fee_value,
               :dprice_percent,:value_diff_dex_value_percent,
               :cex_fee,:total_pnl,:roi_percent,:unhedged_pnl,:unhedged_roi_percent, 
               :bot_output,:observation,:trigger,:time_buffer,:volume0,:volume1,:volume,:ul_ratio]
-        round = [nil,nil,nil,8,2,2,8,8,8,
+        round = [nil,nil,nil,8,8,8,2,2,8,8,8,
                  2,2,2,2,2,8,8,
                  2,2,
                  4,2,2,2,2,
@@ -523,8 +528,8 @@ gen_table = ->() {
 }
 
 gen_download = ->() {
-        column = [:id, :time_ts, :time,:price,:token0_amt,:token1_amt,:token0_fee,:token1_fee,:total_fee, :dex_value, :ddex_value, :cex_position, :cex_value,:value_diff, :cex_fee_position, :cex_fee_value, :dprice_percent,:value_diff_dex_value_percent,:cex_fee,:total_pnl,:roi_percent,:unhedged_pnl,:unhedged_roi_percent, :bot_output,:volume0,:volume1,:volume,:ul_ratio]
-    Element['#export_data_csv'].html = format_csv_table($data['sim'].sim_data, data_column)
+        column = [:id, :time_ts, :time,:price,:uni_price,:cex_price,:token0_amt,:token1_amt,:token0_fee,:token1_fee,:total_fee, :dex_value, :ddex_value, :cex_position, :cex_value,:value_diff, :cex_fee_position, :cex_fee_value, :dprice_percent,:value_diff_dex_value_percent,:cex_fee,:total_pnl,:roi_percent,:unhedged_pnl,:unhedged_roi_percent, :bot_output,:volume0,:volume1,:volume,:ul_ratio]
+    Element['#export_data_csv'].html = format_csv_table($data['sim'].sim_data, column)
 }
 
   

@@ -9,7 +9,7 @@ class TimeTable < MappingObject
         return "uniswap/swap_price"
     end
 
-    mapping_accessor :time_table
+    mapping_accessor :time_table, :time_table_reverse
     
     def load_from_redis(pool_id,uni,reversed=false)
         swap =  DataStore.get("uniswap.#{pool_id}.swap")
@@ -18,6 +18,7 @@ class TimeTable < MappingObject
         block_to_time = block_to_time.map {|x,y,z|  [x,[y,z]] }.to_h
         
         self.time_table = swap.map {|x| (block_to_time[x[:block_number]] or [0])[0] }
+        self.time_table_reverse = self.time_table.reverse
             
     end
     
@@ -63,15 +64,18 @@ class TimeTable < MappingObject
     end
     
     def find_id_by_ts(ts)
-        ret = nil
-        self.time_table.each_with_index {|x,i|
-            if x >= ts then 
-                ret=i; 
-                break; 
-            end 
-        }
-        ret = self.time_table.size-1 if ret==nil
-        return ret
+        index = time_table_reverse.bsearch_index {|x| x<=ts }
+        return 0 if index==nil
+        return (time_table_reverse.size-1)-index
+        # ret = nil
+        # self.time_table.each_with_index {|x,i|
+        #     if x >= ts then 
+        #         ret=i; 
+        #         break; 
+        #     end 
+        # }
+        # ret = self.time_table.size-1 if ret==nil
+        # return ret
     end
 
 end
@@ -407,7 +411,7 @@ class SwapPriceCex < MappingObject
     end
     
     def interpolate(cur,upper,lower,upper_value,lower_value)
-        return upper_value if (upper_value-lower_value).abs < 1e8
+        return upper_value if (upper_value-lower_value).abs < 1e-8
         return ((cur-lower) / (upper-lower).to_f) * (upper_value-lower_value) + lower_value
     end
     
@@ -424,6 +428,8 @@ class SwapPriceCex < MappingObject
         history_upper = (history_upper[:ts] - ts).abs>120 ? {ts:0} :history_upper
         realtime_low = (realtime_low[:ts] - ts).abs>2 ? {ts:0} :realtime_low
         realtime_upper = (realtime_upper[:ts] - ts).abs>2 ? {ts:0} :realtime_upper
+
+
         
         if realtime_low[:ts]>0 and realtime_upper[:ts]>0 then
             realtime_price = interpolate(ts,realtime_upper[:ts],realtime_low[:ts],realtime_upper[:price],realtime_low[:price])
@@ -757,68 +763,106 @@ def main
 
     DataStore.init()
 
-    ethusdt = SwapPriceCex.new
+    time_table = TimeTable.new
     
-    ethusdt.load_from_redis("okex","ETH","USDT")
+    time_table.load_from_redis("0xac4b3dacb91461209ae9d41ec517c2b9cb1b7daf",nil,nil)
+    
+    $logger.call time_table.time_table[10000,5]
+    
+    $logger.call time_table.find_ts_by_id(10000)
+    $logger.call time_table.find_ts_by_id(10001)
 
-    $logger.call "token0 = #{ethusdt.token0}"
-    $logger.call "token1 = #{ethusdt.token1}"
-    $logger.call "realtime = #{ethusdt.realtime[0]}"
-    $logger.call "history = #{ethusdt.history[0]}"
-    $logger.call "realtime.size = #{ethusdt.realtime.size}"
-    $logger.call "history.size = #{ethusdt.history.size}"
-    $logger.call "realtime.range: #{Time.at(ethusdt.realtime[0][:ts])} - #{Time.at(ethusdt.realtime[-1][:ts])}"
-    $logger.call "history.range: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
+    $logger.call time_table.time_str_by_id(10000)
+    $logger.call time_table.time_str_by_id(10001)
+    $logger.call time_table.time_str_by_ts(time_table.find_ts_by_id(10000))
+    $logger.call time_table.time_str_by_ts(time_table.find_ts_by_id(10001))
+    
+    $logger.call time_table.find_id_by_ts(0)
+    $logger.call time_table.find_id_by_ts(1647881018)
+    $logger.call time_table.find_id_by_ts(1647881025)
+    $logger.call time_table.find_id_by_ts(1647881046)
+    $logger.call time_table.find_id_by_ts(9999999999)
 
-    $logger.call "ETH/USDT"
-    time = Time.new(2022,05,17,01,02,03).to_i
-    $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
+    return
 
-    time = Time.new(2022,05,19,01,02,02).to_i
-    $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
+    # ethusdt = SwapPriceCex.new
+    
+    # ethusdt.load_from_redis("okex","ETH","USDT")
 
-    time = Time.new(2021,05,19,01,02,02).to_i
-    $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
+    # $logger.call "token0 = #{ethusdt.token0}"
+    # $logger.call "token1 = #{ethusdt.token1}"
+    # $logger.call "realtime = #{ethusdt.realtime[0]}"
+    # $logger.call "history = #{ethusdt.history[0]}"
+    # $logger.call "realtime.size = #{ethusdt.realtime.size}"
+    # $logger.call "history.size = #{ethusdt.history.size}"
+    # $logger.call "realtime.range: #{Time.at(ethusdt.realtime[0][:ts])} - #{Time.at(ethusdt.realtime[-1][:ts])}"
+    # $logger.call "history.range: #{Time.at(ethusdt.history[0][:ts])} - #{Time.at(ethusdt.history[-1][:ts])}"
 
-    time = Time.new(2023,05,19,01,02,02).to_i
-    $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
+    # $logger.call "ETH/USDT"
+    # time = Time.new(2022,05,17,01,02,03).to_i
+    # $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
+
+    # time = Time.new(2022,05,19,01,02,02).to_i
+    # $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
+
+    # time = Time.new(2021,05,19,01,02,02).to_i
+    # $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
+
+    # time = Time.new(2023,05,19,01,02,02).to_i
+    # $logger.call " - time=#{time.to_s} price=#{ethusdt.get_swap_by_ts(time)}"
 
     cex = SwapPriceCexSynthesis.new
     cex.load_from_redis("okex","APE","ETH","USDT")
 
     $logger.call "APE/ETH"
-    time = Time.new(2022,05,17,01,02,03).to_i
+    # time = Time.new(2022,05,17,01,02,03).to_i
+    # $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
+
+    # time = Time.new(2022,05,19,01,02,02).to_i
+    # $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
+
+    # time = Time.new(2021,05,19,01,02,02).to_i
+    # $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
+
+    # time = Time.new(2023,05,19,01,02,02).to_i
+    # $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
+
+
+    time = 1651217434
     $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
 
-    time = Time.new(2022,05,19,01,02,02).to_i
-    $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
 
-    time = Time.new(2021,05,19,01,02,02).to_i
-    $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
-
-    time = Time.new(2023,05,19,01,02,02).to_i
+    time = 1651217435
     $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
 
 
-    time = Time.new(2022,05,19,01,02,02).to_i
-    $logger.call cex.get_swap_by_ts(time,"APEETH")
-    $logger.call cex.get_swap_by_ts(time,"APEUSDT")
-    $logger.call cex.get_swap_by_ts(time,"ETHUSDT")
-    $logger.call cex.get_swap_by_ts(time,"ETHAPE")
-    $logger.call cex.get_swap_by_ts(time,"USDTAPE")
-    $logger.call cex.get_swap_by_ts(time,"USDTETH")
+    time = 1651217436
+    $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
+
+
+    time = 1651217437
+    $logger.call " - time=#{time.to_s} price=#{cex.get_swap_by_ts(time)}"
+
+
+    # time = Time.new(2022,05,19,01,02,02).to_i
+    # $logger.call cex.get_swap_by_ts(time,"APEETH")
+    # $logger.call cex.get_swap_by_ts(time,"APEUSDT")
+    # $logger.call cex.get_swap_by_ts(time,"ETHUSDT")
+    # $logger.call cex.get_swap_by_ts(time,"ETHAPE")
+    # $logger.call cex.get_swap_by_ts(time,"USDTAPE")
+    # $logger.call cex.get_swap_by_ts(time,"USDTETH")
     
-    $logger.call " == time_interval =="
-    $logger.call cex.time_interval
-    $logger.call cex.token0base.time_interval
-    $logger.call cex.token1base.time_interval
+    # $logger.call " == time_interval =="
+    # $logger.call cex.time_interval
+    # $logger.call cex.token0base.time_interval
+    # $logger.call cex.token1base.time_interval
 
 
-    $logger.call " == data_range =="
+    # $logger.call " == data_range =="
 
-    $logger.call cex.token0base.data_range    
-    $logger.call cex.token1base.data_range    
+    # $logger.call cex.token0base.data_range    
+    # $logger.call cex.token1base.data_range    
 
-    $logger.call " == data_size_down =="
-    cex.data_size_down(nil)
+    # $logger.call " == data_size_down =="
+    # cex.data_size_down(nil)
 end

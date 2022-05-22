@@ -499,6 +499,7 @@ class UniswapV3 < MappingObject
     end
     
     def change_assets_by_price(new_price)
+        return if new_price == nil
         # change token0 token1 assets
         self.liquidity_pool.map! do |pool|
             if pool[:sender]!=nil then

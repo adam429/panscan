@@ -14,6 +14,11 @@ class Timer
         @sim_time_end_ts = sim_time_end_ts
         @time_source = time_source
         @sim = sim
+        @timer_trigger = 0
+    end
+    
+    def mark_timer_trigger(ts)
+        @timer_trigger = ts
     end
 
     def run() 
@@ -26,6 +31,13 @@ class Timer
                     $logger.call(sim_status)
                 end
                 ts = @sim.time_table.find_ts_by_id(id)
+                
+                # make sure we will run @timer_trigger ts 
+                @timer_trigger = 0 if @timer_trigger == ts
+                if @timer_trigger < ts and @timer_trigger != 0 then
+                    yield(@timer_trigger)
+                    @timer_trigger=0
+                end
                 yield(ts)
             end
 
@@ -39,6 +51,13 @@ class Timer
                 if (ts-sim_time_ts) % 3600==0 then
                     sim_status = "#{Time.now} : Simulation Progress [#{ts-sim_time_ts} / #{sim_time_end_ts-sim_time_ts}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
                     $logger.call(sim_status)
+                end
+
+                # make sure we will run @timer_trigger ts 
+                @timer_trigger = 0 if @timer_trigger == ts
+                if @timer_trigger < ts and @timer_trigger != 0 then
+                    yield(@timer_trigger)
+                    @timer_trigger=0
                 end
                 yield(ts)
             end
@@ -210,7 +229,7 @@ class Simulation < MappingObject
             chart ={
                   "title": title,
                   "data": {
-                    "values": self.sim_data.map {|x| x[:cex_fee]=-x[:cex_fee]; x}
+                    "values": self.sim_data.map {|x| x[:cex_fee_chart]=-x[:cex_fee]; x}
                   },
   "vconcat": [
     {
@@ -388,8 +407,7 @@ class Simulation < MappingObject
                 "y": {"field": "value_diff", "type": "quantitative"},
                 "tooltip": [
                   {"field": "time_str"},
-                  {"field": "total_pnl"},
-                  {"field": "unhedged_pnl"}
+                  {"field": "value_diff"}
                 ]
               }
             },
@@ -418,8 +436,9 @@ class Simulation < MappingObject
                 "x": {"field": "time", "type": "temporal"},
                 "y": {"field": "total_fee", "type": "quantitative"},
                 "tooltip": [
+                  {"field": "time_str"},
                   {"field": "total_fee"},
-                  {"field": "cex_fee"},
+                  {"field": "cex_fee_chart"},
                 ]
               }
             },
@@ -432,10 +451,11 @@ class Simulation < MappingObject
               },
               "encoding": {
                 "x": {"field": "time", "type": "temporal"},
-                "y": {"field": "cex_fee", "type": "quantitative"},
+                "y": {"field": "cex_fee_chart", "type": "quantitative"},
                 "tooltip": [
+                  {"field": "time_str"},
                   {"field": "total_fee"},
-                  {"field": "cex_fee"},
+                  {"field": "cex_fee_chart"},
                 ]
               }
             },
@@ -465,10 +485,12 @@ class Simulation < MappingObject
               },
               "encoding": {
                 "x": {"field": "time", "type": "temporal"},
-                "y": {"field": "value_diff_dex_value", "type": "quantitative"},
+                "y": {"field": "value_diff", "type": "quantitative"},
                 "tooltip": [
                   {"field": "time_str"},
-                  {"field": "value_diff_dex_value"}
+                  {"field": "value_diff"},
+                  {"field": "cex_fee_chart"},
+                  {"field": "total_fee"}
                 ]
               }
             },
@@ -484,7 +506,9 @@ class Simulation < MappingObject
                 "y": {"field": "total_fee", "type": "quantitative"},
                 "tooltip": [
                   {"field": "time_str"},
-                  {"field": "value_diff_dex_value"}
+                  {"field": "value_diff"},
+                  {"field": "cex_fee_chart"},
+                  {"field": "total_fee"}
                 ]
               }
             },            
@@ -497,11 +521,11 @@ class Simulation < MappingObject
               },
               "encoding": {
                 "x": {"field": "time", "type": "temporal"},
-                "y": {"field": "cex_fee", "type": "quantitative"},
+                "y": {"field": "cex_fee_chart", "type": "quantitative"},
                 "tooltip": [
                   {"field": "time_str"},
-                  {"field": "value_diff_dex_value"},
-                  {"field": "cex_fee"},
+                  {"field": "value_diff"},
+                  {"field": "cex_fee_chart"},
                   {"field": "total_fee"}
                 ]
               }
@@ -670,11 +694,6 @@ class Simulation < MappingObject
     end
     
     def change_time_by_idts(id,run=false,ts)
-        if self.bot.config[:observation_price] == "cex" then
-            cex_price = self.swap_price_cex.get_swap_by_ts(ts) 
-            self.uni.change_assets_by_price(cex_price)
-        end
-
         return if self.cur_time==id 
         self.swap_price_cex.change_time(ts)
         
@@ -707,37 +726,36 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         change_time_by_idts(id,run,ts)
     end
     
-    def simulate_tick_logic(time_ts)
+    def simulate_tick_logic(timer,time_ts)
 
     profiler_time = Time.now()
         self.change_time_by_ts((time_ts),true)
     $profiler[:change_time] = ($profiler[:change_time] or 0) + (Time.now()-profiler_time)
-    
-    
+
+
     profiler_time = Time.now()
+        if self.bot.config[:observation_price] == "cex" or self.bot.config[:settlement_price] == "cex" then
+            @cex_price = self.swap_price_cex.get_swap_by_ts(time_ts) 
+        end
 
         time_str = self.time_table.time_str_by_ts(time_ts)
-
         uni_price = self.uni.price
-        cex_price = nil
-        
+
         if self.bot.config[:observation_price] == "uniswap" then
             price = uni_price
         end
         if self.bot.config[:observation_price] == "cex" then
-            cex_price = self.swap_price_cex.get_swap_by_ts(time_ts) if cex_price==nil  # lazy eval
-            price = cex_price
+            self.uni.change_assets_by_price(@cex_price)
+            price = @cex_price
         end
 
         if self.bot.config[:settlement_price] == "uniswap" then
             self.hedge.set_price(uni_price)
         end
         if self.bot.config[:settlement_price] == "cex" then
-            cex_price = self.swap_price_cex.get_swap_by_ts(time_ts) if cex_price==nil # lazy eval
-            self.hedge.set_price(cex_price)
+            self.hedge.set_price(@cex_price)
         end
 
-        
         dprice = ((@saved_price == 0 ? 1 : price / @saved_price) - 1)*100
         @saved_price = price
         
@@ -758,16 +776,25 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         token1_fee = self.uni.adjd2d(lp.map {|x| x[:token1_fee]}.sum,self.uni.token1_decimal).to_f
     $profiler[:uni_math] = ($profiler[:uni_math] or 0) + (Time.now()-profiler_time1)
         total_fee = token0_fee*price + token1_fee
-        dex_value = token0_amt*price + token1_amt
+
+        if self.bot.config[:settlement_price] == "uniswap" then
+            dex_value = token0_amt*price + token1_amt
+        end
+        if self.bot.config[:settlement_price] == "cex" then
+            dex_value = token0_amt*@cex_price + token1_amt
+        end
+        # dex_value = token0_amt*price + token1_amt
         ddex_value = (self.sim_data==[]) ? 0 : dex_value.to_f - self.sim_data[0][:dex_value]
+
         
     profiler_time1 = Time.now()
-        bot_data = self.bot.run(self.hedge, time_ts, time_str,self.uni.price,token0_amt,token1_amt, token0_fee, token1_fee)
+        bot_data = self.bot.run(timer,self.hedge, time_ts, time_str,self.uni.price,token0_amt,token1_amt, token0_fee, token1_fee)
     $profiler[:bot_run] = ($profiler[:bot_run] or 0) + (Time.now()-profiler_time1)
         
         
     profiler_time1 = Time.now()
         cex_fee = self.hedge.get_fee
+
         cex_position = self.hedge.get_position("amt")
         cex_value = self.hedge.get_pnl("amt")
         cex_fee_position = self.hedge.get_position("fee")
@@ -791,6 +818,8 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
                      time:time_str,
                      time_str:time_str,
                      price:price.round(8),
+                     uni_price:uni_price.round(8),
+                     cex_price:@cex_price.round(8),
                      token0_amt:token0_amt.round(8),
                      token1_amt:token1_amt.round(8),
                      token0_fee:token0_fee.round(8), #8
@@ -827,6 +856,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         self.clean_fee
         self.cur_time = 99999999
         @saved_price  = 0
+        @cex_price = 0
         
         # run simulation in backend  
         # sim_status = "#{Time.now} : Simulation Progress [#{time-time} / #{time_end-time}] : #{ObjectSpace.memsize_of_all/1_000_000} MB memory"
@@ -844,7 +874,7 @@ $profiler[:calc_pool] = ($profiler[:calc_pool] or 0) + (Time.now()-profiler_time
         # $logger.call(sim_status)
         
         timer.run { |ts|
-            simulate_tick_logic(ts)
+            simulate_tick_logic(timer,ts)
         }
 
         self.change_time(self.sim_time)

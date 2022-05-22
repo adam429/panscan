@@ -24,8 +24,8 @@ class Bot < MappingObject
             settlement_price: "uniswap",
             hedge_method: "h1",
 
-            trigger_position:0.1, 
-            trigger_price:0.1, 
+            trigger_position:0.001, 
+            trigger_price:0.001, 
             trigger_time_buffer:0,
             
             adj_position_ratio:1,
@@ -79,7 +79,7 @@ class Bot < MappingObject
         return self.config
     end
     
-    def run(hedge,  time_ts, time, price, token0_amt, token1_amt, token0_fee, token1_fee)
+    def run(timer, hedge,  time_ts, time, price, token0_amt, token1_amt, token0_fee, token1_fee)
         config = self.get_config
         
         total_hedge_position = (config[:amt_hedge]=="true" ? token0_amt : 0 ) + (config[:fee_hedge]=="true" ? token0_fee : 0 )
@@ -101,9 +101,13 @@ class Bot < MappingObject
         trigger[1] = delta_price.abs >= config[:trigger_price].to_f
         
         if trigger.filter {|x| x==true }.size>0
+        
             #update time buffer
-            @time_buffer = time_ts if @time_buffer==-1
-            
+            if @time_buffer==-1 and config[:trigger_time_buffer]>0 then
+                @time_buffer = time_ts 
+                timer.mark_timer_trigger(time_ts + config[:trigger_time_buffer])
+            end
+
             if time_ts - @time_buffer >= config[:trigger_time_buffer] then
                 
                 fee_short_position = (config[:fee_hedge]=="true" ? config[:adj_position_ratio].to_f * token0_fee : 0) + hedge.get_position("fee")
@@ -116,12 +120,13 @@ class Bot < MappingObject
 
                 @last_action[:price] = price
                 @last_action[:time] = time
-                
+
                 bot_output="#{ short_position>0 ? 'open' : 'close' } short position #{amt_short_position.abs}+#{fee_short_position.abs}  make #{total_hedge_position} * #{config[:adj_position_ratio].to_f} hedged"
             end
         else
             # clean time buffer
             @time_buffer = -1
+            timer.mark_timer_trigger(0)
         end
         
         return {bot_output:bot_output,observation:observation.join("/"),trigger:trigger.join("/"),time_buffer: @time_buffer==-1 ? -1 : time_ts - @time_buffer}
