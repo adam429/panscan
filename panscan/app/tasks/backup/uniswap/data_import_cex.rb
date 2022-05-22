@@ -12,7 +12,7 @@ def main()
     
     swaps = ["ETH-USDT","APE-USDT"]
     # exchange = ["okex","binance"]
-    exchange = ["binance"]
+    exchange = ["okex"]
     
     exchange.each do |exchange_name|
       swaps.each do |swap_name|

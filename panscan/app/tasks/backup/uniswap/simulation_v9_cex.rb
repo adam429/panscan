@@ -1,5 +1,5 @@
 __TASK_NAME__ = "uniswap/simulation_v9_cex"
-__ENV__ = "ruby3"
+__ENV__ = "aliyun"
 
 load(Task.load("uniswap/simulation_runner_v7"))
 
