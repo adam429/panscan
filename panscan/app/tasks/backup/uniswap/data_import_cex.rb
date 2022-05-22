@@ -1,5 +1,5 @@
 __TASK_NAME__ = "uniswap/data_import_cex"
-__ENV__ = "ruby3"
+__ENV__ = "base"
 
 load(Task.load("base/auto-retry"))
 load(Task.load("base/auto_split"))
