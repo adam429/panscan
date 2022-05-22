@@ -55,7 +55,7 @@ class Worker
         worker_run_script([instance],stop_script)
     end
 
-    def start_worker(instance,image="ruby3")
+    def start_worker(instance,image="base")
         get_public_ips
         start_script = '''docker container run -d --restart=always -e DB_CONNECT_STR=__PARAMS_DB_CONNECT_STR__ -e REDIS_CONNECT_STR=__PARAMS_REDIS_CONNECT_STR__ -e WORKER_NAME="__WORKER__" --name __WORKER__  adam429/pan-repo:panworker___ENV__'''
         script_a = start_script.gsub(/__WORKER__/,"#{image}.#{instance}_#{SecureRandom.hex(2)}").gsub(/__PARAMS_DB_CONNECT_STR__/,ENV["DB_CONNECT_STR"]).gsub(/__PARAMS_REDIS_CONNECT_STR__/,ENV["REDIS_CONNECT_STR"]).gsub(/__ENV__/,image)
@@ -63,7 +63,7 @@ class Worker
         worker_run([instance],script_a)
     end
 
-    def create_instances(instance_number, docker_per_instance=2, image="ruby3")
+    def create_instances(instance_number, docker_per_instance=2, image="base")
         # generate instance number list
         instances = get_instances.map {|k,v| k}
         last_id = 0
