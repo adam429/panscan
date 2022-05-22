@@ -1,4 +1,5 @@
 __TASK_NAME__ = "panbot/online/panbot_online_runner_bot4"
+__ENV__ = "base"
 
 require 'ethereum.rb'
 require 'eth'
