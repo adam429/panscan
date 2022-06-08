@@ -21,7 +21,6 @@ require 'browser/canvas'
 
 # require 'opal-parser'
 
-
 # for vega-support
 # require 'browser/http'
 # require 'browser/effects'

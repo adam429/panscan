@@ -151,6 +151,7 @@ def get_params
     return ret
 end
 
+
 def update_refs()
     json = get_page
     code = json[:code]

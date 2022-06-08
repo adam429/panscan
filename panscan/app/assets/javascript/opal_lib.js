@@ -184,7 +184,22 @@
   };
 
   Opal.coerce_to = function(object, type, method, args) {
-    if (type['$==='](object)) return object;
+    var body;
+
+    if (method === 'to_int' && type === Opal.Integer && object.$$is_number)
+      return object < 0 ? Math.ceil(object) : Math.floor(object);
+
+    if (method === 'to_str' && type === Opal.String && object.$$is_string)
+      return object;
+
+    if (Opal.is_a(object, type)) return object;
+
+    // Fast path for the most common situation
+    if (object['$respond_to?'].$$pristine && object.$method_missing.$$pristine) {
+      body = object['$' + method];
+      if (body == null || body.$$stub) throw Opal.type_error(object, type);
+      return body.apply(object, args);
+    }
 
     if (!object['$respond_to?'](method)) {
       throw Opal.type_error(object, type);
@@ -1592,7 +1607,10 @@
     }
 
     if (implicit && current_func.$$define_meth) {
-      throw Opal.RuntimeError.$new("implicit argument passing of super from method defined by define_method() is not supported. Specify all arguments explicitly");
+      throw Opal.RuntimeError.$new(
+        "implicit argument passing of super from method defined by define_method() is not supported. " +
+        "Specify all arguments explicitly"
+      );
     }
 
     if (current_func.$$def) {
@@ -1708,15 +1726,9 @@
       return (klass.$$is_integer_class) ? (object % 1) === 0 : true;
     }
 
-    var i, length, ancestors = Opal.ancestors(object.$$is_class ? Opal.get_singleton_class(object) : (object.$$meta || object.$$class));
+    var ancestors = Opal.ancestors(object.$$is_class ? Opal.get_singleton_class(object) : (object.$$meta || object.$$class));
 
-    for (i = 0, length = ancestors.length; i < length; i++) {
-      if (ancestors[i] === klass) {
-        return true;
-      }
-    }
-
-    return false;
+    return ancestors.indexOf(klass) !== -1;
   };
 
   // Helpers for extracting kwsplats
@@ -1874,8 +1886,6 @@
   Opal.send = function(recv, method, args, block, blockopts) {
     var body;
 
-    apply_blockopts(block, blockopts);
-
     if (typeof(method) === 'function') {
       body = method;
       method = null;
@@ -1885,7 +1895,7 @@
       throw Opal.NameError.$new("Passed method should be a string or a function");
     }
 
-    return Opal.send2(recv, body, method, args, block);
+    return Opal.send2(recv, body, method, args, block, blockopts);
   };
 
   Opal.send2 = function(recv, body, method, args, block, blockopts) {
@@ -1909,8 +1919,6 @@
       ancestors = Opal.ancestors(recv.$$class);
     }
 
-    apply_blockopts(block, blockopts);
-
     // For all ancestors that there are, starting from the closest to the furthest...
     for (i = 0; i < ancestors.length; i++) {
       ancestor = Opal.id(ancestors[i]);
@@ -1930,14 +1938,14 @@
             // Does this module define a method we want to call?
             if (typeof refine_module.$$prototype['$'+method] !== 'undefined') {
               body = refine_module.$$prototype['$'+method];
-              return Opal.send2(recv, body, method, args, block);
+              return Opal.send2(recv, body, method, args, block, blockopts);
             }
           }
         }
       }
     }
 
-    return Opal.send(recv, method, args, block);
+    return Opal.send(recv, method, args, block, blockopts);
   };
 
   Opal.lambda = function(block, blockopts) {
@@ -2654,7 +2662,7 @@
       if (typeof Promise !== 'undefined' && retval instanceof Promise) {
         // A special case of require having an async top:
         // We will need to await it.
-        return retval.then(function() { return true; });
+        return retval.then($return_val(true));
       }
     }
     else {
@@ -2777,13 +2785,15 @@
   Opal.rb_ge     = function(l,r) { return (typeof(l) === 'number' && typeof(r) === 'number') ? l >= r : l['$>='](r); }
 
   // Optimized helpers for calls like $truthy((a)['$==='](b)) -> $eqeqeq(a, b)
-  Opal.eqeq = function(lhs, rhs) {
+  function $eqeq(lhs, rhs) {
     if ((typeof lhs === 'number' && typeof rhs === 'number') ||
         (typeof lhs === 'string' && typeof rhs === 'string')) {
       return lhs === rhs;
     }
     return $truthy((lhs)['$=='](rhs));
   };
+  Opal.eqeq = $eqeq;
+
   Opal.eqeqeq = function(lhs, rhs) {
     if ((typeof lhs === 'number' && typeof rhs === 'number') ||
         (typeof lhs === 'string' && typeof rhs === 'string')) {
@@ -2804,7 +2814,33 @@
     return $truthy(arg['$!']());
   }
 
+  // Shortcuts - optimized function generators for simple kinds of functions
+  function $return_val(arg) {
+    return function() {
+      return arg;
+    }
+  }
+  Opal.return_val = $return_val;
 
+  Opal.return_self = function() {
+    return this;
+  }
+  Opal.return_ivar = function(ivar) {
+    return function() {
+      if (this[ivar] == null) this[ivar] = nil;
+      return this[ivar];
+    }
+  }
+  Opal.assign_ivar = function(ivar) {
+    return function(val) {
+      return this[ivar] = val;
+    }
+  }
+  Opal.assign_ivar_val = function(ivar, static_val) {
+    return function() {
+      return this[ivar] = static_val;
+    }
+  }
 
   // Initialization
   // --------------
@@ -2856,7 +2892,7 @@
 
   // Instantiate the main object
   Opal.top = new _Object();
-  Opal.top.$to_s = Opal.top.$inspect = function() { return 'main' };
+  Opal.top.$to_s = Opal.top.$inspect = $return_val('main');
   Opal.top.$define_method = top_define_method;
 
   // Foward calls to define_method on the top object to Object
@@ -2880,7 +2916,7 @@
   TypeError.$$super = Error;
 }).call(this);
 Opal.loaded(["corelib/runtime.js"]);
-Opal.modules["corelib/helpers"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/helpers"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var nil = Opal.nil, $$$ = Opal.$$$, $type_error = Opal.type_error, $coerce_to = Opal.coerce_to, $module = Opal.module, $defs = Opal.defs, $eqeqeq = Opal.eqeqeq, $Kernel = Opal.Kernel, $truthy = Opal.truthy, $Opal = Opal.Opal;
 
   Opal.add_stubs('===,raise,respond_to?,nil?,__send__,<=>,class,coerce_to!,new,to_s,__id__');
@@ -3096,10 +3132,10 @@ Opal.modules["corelib/helpers"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::')
 };
 
-Opal.modules["corelib/module"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $coerce_to = Opal.coerce_to, $const_set = Opal.const_set, $Object = Opal.Object, $klass = Opal.klass, $defs = Opal.defs, $send = Opal.send, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $Module = Opal.Module, $Kernel = Opal.Kernel, $rb_lt = Opal.rb_lt, $rb_gt = Opal.rb_gt, $to_a = Opal.to_a, $hash2 = Opal.hash2, $Opal = Opal.Opal, $eqeq = Opal.eqeq, $lambda = Opal.lambda, $range = Opal.range, $send2 = Opal.send2, $find_super = Opal.find_super, $alias = Opal.alias;
+Opal.modules["corelib/module"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $coerce_to = Opal.coerce_to, $const_set = Opal.const_set, $Object = Opal.Object, $return_ivar = Opal.return_ivar, $assign_ivar = Opal.assign_ivar, $ivar = Opal.ivar, $klass = Opal.klass, $defs = Opal.defs, $send = Opal.send, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $Module = Opal.Module, $Kernel = Opal.Kernel, $rb_lt = Opal.rb_lt, $rb_gt = Opal.rb_gt, $to_a = Opal.to_a, $hash2 = Opal.hash2, $Opal = Opal.Opal, $eqeq = Opal.eqeq, $return_val = Opal.return_val, $lambda = Opal.lambda, $range = Opal.range, $send2 = Opal.send2, $find_super = Opal.find_super, $alias = Opal.alias;
 
-  Opal.add_stubs('module_eval,to_proc,===,raise,equal?,<,>,nil?,attr_reader,attr_writer,warn,attr_accessor,const_name?,class_variable_name!,const_name!,=~,new,inject,split,const_get,==,start_with?,!~,bind,call,class,append_features,included,name,cover?,size,merge,compile,proc,any?,prepend_features,prepended,to_s,__id__,constants,include?,copy_class_variables,copy_constants,class_exec,inspect');
+  Opal.add_stubs('module_eval,to_proc,===,raise,equal?,<,>,nil?,attr_reader,attr_writer,warn,attr_accessor,const_name?,class_variable_name!,const_name!,=~,new,inject,split,const_get,==,start_with?,!~,bind,call,class,append_features,included,name,cover?,size,merge,compile,proc,any?,prepend_features,prepended,to_s,__id__,constants,include?,copy_class_variables,copy_constants,class_exec,module_exec,inspect');
   
   (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Module');
@@ -3305,20 +3341,9 @@ Opal.modules["corelib/module"] = function(Opal) {/* Generated by Opal 1.4.1 */
       for (var i = names.length - 1; i >= 0; i--) {
         var name = names[i],
             id   = '$' + name,
-            ivar = Opal.ivar(name);
+            ivar = $ivar(name);
 
-        // the closure here is needed because name will change at the next
-        // cycle, I wish we could use let.
-        var body = (function(ivar) {
-          return function() {
-            if (this[ivar] == null) {
-              return nil;
-            }
-            else {
-              return this[ivar];
-            }
-          };
-        })(ivar);
+        var body = $return_ivar(ivar);
 
         // initialize the instance variable as nil
         Opal.prop(proto, ivar, nil);
@@ -3346,15 +3371,9 @@ Opal.modules["corelib/module"] = function(Opal) {/* Generated by Opal 1.4.1 */
       for (var i = names.length - 1; i >= 0; i--) {
         var name = names[i],
             id   = '$' + name + '=',
-            ivar = Opal.ivar(name);
+            ivar = $ivar(name);
 
-        // the closure here is needed because name will change at the next
-        // cycle, I wish we could use let.
-        var body = (function(ivar){
-          return function(value) {
-            return this[ivar] = value;
-          }
-        })(ivar);
+        var body = $assign_ivar(ivar)
 
         body.$$parameters = [['req']];
         body.$$arity = 1;
@@ -3585,10 +3604,7 @@ Opal.modules["corelib/module"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return value;
     }, 2);
     
-    $def(self, '$public_constant', function $$public_constant(const_name) {
-      
-      return nil
-    }, 1);
+    $def(self, '$public_constant', $return_val(nil), 0);
     
     $def(self, '$define_method', function $$define_method(name, method) {
       var block = $$define_method.$$p || nil, self = this, $ret_or_1 = nil, $ret_or_2 = nil;
@@ -3611,14 +3627,29 @@ Opal.modules["corelib/module"] = function(Opal) {/* Generated by Opal 1.4.1 */
         bound = method.$bind(self);
         return $send(bound, 'call', $to_a(args));}, {$$arity: -1, $$s: self})) : ($Kernel.$raise($$$('TypeError'), "wrong argument type " + (block.$class()) + " (expected Proc/Method)"))))));
       
-      var id = '$' + name;
+      if (typeof(Proxy) !== 'undefined') {
+        var meta = Object.create(null)
+
+        block.$$proxy_target = block
+        block = new Proxy(block, {
+          apply: function(target, self, args) {
+            var old_name = target.$$jsid
+            target.$$jsid = name;
+            try {
+              return target.apply(self, args);
+            } finally {
+              target.$$jsid = old_name
+            }
+          }
+        })
+      }
 
       block.$$jsid        = name;
       block.$$s           = null;
       block.$$def         = block;
       block.$$define_meth = true;
 
-      return Opal.defn(self, id, block);
+      return Opal.defn(self, '$' + name, block);
     ;
     }, -2);
     
@@ -3723,20 +3754,11 @@ Opal.modules["corelib/module"] = function(Opal) {/* Generated by Opal 1.4.1 */
     ;
     }, -1);
     
-    $def(self, '$included', function $$included(mod) {
-      
-      return nil
-    }, 1);
+    $def(self, '$included', $return_val(nil), 0);
     
-    $def(self, '$extended', function $$extended(mod) {
-      
-      return nil
-    }, 1);
+    $def(self, '$extended', $return_val(nil), 0);
     
-    $def(self, '$extend_object', function $$extend_object(object) {
-      
-      return nil
-    }, 1);
+    $def(self, '$extend_object', $return_val(nil), 0);
     
     $def(self, '$method_added', function $$method_added($a) {
       var $post_args, $rest_arg;
@@ -3942,10 +3964,7 @@ Opal.modules["corelib/module"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, 1);
     
-    $def(self, '$prepended', function $$prepended(mod) {
-      
-      return nil
-    }, 1);
+    $def(self, '$prepended', $return_val(nil), 0);
     
     $def(self, '$remove_const', function $$remove_const(name) {
       var self = this;
@@ -4082,8 +4101,8 @@ Opal.modules["corelib/module"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', $Module);
 };
 
-Opal.modules["corelib/class"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $defs = Opal.defs, $def = Opal.def, $rb_plus = Opal.rb_plus, $send2 = Opal.send2, $find_super = Opal.find_super, $alias = Opal.alias;
+Opal.modules["corelib/class"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $defs = Opal.defs, $def = Opal.def, $rb_plus = Opal.rb_plus, $return_val = Opal.return_val, $send2 = Opal.send2, $find_super = Opal.find_super, $alias = Opal.alias;
 
   Opal.add_stubs('require,class_eval,to_proc,+,subclasses,flatten,map,initialize_copy,allocate,name,to_s');
   
@@ -4130,10 +4149,7 @@ Opal.modules["corelib/class"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return $rb_plus(self.$subclasses(), $send(self.$subclasses(), 'map', [], "descendants".$to_proc()).$flatten())
     }, 0);
     
-    $def(self, '$inherited', function $$inherited(cls) {
-      
-      return nil
-    }, 1);
+    $def(self, '$inherited', $return_val(nil), 0);
     
     $def(self, '$initialize_dup', function $$initialize_dup(original) {
       var self = this;
@@ -4211,9 +4227,9 @@ Opal.modules["corelib/class"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', null, $nesting);
 };
 
-Opal.modules["corelib/basic_object"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/basic_object"] = function(Opal) {/* Generated by Opal 1.5.0 */
   "use strict";
-  var nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $def = Opal.def, $alias = Opal.alias, $truthy = Opal.truthy, $range = Opal.range, $Kernel = Opal.Kernel, $to_a = Opal.to_a, $hash2 = Opal.hash2, $Opal = Opal.Opal, $send = Opal.send, $eqeq = Opal.eqeq, $rb_ge = Opal.rb_ge;
+  var nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $def = Opal.def, $alias = Opal.alias, $return_val = Opal.return_val, $truthy = Opal.truthy, $range = Opal.range, $Kernel = Opal.Kernel, $to_a = Opal.to_a, $hash2 = Opal.hash2, $Opal = Opal.Opal, $send = Opal.send, $eqeq = Opal.eqeq, $rb_ge = Opal.rb_ge;
 
   Opal.add_stubs('==,raise,inspect,!,nil?,cover?,size,merge,compile,proc,[],first,>=,length,instance_variable_get,any?,new,caller,pristine');
   return (function($base, $super) {
@@ -4291,12 +4307,9 @@ Opal.modules["corelib/basic_object"] = function(Opal) {/* Generated by Opal 1.4.
     ;
     }, -2);
     
-    $def(self, '$!', function $BasicObject_$excl$3() {
-      
-      return false
-    }, 0);
+    $def(self, '$!', $return_val(false), 0);
     
-    $def(self, '$!=', function $BasicObject_$not_eq$4(other) {
+    $def(self, '$!=', function $BasicObject_$not_eq$3(other) {
       var self = this;
 
       return self['$=='](other)['$!']()
@@ -4321,7 +4334,7 @@ Opal.modules["corelib/basic_object"] = function(Opal) {/* Generated by Opal 1.4.
         default_eval_options = $hash2(["file", "eval"], {"file": ($truthy(($ret_or_1 = file)) ? ($ret_or_1) : ("(eval)")), "eval": true});
         compiling_options = Opal.hash({ arity_check: false }).$merge(default_eval_options);
         compiled = $Opal.$compile(string, compiling_options);
-        block = $send($Kernel, 'proc', [], function $$5(){var self = $$5.$$s == null ? this : $$5.$$s;
+        block = $send($Kernel, 'proc', [], function $$4(){var self = $$4.$$s == null ? this : $$4.$$s;
 
           return new Function("Opal,self", "return " + compiled)(Opal, self);}, {$$arity: 0, $$s: self});
       } else if ((($truthy(block['$nil?']()) && ($truthy($rb_ge(args.$length(), 1)))) && ($eqeq(args.$first()['$[]'](0), "@")))) {
@@ -4442,7 +4455,7 @@ Opal.modules["corelib/basic_object"] = function(Opal) {/* Generated by Opal 1.4.
       return $Kernel.$raise($$$('NoMethodError').$new("undefined method `" + (symbol) + "' for " + (inspect_result), symbol, args), nil, $Kernel.$caller(1));
     }, -2);
     $Opal.$pristine(self, "method_missing");
-    return $def(self, '$respond_to_missing?', function $BasicObject_respond_to_missing$ques$6(method_name, include_all) {
+    return $def(self, '$respond_to_missing?', function $BasicObject_respond_to_missing$ques$5(method_name, include_all) {
       
       
       
@@ -4452,11 +4465,11 @@ Opal.modules["corelib/basic_object"] = function(Opal) {/* Generated by Opal 1.4.
   })('::', null)
 };
 
-Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.5.0 */
   "use strict";
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $coerce_to = Opal.coerce_to, $respond_to = Opal.respond_to, $Opal = Opal.Opal, $module = Opal.module, $def = Opal.def, $Kernel = Opal.Kernel, $gvars = Opal.gvars, $hash2 = Opal.hash2, $send = Opal.send, $to_a = Opal.to_a, $rb_plus = Opal.rb_plus, $eqeq = Opal.eqeq, $eqeqeq = Opal.eqeqeq, $rb_le = Opal.rb_le, $rb_lt = Opal.rb_lt, $Object = Opal.Object, $alias = Opal.alias, $klass = Opal.klass;
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $coerce_to = Opal.coerce_to, $respond_to = Opal.respond_to, $Opal = Opal.Opal, $module = Opal.module, $return_val = Opal.return_val, $def = Opal.def, $Kernel = Opal.Kernel, $gvars = Opal.gvars, $hash2 = Opal.hash2, $send = Opal.send, $to_a = Opal.to_a, $rb_plus = Opal.rb_plus, $eqeq = Opal.eqeq, $eqeqeq = Opal.eqeqeq, $return_self = Opal.return_self, $rb_le = Opal.rb_le, $rb_lt = Opal.rb_lt, $Object = Opal.Object, $alias = Opal.alias, $klass = Opal.klass;
 
-  Opal.add_stubs('!,=~,==,object_id,raise,new,class,coerce_to?,<<,allocate,copy_instance_variables,copy_singleton_methods,initialize_clone,initialize_copy,define_method,singleton_class,to_proc,initialize_dup,for,empty?,pop,call,append_features,extend_object,extended,gets,__id__,include?,each,instance_variables,instance_variable_get,inspect,+,to_s,instance_variable_name!,respond_to?,to_int,coerce_to!,Integer,nil?,===,enum_for,result,any?,print,format,puts,<=,length,[],readline,<,first,split,caller,map,to_str,exception,backtrace,rand,respond_to_missing?,pristine,try_convert!,expand_path,join,start_with?,new_seed,srand,tag,value,open,include');
+  Opal.add_stubs('!,=~,==,object_id,raise,new,class,coerce_to?,<<,allocate,copy_instance_variables,copy_singleton_methods,initialize_clone,initialize_copy,define_method,singleton_class,to_proc,initialize_dup,for,empty?,pop,call,append_features,extend_object,extended,gets,__id__,include?,each,instance_variables,instance_variable_get,inspect,+,to_s,instance_variable_name!,respond_to?,to_int,coerce_to!,Integer,nil?,===,enum_for,result,any?,print,format,puts,<=,length,[],readline,<,first,split,caller,map,to_str,exception,backtrace,rand,respond_to_missing?,pristine,try_convert!,expand_path,join,start_with?,new_seed,srand,tag,value,open,is_a?,__send__,yield_self,include');
   
   (function($base, $parent_nesting) {
     var self = $module($base, 'Kernel');
@@ -4465,18 +4478,15 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
     
     
-    $def(self, '$=~', function $Kernel_$eq_tilde$1(obj) {
-      
-      return false
-    }, 1);
+    $def(self, '$=~', $return_val(false), 0);
     
-    $def(self, '$!~', function $Kernel_$excl_tilde$2(obj) {
+    $def(self, '$!~', function $Kernel_$excl_tilde$1(obj) {
       var self = this;
 
       return self['$=~'](obj)['$!']()
     }, 1);
     
-    $def(self, '$===', function $Kernel_$eq_eq_eq$3(other) {
+    $def(self, '$===', function $Kernel_$eq_eq_eq$2(other) {
       var self = this, $ret_or_1 = nil;
 
       if ($truthy(($ret_or_1 = self.$object_id()['$=='](other.$object_id())))) {
@@ -4486,7 +4496,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
     }, 1);
     
-    $def(self, '$<=>', function $Kernel_$lt_eq_gt$4(other) {
+    $def(self, '$<=>', function $Kernel_$lt_eq_gt$3(other) {
       var self = this;
 
       
@@ -4605,7 +4615,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
     ;
     }, -1);
     
-    $def(self, '$class', function $Kernel_class$5() {
+    $def(self, '$class', function $Kernel_class$4() {
       var self = this;
 
       return self.$$class;
@@ -4727,7 +4737,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return $send($$$('Enumerator'), 'for', [self, method].concat($to_a(args)), block.$to_proc());
     }, -1);
     
-    $def(self, '$equal?', function $Kernel_equal$ques$6(other) {
+    $def(self, '$equal?', function $Kernel_equal$ques$5(other) {
       var self = this;
 
       return self === other;
@@ -4802,10 +4812,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self.$__id__()
     }, 0);
     
-    $def(self, '$initialize_copy', function $$initialize_copy(other) {
-      
-      return nil
-    }, 1);
+    $def(self, '$initialize_copy', $return_val(nil), 0);
     var inspect_stack = [];
     
     $def(self, '$inspect', function $$inspect() {
@@ -4822,7 +4829,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
           
           (inspect_stack)['$<<'](id);
           pushed = true;
-          $send(self.$instance_variables(), 'each', [], function $$7(i){var self = $$7.$$s == null ? this : $$7.$$s, ivar = nil, inspect = nil;
+          $send(self.$instance_variables(), 'each', [], function $$6(i){var self = $$6.$$s == null ? this : $$6.$$s, ivar = nil, inspect = nil;
 
             
             
@@ -4844,7 +4851,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }; })()
     }, 0);
     
-    $def(self, '$instance_of?', function $Kernel_instance_of$ques$8(klass) {
+    $def(self, '$instance_of?', function $Kernel_instance_of$ques$7(klass) {
       var self = this;
 
       
@@ -4856,7 +4863,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
     
     }, 1);
     
-    $def(self, '$instance_variable_defined?', function $Kernel_instance_variable_defined$ques$9(name) {
+    $def(self, '$instance_variable_defined?', function $Kernel_instance_variable_defined$ques$8(name) {
       var self = this;
 
       
@@ -5059,7 +5066,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return $Opal['$coerce_to!'](arg, $$$('Hash'), "to_hash");
     }, 1);
     
-    $def(self, '$is_a?', function $Kernel_is_a$ques$10(klass) {
+    $def(self, '$is_a?', function $Kernel_is_a$ques$9(klass) {
       var self = this;
 
       
@@ -5071,11 +5078,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
     
     }, 1);
     
-    $def(self, '$itself', function $$itself() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$itself', $return_self, 0);
     
     $def(self, '$lambda', function $$lambda() {
       var block = $$lambda.$$p || nil;
@@ -5099,7 +5102,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       delete $$loop.$$p;
       
       if (!($yield !== nil)) {
-        return $send(self, 'enum_for', ["loop"], function $$11(){
+        return $send(self, 'enum_for', ["loop"], function $$10(){
           return $$$($$$('Float'), 'INFINITY')}, 0)
       };
       while ($truthy(true)) {
@@ -5117,10 +5120,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, 0);
     
-    $def(self, '$nil?', function $Kernel_nil$ques$12() {
-      
-      return false
-    }, 0);
+    $def(self, '$nil?', $return_val(false), 0);
     
     $def(self, '$printf', function $$printf($a) {
       var $post_args, args, self = this;
@@ -5169,7 +5169,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       $post_args = Opal.slice.call(arguments);
       
       args = $post_args;;
-      $send(args, 'each', [], function $$13(obj){        if ($gvars.stdout == null) $gvars.stdout = nil;
+      $send(args, 'each', [], function $$11(obj){        if ($gvars.stdout == null) $gvars.stdout = nil;
 
         
         
@@ -5207,7 +5207,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
     }, -1);
     
     $def(self, '$warn', function $$warn($a, $b) {
-      var $post_args, $kwargs, strs, uplevel, $c, $d, self = this, location = nil;
+      var $post_args, $kwargs, strs, uplevel, $c, $d, $e, self = this, location = nil;
       if ($gvars.VERBOSE == null) $gvars.VERBOSE = nil;
       if ($gvars.stderr == null) $gvars.stderr = nil;
 
@@ -5233,11 +5233,11 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if ($truthy($rb_lt(uplevel, 0))) {
           $Kernel.$raise($$$('ArgumentError'), "negative level (" + (uplevel) + ")")
         };
-        location = ($d = ($c = self.$caller($rb_plus(uplevel, 1), 1).$first(), ($c === nil || $c == null) ? nil : $send($c, 'split', [":in `"])), ($d === nil || $d == null) ? nil : $send($d, 'first', []));
+        location = ($c = ($d = self.$caller($rb_plus(uplevel, 1), 1).$first(), ($d === nil || $d == null) ? nil : self.$caller($rb_plus(uplevel, 1), 1).$first().$split(":in `")), ($c === nil || $c == null) ? nil : ($e = self.$caller($rb_plus(uplevel, 1), 1).$first(), ($e === nil || $e == null) ? nil : self.$caller($rb_plus(uplevel, 1), 1).$first().$split(":in `")).$first());
         if ($truthy(location)) {
           location = "" + (location) + ": "
         };
-        strs = $send(strs, 'map', [], function $$14(s){
+        strs = $send(strs, 'map', [], function $$12(s){
           
           
           if (s == null) s = nil;;
@@ -5322,7 +5322,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return $$$($$$('Random'), 'DEFAULT').$rand(max);
     }, -1);
     
-    $def(self, '$respond_to?', function $Kernel_respond_to$ques$15(name, include_all) {
+    $def(self, '$respond_to?', function $Kernel_respond_to$ques$13(name, include_all) {
       var self = this;
 
       
@@ -5343,7 +5343,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
     ;
     }, -2);
     
-    $def(self, '$respond_to_missing?', function $Kernel_respond_to_missing$ques$16(method_name, include_all) {
+    $def(self, '$respond_to_missing?', function $Kernel_respond_to_missing$ques$14(method_name, include_all) {
       
       
       
@@ -5464,11 +5464,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, 0);
     
-    $def(self, '$to_proc', function $$to_proc() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$to_proc', $return_self, 0);
     
     $def(self, '$to_s', function $$to_s() {
       var self = this;
@@ -5476,10 +5472,10 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return "#<" + (self.$class()) + ":0x" + (self.$__id__().$to_s(16)) + ">"
     }, 0);
     
-    $def(self, '$catch', function $Kernel_catch$17(tag) {
-      var $yield = $Kernel_catch$17.$$p || nil, $ret_or_1 = nil, e = nil;
+    $def(self, '$catch', function $Kernel_catch$15(tag) {
+      var $yield = $Kernel_catch$15.$$p || nil, $ret_or_1 = nil, e = nil;
 
-      delete $Kernel_catch$17.$$p;
+      delete $Kernel_catch$15.$$p;
       
       
       if (tag == null) tag = nil;;
@@ -5500,7 +5496,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       };
     }, -1);
     
-    $def(self, '$throw', function $Kernel_throw$18(tag, obj) {
+    $def(self, '$throw', function $Kernel_throw$16(tag, obj) {
       
       
       
@@ -5527,8 +5523,7 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
       delete $$yield_self.$$p;
       
       if (!($yield !== nil)) {
-        return $send(self, 'enum_for', ["yield_self"], function $$19(){
-          return 1}, 0)
+        return $send(self, 'enum_for', ["yield_self"], $return_val(1), 0)
       };
       return Opal.yield1($yield, self);;
     }, 0);
@@ -5550,18 +5545,15 @@ Opal.modules["corelib/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', null);
 };
 
-Opal.modules["corelib/main"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $def = Opal.def, $Object = Opal.Object, $Kernel = Opal.Kernel;
+Opal.modules["corelib/main"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $return_val = Opal.return_val, $def = Opal.def, $Object = Opal.Object, $Kernel = Opal.Kernel;
 
   Opal.add_stubs('include,raise');
   return (function(self, $parent_nesting) {
     
     
     
-    $def(self, '$to_s', function $$to_s() {
-      
-      return "main"
-    }, 0);
+    $def(self, '$to_s', $return_val("main"), 0);
     
     $def(self, '$include', function $$include(mod) {
       
@@ -5585,7 +5577,7 @@ Opal.modules["corelib/main"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })(Opal.get_singleton_class(self), $nesting)
 };
 
-Opal.modules["corelib/error/errno"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/error/errno"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $truthy = Opal.truthy, $rb_plus = Opal.rb_plus, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $klass = Opal.klass;
 
   Opal.add_stubs('+,errno,class,attr_reader');
@@ -5648,7 +5640,7 @@ Opal.modules["corelib/error/errno"] = function(Opal) {/* Generated by Opal 1.4.1
   })('::', $$$('StandardError'), $nesting);
 };
 
-Opal.modules["corelib/error"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/error"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $gvars = Opal.gvars, $defs = Opal.defs, $send = Opal.send, $to_a = Opal.to_a, $def = Opal.def, $truthy = Opal.truthy, $hash2 = Opal.hash2, $Kernel = Opal.Kernel, $not = Opal.not, $rb_plus = Opal.rb_plus, $eqeq = Opal.eqeq, $Object = Opal.Object, $send2 = Opal.send2, $find_super = Opal.find_super, $module = Opal.module;
 
   Opal.add_stubs('new,map,backtrace,clone,to_s,merge,tty?,[],include?,raise,dup,empty?,!,caller,shift,+,class,join,cause,full_message,==,reverse,split,autoload,attr_reader,inspect');
@@ -6076,22 +6068,22 @@ Opal.modules["corelib/error"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', $nesting);
 };
 
-Opal.modules["corelib/constants"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/constants"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var nil = Opal.nil, $$$ = Opal.$$$, $const_set = Opal.const_set;
 
   
   $const_set('::', 'RUBY_PLATFORM', "opal");
   $const_set('::', 'RUBY_ENGINE', "opal");
   $const_set('::', 'RUBY_VERSION', "3.1.0");
-  $const_set('::', 'RUBY_ENGINE_VERSION', "1.4.1");
-  $const_set('::', 'RUBY_RELEASE_DATE', "2022-01-12");
+  $const_set('::', 'RUBY_ENGINE_VERSION', "1.5.0");
+  $const_set('::', 'RUBY_RELEASE_DATE', "2022-04-13");
   $const_set('::', 'RUBY_PATCHLEVEL', 0);
   $const_set('::', 'RUBY_REVISION', "0");
-  $const_set('::', 'RUBY_COPYRIGHT', "opal - Copyright (C) 2013-2021 Adam Beynon and the Opal contributors");
+  $const_set('::', 'RUBY_COPYRIGHT', "opal - Copyright (C) 2013-2022 Adam Beynon and the Opal contributors");
   return $const_set('::', 'RUBY_DESCRIPTION', "opal " + ($$$('RUBY_ENGINE_VERSION')) + " (" + ($$$('RUBY_RELEASE_DATE')) + " revision " + ($$$('RUBY_REVISION')) + ")");
 };
 
-Opal.modules["opal/base"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["opal/base"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var nil = Opal.nil, $Object = Opal.Object;
 
   Opal.add_stubs('require');
@@ -6107,10 +6099,10 @@ Opal.modules["opal/base"] = function(Opal) {/* Generated by Opal 1.4.1 */
   return $Object.$require("corelib/constants");
 };
 
-Opal.modules["corelib/nil"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $Kernel = Opal.Kernel, $def = Opal.def, $hash2 = Opal.hash2, $NilClass = Opal.NilClass, $truthy = Opal.truthy, $rb_gt = Opal.rb_gt, $alias = Opal.alias;
+Opal.modules["corelib/nil"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $Kernel = Opal.Kernel, $def = Opal.def, $return_val = Opal.return_val, $hash2 = Opal.hash2, $NilClass = Opal.NilClass, $truthy = Opal.truthy, $rb_gt = Opal.rb_gt, $alias = Opal.alias;
 
-  Opal.add_stubs('raise,name,new,>,length,Rational');
+  Opal.add_stubs('raise,name,new,>,length,Rational,to_i');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'NilClass');
 
@@ -6133,35 +6125,26 @@ Opal.modules["corelib/nil"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return nil;;
     })(Opal.get_singleton_class(self), $nesting);
     
-    $def(self, '$!', function $NilClass_$excl$1() {
-      
-      return true
-    }, 0);
+    $def(self, '$!', $return_val(true), 0);
     
-    $def(self, '$&', function $NilClass_$$2(other) {
-      
-      return false
-    }, 1);
+    $def(self, '$&', $return_val(false), 0);
     
-    $def(self, '$|', function $NilClass_$$3(other) {
+    $def(self, '$|', function $NilClass_$$1(other) {
       
       return other !== false && other !== nil;
     }, 1);
     
-    $def(self, '$^', function $NilClass_$$4(other) {
+    $def(self, '$^', function $NilClass_$$2(other) {
       
       return other !== false && other !== nil;
     }, 1);
     
-    $def(self, '$==', function $NilClass_$eq_eq$5(other) {
+    $def(self, '$==', function $NilClass_$eq_eq$3(other) {
       
       return other === nil;
     }, 1);
     
-    $def(self, '$dup', function $$dup() {
-      
-      return nil
-    }, 0);
+    $def(self, '$dup', $return_val(nil), 0);
     
     $def(self, '$clone', function $$clone($kwargs) {
       var freeze;
@@ -6179,15 +6162,9 @@ Opal.modules["corelib/nil"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return nil;
     }, -1);
     
-    $def(self, '$inspect', function $$inspect() {
-      
-      return "nil"
-    }, 0);
+    $def(self, '$inspect', $return_val("nil"), 0);
     
-    $def(self, '$nil?', function $NilClass_nil$ques$6() {
-      
-      return true
-    }, 0);
+    $def(self, '$nil?', $return_val(true), 0);
     
     $def(self, '$singleton_class', function $$singleton_class() {
       
@@ -6204,15 +6181,9 @@ Opal.modules["corelib/nil"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return Opal.hash();
     }, 0);
     
-    $def(self, '$to_i', function $$to_i() {
-      
-      return 0
-    }, 0);
+    $def(self, '$to_i', $return_val(0), 0);
     
-    $def(self, '$to_s', function $$to_s() {
-      
-      return ""
-    }, 0);
+    $def(self, '$to_s', $return_val(""), 0);
     
     $def(self, '$to_c', function $$to_c() {
       
@@ -6246,11 +6217,11 @@ Opal.modules["corelib/nil"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', null, $nesting)
 };
 
-Opal.modules["corelib/boolean"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/boolean"] = function(Opal) {/* Generated by Opal 1.5.0 */
   "use strict";
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $Kernel = Opal.Kernel, $def = Opal.def, $hash2 = Opal.hash2, $truthy = Opal.truthy, $send2 = Opal.send2, $find_super = Opal.find_super, $to_a = Opal.to_a, $alias = Opal.alias;
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $Kernel = Opal.Kernel, $def = Opal.def, $return_self = Opal.return_self, $hash2 = Opal.hash2, $truthy = Opal.truthy, $send2 = Opal.send2, $find_super = Opal.find_super, $to_a = Opal.to_a, $alias = Opal.alias;
 
-  Opal.add_stubs('raise,name');
+  Opal.add_stubs('raise,name,==,to_s,__id__');
   
   (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Boolean');
@@ -6347,11 +6318,7 @@ Opal.modules["corelib/boolean"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return (self == true) ? 'true' : 'false';
     }, 0);
     
-    $def(self, '$dup', function $$dup() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$dup', $return_self, 0);
     
     $def(self, '$clone', function $$clone($kwargs) {
       var freeze, self = this;
@@ -6404,7 +6371,7 @@ Opal.modules["corelib/boolean"] = function(Opal) {/* Generated by Opal 1.4.1 */
   return ($klass('::', $$$('Boolean'), 'FalseClass'), nil);
 };
 
-Opal.modules["corelib/comparable"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/comparable"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $module = Opal.module, $rb_gt = Opal.rb_gt, $rb_lt = Opal.rb_lt, $eqeqeq = Opal.eqeqeq, $Kernel = Opal.Kernel, $def = Opal.def;
 
   Opal.add_stubs('>,<,===,raise,class,<=>,equal?');
@@ -6545,10 +6512,10 @@ Opal.modules["corelib/comparable"] = function(Opal) {/* Generated by Opal 1.4.1 
   })('::')
 };
 
-Opal.modules["corelib/regexp"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $coerce_to = Opal.coerce_to, $klass = Opal.klass, $const_set = Opal.const_set, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $truthy = Opal.truthy, $gvars = Opal.gvars, $Kernel = Opal.Kernel, $Opal = Opal.Opal, $alias = Opal.alias, $send = Opal.send, $hash2 = Opal.hash2, $rb_plus = Opal.rb_plus, $rb_ge = Opal.rb_ge, $to_a = Opal.to_a, $eqeqeq = Opal.eqeqeq, $rb_minus = Opal.rb_minus;
+Opal.modules["corelib/regexp"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $coerce_to = Opal.coerce_to, $klass = Opal.klass, $const_set = Opal.const_set, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $truthy = Opal.truthy, $gvars = Opal.gvars, $Kernel = Opal.Kernel, $Opal = Opal.Opal, $alias = Opal.alias, $send = Opal.send, $hash2 = Opal.hash2, $rb_plus = Opal.rb_plus, $rb_ge = Opal.rb_ge, $to_a = Opal.to_a, $eqeqeq = Opal.eqeqeq, $rb_minus = Opal.rb_minus, $return_ivar = Opal.return_ivar;
 
-  Opal.add_stubs('nil?,[],raise,escape,options,to_str,new,join,coerce_to!,!,match,coerce_to?,begin,uniq,map,scan,source,to_proc,transform_values,group_by,each_with_index,+,last,=~,attr_reader,>=,length,is_a?,include?,names,regexp,named_captures,===,captures,-,inspect,empty?,each,to_a');
+  Opal.add_stubs('nil?,[],raise,escape,options,to_str,new,join,coerce_to!,!,match,coerce_to?,begin,uniq,map,scan,source,to_proc,transform_values,group_by,each_with_index,+,last,=~,==,attr_reader,>=,length,is_a?,include?,names,regexp,named_captures,===,captures,-,inspect,empty?,each,to_a');
   
   $klass('::', $$$('StandardError'), 'RegexpError');
   (function($base, $super, $parent_nesting) {
@@ -6659,6 +6626,8 @@ Opal.modules["corelib/regexp"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if (regexp.charAt(regexp.length - 1) === '\\' && regexp.charAt(regexp.length - 2) !== '\\') {
           $Kernel.$raise($$$('RegexpError'), "too short escape sequence: /" + (regexp) + "/")
         }
+
+        regexp = regexp.replace('\\A', '^').replace('\\z', '$')
 
         if (options === undefined || options['$!']()) {
           return new RegExp(regexp);
@@ -6959,7 +6928,7 @@ Opal.modules["corelib/regexp"] = function(Opal) {/* Generated by Opal 1.4.1 */
     $def(self, '$match_length', function $$match_length(idx) {
       var $a, self = this;
 
-      return ($a = self.$match(idx), ($a === nil || $a == null) ? nil : $send($a, 'length', []))
+      return ($a = self.$match(idx), ($a === nil || $a == null) ? nil : self.$match(idx).$length())
     }, 1);
     
     $def(self, '$[]', function $MatchData_$$$10($a) {
@@ -7085,11 +7054,7 @@ Opal.modules["corelib/regexp"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self.matches.length
     }, 0);
     
-    $def(self, '$to_a', function $$to_a() {
-      var self = this;
-
-      return self.matches
-    }, 0);
+    $def(self, '$to_a', $return_ivar("matches"), 0);
     
     $def(self, '$to_s', function $$to_s() {
       var self = this;
@@ -7137,10 +7102,10 @@ Opal.modules["corelib/regexp"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $coerce_to = Opal.coerce_to, $respond_to = Opal.respond_to, $global_multiline_regexp = Opal.global_multiline_regexp, $klass = Opal.klass, $def = Opal.def, $Opal = Opal.Opal, $defs = Opal.defs, $send = Opal.send, $to_a = Opal.to_a, $hash2 = Opal.hash2, $eqeqeq = Opal.eqeqeq, $Kernel = Opal.Kernel, $truthy = Opal.truthy, $gvars = Opal.gvars, $rb_divide = Opal.rb_divide, $rb_plus = Opal.rb_plus, $alias = Opal.alias, $const_set = Opal.const_set;
 
-  Opal.add_stubs('require,include,coerce_to?,initialize,===,format,raise,respond_to?,to_s,to_str,<=>,==,=~,new,force_encoding,casecmp,empty?,ljust,ceil,/,+,rjust,floor,coerce_to!,copy_singleton_methods,initialize_clone,initialize_dup,enum_for,chomp,[],to_i,each_line,to_proc,to_a,class,match,match?,captures,proc,succ,escape,include?,upcase,unicode_normalize,pristine');
+  Opal.add_stubs('require,include,coerce_to?,initialize,===,format,raise,respond_to?,to_s,to_str,<=>,==,=~,new,force_encoding,casecmp,empty?,ljust,ceil,/,+,rjust,floor,coerce_to!,copy_singleton_methods,initialize_clone,initialize_dup,enum_for,chomp,[],to_i,each_line,to_proc,to_a,class,match,match?,captures,proc,succ,escape,include?,upcase,unicode_normalize,dup,__id__,next,intern,pristine');
   
   self.$require("corelib/comparable");
   self.$require("corelib/regexp");
@@ -7153,15 +7118,6 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
     self.$include($$$('Comparable'));
     
     Opal.prop(self.$$prototype, '$$is_string', true);
-
-    Opal.prop(self.$$prototype, '$$cast', function(string) {
-      var klass = this.$$class;
-      if (klass.$$constructor === String) {
-        return string;
-      } else {
-        return new klass.$$constructor(string);
-      }
-    });
   ;
     
     $def(self, '$__id__', function $$__id__() {
@@ -7240,7 +7196,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
 
       if (count === 0) {
-        return self.$$cast('');
+        return '';
       }
 
       var result = '',
@@ -7265,7 +7221,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
         string += string;
       }
 
-      return self.$$cast(result);
+      return result;
     
     }, 1);
     
@@ -7367,7 +7323,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
           length = 0;
         }
 
-        return self.$$cast(self.substr(index, length));
+        return self.substr(index, length);
       }
 
 
@@ -7375,7 +7331,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if (length != null) {
           $Kernel.$raise($$$('TypeError'))
         }
-        return self.indexOf(index) !== -1 ? self.$$cast(index) : nil;
+        return self.indexOf(index) !== -1 ? index : nil;
       }
 
 
@@ -7390,17 +7346,17 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
         ($gvars["~"] = $$$('MatchData').$new(index, match))
 
         if (length == null) {
-          return self.$$cast(match[0]);
+          return match[0];
         }
 
         length = $coerce_to(length, $$$('Integer'), 'to_int');
 
         if (length < 0 && -length < match.length) {
-          return self.$$cast(match[length += match.length]);
+          return match[length += match.length];
         }
 
         if (length >= 0 && length < match.length) {
-          return self.$$cast(match[length]);
+          return match[length];
         }
 
         return nil;
@@ -7417,7 +7373,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if (index >= size || index < 0) {
           return nil;
         }
-        return self.$$cast(self.substr(index, 1));
+        return self.substr(index, 1);
       }
 
       length = $coerce_to(length, $$$('Integer'), 'to_int');
@@ -7430,7 +7386,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return nil;
       }
 
-      return self.$$cast(self.substr(index, length));
+      return self.substr(index, length);
     ;
     }, -2);
     
@@ -7443,7 +7399,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
     $def(self, '$capitalize', function $$capitalize() {
       var self = this;
 
-      return self.$$cast(self.charAt(0).toUpperCase() + self.substr(1).toLowerCase());
+      return self.charAt(0).toUpperCase() + self.substr(1).toLowerCase();
     }, 0);
     
     $def(self, '$casecmp', function $$casecmp(other) {
@@ -7495,7 +7451,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
       var ljustified = self.$ljust($rb_divide($rb_plus(width, self.length), 2).$ceil(), padstr),
           rjustified = self.$rjust($rb_divide($rb_plus(width, self.length), 2).$floor(), padstr);
 
-      return self.$$cast(rjustified + ljustified.slice(self.length));
+      return rjustified + ljustified.slice(self.length);
     ;
     }, -2);
     
@@ -7528,7 +7484,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
 
       if (result != null) {
-        return self.$$cast(result);
+        return result;
       }
     ;
       return self;
@@ -7548,7 +7504,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
         result = self.substr(0, length - 1);
       }
 
-      return self.$$cast(result);
+      return result;
     
     }, 0);
     
@@ -7613,7 +7569,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
       if (char_class === null) {
         return self;
       }
-      return self.$$cast(self.replace(new RegExp(char_class, 'g'), ''));
+      return self.replace(new RegExp(char_class, 'g'), '');
     ;
     }, -1);
     
@@ -7626,7 +7582,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
 
       if (self.slice(0, prefix.length) === prefix) {
-        return self.$$cast(self.slice(prefix.length));
+        return self.slice(prefix.length);
       } else {
         return self;
       }
@@ -7642,7 +7598,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
 
       if (self.slice(self.length - suffix.length) === suffix) {
-        return self.$$cast(self.slice(0, self.length - suffix.length));
+        return self.slice(0, self.length - suffix.length);
       } else {
         return self;
       }
@@ -7652,7 +7608,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
     $def(self, '$downcase', function $$downcase() {
       var self = this;
 
-      return self.$$cast(self.toLowerCase());
+      return self.toLowerCase();
     }, 0);
     
     $def(self, '$each_line', function $$each_line($a, $b) {
@@ -7827,7 +7783,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
 
       ($gvars["~"] = match_data)
-      return self.$$cast(result);
+      return result;
     ;
     }, -2);
     
@@ -7998,7 +7954,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
         result += padstr;
       }
 
-      return self.$$cast(self + result.slice(0, width));
+      return self + result.slice(0, width);
     ;
     }, -2);
     
@@ -8053,7 +8009,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
       
       var i = self.length;
       if (i === 0) {
-        return self.$$cast('');
+        return '';
       }
       var result = self;
       var first_alphanum_char_index = self.search(/[a-zA-Z0-9]/);
@@ -8115,7 +8071,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
           break;
         }
       }
-      return self.$$cast(result);
+      return result;
     
     }, 0);
     
@@ -8282,7 +8238,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
           result    = Array(patterns + 1).join(padstr),
           remaining = chars - result.length;
 
-      return self.$$cast(result + padstr.slice(0, remaining) + self);
+      return result + padstr.slice(0, remaining) + self;
     ;
     }, -2);
     
@@ -8433,24 +8389,17 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
       result = string.split(pattern);
 
       if (result.length === 1 && result[0] === string) {
-        return [self.$$cast(result[0])];
+        return [result[0]];
       }
 
       while ((i = result.indexOf(undefined)) !== -1) {
         result.splice(i, 1);
       }
 
-      function castResult() {
-        for (i = 0; i < result.length; i++) {
-          result[i] = self.$$cast(result[i]);
-        }
-      }
-
       if (limit === 0) {
         while (result[result.length - 1] === '') {
           result.length -= 1;
         }
-        castResult();
         return result;
       }
 
@@ -8462,18 +8411,15 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
             result.push('');
           }
         }
-        castResult();
         return result;
       }
 
       if (match !== null && match[0] === '') {
         result.splice(limit - 1, result.length - 1, result.slice(limit - 1).join(''));
-        castResult();
         return result;
       }
 
       if (limit >= result.length) {
-        castResult();
         return result;
       }
 
@@ -8487,7 +8433,6 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
         match = pattern.exec(string);
       }
       result.splice(limit - 1, result.length - 1, string.slice(index));
-      castResult();
       return result;
     ;
     }, -1);
@@ -8502,13 +8447,13 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
       sets = $post_args;;
       
       if (sets.length === 0) {
-        return self.$$cast(self.replace(/(.)\1+/g, '$1'));
+        return self.replace(/(.)\1+/g, '$1');
       }
       var char_class = char_class_from_char_sets(sets);
       if (char_class === null) {
         return self;
       }
-      return self.$$cast(self.replace(new RegExp('(' + char_class + ')\\1+', 'g'), '$1'));
+      return self.replace(new RegExp('(' + char_class + ')\\1+', 'g'), '$1');
     ;
     }, -1);
     
@@ -8610,7 +8555,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
         }
       }
 
-      return self.$$cast(result);
+      return result;
     ;
     }, -2);
     
@@ -8647,11 +8592,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return $1 ? $0.toUpperCase() : $0.toLowerCase();
       });
 
-      if (self.constructor === String) {
-        return str;
-      }
-
-      return self.$class().$new(str);
+      return str;
     
     }, 0);
     
@@ -8743,7 +8684,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
       delete $$to_proc.$$p;
       
-      method_name = $rb_plus("$", self.valueOf());
+      method_name = self.valueOf();
       return $send($Kernel, 'proc', [], function $$17($a){var block = $$17.$$p || nil, $post_args, args;
 
         delete $$17.$$p;
@@ -8762,20 +8703,23 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
         if (recv == null) recv = nil;
 
-        var body = recv[method_name];
+        var body = recv['$' + method_name];
 
         if (!body) {
-          return recv.$method_missing.apply(recv, args);
+          body = recv.$method_missing;
+          args[0] = method_name;
+        } else {
+          args = args.slice(1);
         }
 
         if (typeof block === 'function') {
           body.$$p = block;
         }
 
-        if (args.length === 1) {
+        if (args.length === 0) {
           return body.call(recv);
         } else {
-          return body.apply(recv, args.slice(1));
+          return body.apply(recv, args);
         }
       ;}, -1);
     }, 0);
@@ -8929,7 +8873,7 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
           new_str += (sub != null ? sub : ch);
         }
       }
-      return self.$$cast(new_str);
+      return new_str;
     
     }, 2);
     
@@ -9094,14 +9038,14 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
           }
         }
       }
-      return self.$$cast(new_str);
+      return new_str;
     
     }, 2);
     
     $def(self, '$upcase', function $$upcase() {
       var self = this;
 
-      return self.$$cast(self.toUpperCase());
+      return self.toUpperCase();
     }, 0);
     
     $def(self, '$upto', function $$upto(stop, excl) {
@@ -9339,10 +9283,10 @@ Opal.modules["corelib/string"] = function(Opal) {/* Generated by Opal 1.4.1 */
   return $const_set($nesting[0], 'Symbol', $$('String'));
 };
 
-Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $coerce_to = Opal.coerce_to, $yield1 = Opal.yield1, $yieldX = Opal.yieldX, $module = Opal.module, $send = Opal.send, $to_a = Opal.to_a, $Opal = Opal.Opal, $def = Opal.def, $Kernel = Opal.Kernel, $rb_gt = Opal.rb_gt, $rb_times = Opal.rb_times, $rb_lt = Opal.rb_lt, $eqeq = Opal.eqeq, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $rb_divide = Opal.rb_divide, $rb_le = Opal.rb_le, $hash2 = Opal.hash2, $lambda = Opal.lambda, $not = Opal.not, $alias = Opal.alias;
+Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $coerce_to = Opal.coerce_to, $yield1 = Opal.yield1, $yieldX = Opal.yieldX, $module = Opal.module, $send = Opal.send, $to_a = Opal.to_a, $Opal = Opal.Opal, $def = Opal.def, $Kernel = Opal.Kernel, $return_val = Opal.return_val, $rb_gt = Opal.rb_gt, $rb_times = Opal.rb_times, $rb_lt = Opal.rb_lt, $eqeq = Opal.eqeq, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $rb_divide = Opal.rb_divide, $rb_le = Opal.rb_le, $hash2 = Opal.hash2, $lambda = Opal.lambda, $not = Opal.not, $alias = Opal.alias;
 
-  Opal.add_stubs('each,public_send,destructure,to_enum,enumerator_size,new,yield,raise,slice_when,!,enum_for,flatten,map,compact,to_a,warn,proc,==,nil?,respond_to?,coerce_to!,>,*,try_convert,<,+,-,ceil,/,size,select,to_proc,__send__,length,<=,[],push,<<,[]=,===,inspect,<=>,first,reverse,sort,take,sort_by,compare,call,dup,sort!,map!,include?,-@,key?,values,transform_values,group_by,fetch,to_h,coerce_to?,class,zip');
+  Opal.add_stubs('each,public_send,destructure,to_enum,enumerator_size,new,yield,raise,slice_when,!,enum_for,flatten,map,compact,to_a,warn,proc,==,nil?,respond_to?,coerce_to!,>,*,try_convert,<,+,-,ceil,/,size,select,to_proc,__send__,length,<=,[],push,<<,[]=,===,inspect,<=>,first,reverse,sort,take,sort_by,compare,call,dup,sort!,map!,include?,-@,key?,values,transform_values,group_by,fetch,to_h,coerce_to?,class,zip,detect,find_all,collect_concat,collect,inject,entries');
   return (function($base) {
     var self = $module($base, 'Enumerable');
 
@@ -9609,10 +9553,9 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
           args = $post_args;;
           return $Opal.$destructure(args)['$=='](object);}, -1)
       } else if ($truthy(block['$nil?']())) {
-        block = $send($Kernel, 'proc', [], function $$16(){
-          return true}, 0)
+        block = $send($Kernel, 'proc', [], $return_val(true), 0)
       };
-      $send(self, 'each', [], function $$17($a){var $post_args, args;
+      $send(self, 'each', [], function $$16($a){var $post_args, args;
 
         
         
@@ -9636,7 +9579,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       if (n == null) n = nil;;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["cycle", n], function $$18(){var self = $$18.$$s == null ? this : $$18.$$s;
+        return $send(self, 'enum_for', ["cycle", n], function $$17(){var self = $$17.$$s == null ? this : $$17.$$s;
 
           if ($truthy(n['$nil?']())) {
             if ($truthy(self['$respond_to?']("size"))) {
@@ -9707,7 +9650,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       if (!(block !== nil)) {
         return self.$enum_for("detect", ifnone)
       };
-      $send(self, 'each', [], function $$19($a){var $post_args, args, value = nil;
+      $send(self, 'each', [], function $$18($a){var $post_args, args, value = nil;
 
         
         
@@ -9808,7 +9751,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
         $Kernel.$raise($$$('ArgumentError'), "invalid size")
       };
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["each_cons", n], function $$20(){var self = $$20.$$s == null ? this : $$20.$$s, enum_size = nil;
+        return $send(self, 'enum_for', ["each_cons", n], function $$19(){var self = $$19.$$s == null ? this : $$19.$$s, enum_size = nil;
 
           
           enum_size = self.$enumerator_size();
@@ -9851,7 +9794,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       data = $post_args;;
       if (!(block !== nil)) {
-        return $send(self, 'to_enum', ["each_entry"].concat($to_a(data)), function $$21(){var self = $$21.$$s == null ? this : $$21.$$s;
+        return $send(self, 'to_enum', ["each_entry"].concat($to_a(data)), function $$20(){var self = $$20.$$s == null ? this : $$20.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -9879,7 +9822,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
         $Kernel.$raise($$$('ArgumentError'), "invalid slice size")
       };
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["each_slice", n], function $$22(){var self = $$22.$$s == null ? this : $$22.$$s;
+        return $send(self, 'enum_for', ["each_slice", n], function $$21(){var self = $$21.$$s == null ? this : $$21.$$s;
 
           if ($truthy(self['$respond_to?']("size"))) {
             return $rb_divide(self.$size(), n).$ceil()
@@ -9922,7 +9865,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       args = $post_args;;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["each_with_index"].concat($to_a(args)), function $$23(){var self = $$23.$$s == null ? this : $$23.$$s;
+        return $send(self, 'enum_for', ["each_with_index"].concat($to_a(args)), function $$22(){var self = $$22.$$s == null ? this : $$22.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -9949,7 +9892,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["each_with_object", object], function $$24(){var self = $$24.$$s == null ? this : $$24.$$s;
+        return $send(self, 'enum_for', ["each_with_object", object], function $$23(){var self = $$23.$$s == null ? this : $$23.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -9993,7 +9936,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["filter_map"], function $$25(){var self = $$25.$$s == null ? this : $$25.$$s;
+        return $send(self, 'enum_for', ["filter_map"], function $$24(){var self = $$24.$$s == null ? this : $$24.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -10007,7 +9950,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["find_all"], function $$26(){var self = $$26.$$s == null ? this : $$26.$$s;
+        return $send(self, 'enum_for', ["find_all"], function $$25(){var self = $$25.$$s == null ? this : $$25.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -10047,7 +9990,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
     ;
       index = 0;
       if ($truthy(object != null)) {
-        $send(self, 'each', [], function $$27($a){var $post_args, value;
+        $send(self, 'each', [], function $$26($a){var $post_args, value;
 
           
           
@@ -10059,7 +10002,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
           };
           return index += 1;;}, -1)
       } else {
-        $send(self, 'each', [], function $$28($a){var $post_args, value;
+        $send(self, 'each', [], function $$27($a){var $post_args, value;
 
           
           
@@ -10082,7 +10025,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       if ($truthy(number === undefined)) {
-        return $send(self, 'each', [], function $$29(value){
+        return $send(self, 'each', [], function $$28(value){
           
           
           if (value == null) value = nil;;
@@ -10098,7 +10041,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
           return []
         };
         current = 0;
-        $send(self, 'each', [], function $$30($a){var $post_args, args;
+        $send(self, 'each', [], function $$29($a){var $post_args, args;
 
           
           
@@ -10123,7 +10066,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       result = [];
-      $send(self, 'each', [], function $$31($a){var $post_args, value, cmp = nil;
+      $send(self, 'each', [], function $$30($a){var $post_args, value, cmp = nil;
 
         
         
@@ -10154,7 +10097,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       result = [];
-      $send(self, 'each', [], function $$32($a){var $post_args, value, cmp = nil;
+      $send(self, 'each', [], function $$31($a){var $post_args, value, cmp = nil;
 
         
         
@@ -10179,13 +10122,13 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
     }, 1);
     
     $def(self, '$group_by', function $$group_by() {
-      var block = $$group_by.$$p || nil, self = this, hash = nil, $ret_or_1 = nil, $writer = nil;
+      var block = $$group_by.$$p || nil, $a, self = this, hash = nil, $ret_or_1 = nil;
 
       delete $$group_by.$$p;
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["group_by"], function $$33(){var self = $$33.$$s == null ? this : $$33.$$s;
+        return $send(self, 'enum_for', ["group_by"], function $$32(){var self = $$32.$$s == null ? this : $$32.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -10197,7 +10140,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
         var param = $Opal.$destructure(arguments),
             value = $yield1(block, param);
 
-        ($truthy(($ret_or_1 = hash['$[]'](value))) ? ($ret_or_1) : ((($writer = [value, []]), $send(hash, '[]=', $to_a($writer)), $writer[$rb_minus($writer["length"], 1)])))['$<<'](param);
+        ($truthy(($ret_or_1 = hash['$[]'](value))) ? ($ret_or_1) : (($a = [value, []], $send(hash, '[]=', $a), $a[$a.length - 1])))['$<<'](param);
       }
 
       self.$each();
@@ -10209,12 +10152,12 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       return hash;
     }, 0);
     
-    $def(self, '$include?', function $Enumerable_include$ques$34(obj) {try {
+    $def(self, '$include?', function $Enumerable_include$ques$33(obj) {try {
 
       var self = this;
 
       
-      $send(self, 'each', [], function $$35($a){var $post_args, args;
+      $send(self, 'each', [], function $$34($a){var $post_args, args;
 
         
         
@@ -10286,7 +10229,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
     $def(self, '$lazy', function $$lazy() {
       var self = this;
 
-      return $send($$$($$$('Enumerator'), 'Lazy'), 'new', [self, self.$enumerator_size()], function $$36(enum$, $a){var $post_args, args;
+      return $send($$$($$$('Enumerator'), 'Lazy'), 'new', [self, self.$enumerator_size()], function $$35(enum$, $a){var $post_args, args;
 
         
         
@@ -10365,7 +10308,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       if (n == null) n = nil;;
       if (!$truthy(block)) {
-        return $send(self, 'enum_for', ["max_by", n], function $$37(){var self = $$37.$$s == null ? this : $$37.$$s;
+        return $send(self, 'enum_for', ["max_by", n], function $$36(){var self = $$36.$$s == null ? this : $$36.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -10408,7 +10351,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       if (n == null) n = nil;;
       if (!$truthy(n['$nil?']())) {
         if ((block !== nil)) {
-          return $send(self, 'sort', [], function $$38(a, b){
+          return $send(self, 'sort', [], function $$37(a, b){
             
             
             if (a == null) a = nil;;
@@ -10472,7 +10415,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       if (n == null) n = nil;;
       if (!$truthy(block)) {
-        return $send(self, 'enum_for', ["min_by", n], function $$39(){var self = $$39.$$s == null ? this : $$39.$$s;
+        return $send(self, 'enum_for', ["min_by", n], function $$38(){var self = $$38.$$s == null ? this : $$38.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -10511,7 +10454,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       delete $$minmax.$$p;
       
       ;
-      block = ($truthy(($ret_or_1 = block)) ? ($ret_or_1) : ($send($Kernel, 'proc', [], function $$40(a, b){
+      block = ($truthy(($ret_or_1 = block)) ? ($ret_or_1) : ($send($Kernel, 'proc', [], function $$39(a, b){
         
         
         if (a == null) a = nil;;
@@ -10558,7 +10501,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       if (!$truthy(block)) {
-        return $send(self, 'enum_for', ["minmax_by"], function $$41(){var self = $$41.$$s == null ? this : $$41.$$s;
+        return $send(self, 'enum_for', ["minmax_by"], function $$40(){var self = $$40.$$s == null ? this : $$40.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -10589,16 +10532,16 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
     ;
     }, 0);
     
-    $def(self, '$none?', function $Enumerable_none$ques$42(pattern) {try {
+    $def(self, '$none?', function $Enumerable_none$ques$41(pattern) {try {
 
-      var block = $Enumerable_none$ques$42.$$p || nil, self = this;
+      var block = $Enumerable_none$ques$41.$$p || nil, self = this;
 
-      delete $Enumerable_none$ques$42.$$p;
+      delete $Enumerable_none$ques$41.$$p;
       
       ;
       ;
       if ($truthy(pattern !== undefined)) {
-        $send(self, 'each', [], function $$43($a){var $post_args, value, comparable = nil;
+        $send(self, 'each', [], function $$42($a){var $post_args, value, comparable = nil;
 
           
           
@@ -10612,7 +10555,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
             return nil
           };}, -1)
       } else if ((block !== nil)) {
-        $send(self, 'each', [], function $$44($a){var $post_args, value;
+        $send(self, 'each', [], function $$43($a){var $post_args, value;
 
           
           
@@ -10625,7 +10568,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
             return nil
           };}, -1)
       } else {
-        $send(self, 'each', [], function $$45($a){var $post_args, value, item = nil;
+        $send(self, 'each', [], function $$44($a){var $post_args, value, item = nil;
 
           
           
@@ -10643,17 +10586,17 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       } catch ($returner) { if ($returner === Opal.returner) { return $returner.$v } throw $returner; }
     }, -1);
     
-    $def(self, '$one?', function $Enumerable_one$ques$46(pattern) {try {
+    $def(self, '$one?', function $Enumerable_one$ques$45(pattern) {try {
 
-      var block = $Enumerable_one$ques$46.$$p || nil, self = this, count = nil;
+      var block = $Enumerable_one$ques$45.$$p || nil, self = this, count = nil;
 
-      delete $Enumerable_one$ques$46.$$p;
+      delete $Enumerable_one$ques$45.$$p;
       
       ;
       ;
       count = 0;
       if ($truthy(pattern !== undefined)) {
-        $send(self, 'each', [], function $$47($a){var $post_args, value, comparable = nil;
+        $send(self, 'each', [], function $$46($a){var $post_args, value, comparable = nil;
 
           
           
@@ -10673,7 +10616,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
             return nil
           };}, -1)
       } else if ((block !== nil)) {
-        $send(self, 'each', [], function $$48($a){var $post_args, value;
+        $send(self, 'each', [], function $$47($a){var $post_args, value;
 
           
           
@@ -10690,7 +10633,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
             return nil
           };}, -1)
       } else {
-        $send(self, 'each', [], function $$49($a){var $post_args, value;
+        $send(self, 'each', [], function $$48($a){var $post_args, value;
 
           
           
@@ -10718,7 +10661,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["partition"], function $$50(){var self = $$50.$$s == null ? this : $$50.$$s;
+        return $send(self, 'enum_for', ["partition"], function $$49(){var self = $$49.$$s == null ? this : $$49.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -10750,7 +10693,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["reject"], function $$51(){var self = $$51.$$s == null ? this : $$51.$$s;
+        return $send(self, 'enum_for', ["reject"], function $$50(){var self = $$50.$$s == null ? this : $$50.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -10779,7 +10722,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["reverse_each"], function $$52(){var self = $$52.$$s == null ? this : $$52.$$s;
+        return $send(self, 'enum_for', ["reverse_each"], function $$51(){var self = $$51.$$s == null ? this : $$51.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
@@ -10813,7 +10756,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       if ($truthy(pattern !== undefined && block !== nil || arguments.length > 1)) {
         $Kernel.$raise($$$('ArgumentError'), "wrong number of arguments (" + (arguments.length) + " expected 1)")
       };
-      return $send($$$('Enumerator'), 'new', [], function $$53(e){var self = $$53.$$s == null ? this : $$53.$$s;
+      return $send($$$('Enumerator'), 'new', [], function $$52(e){var self = $$52.$$s == null ? this : $$52.$$s;
 
         
         
@@ -10885,13 +10828,13 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
         $Kernel.$raise($$$('ArgumentError'), "wrong number of arguments (" + (arguments.length) + " expected 1)")
       };
       if ($truthy(pattern !== undefined)) {
-        block = $send($Kernel, 'proc', [], function $$54(e){
+        block = $send($Kernel, 'proc', [], function $$53(e){
           
           
           if (e == null) e = nil;;
           return pattern['$==='](e);}, 1)
       };
-      return $send($$$('Enumerator'), 'new', [], function $$55(yielder){var self = $$55.$$s == null ? this : $$55.$$s;
+      return $send($$$('Enumerator'), 'new', [], function $$54(yielder){var self = $$54.$$s == null ? this : $$54.$$s;
 
         
         
@@ -10933,7 +10876,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       if (!(block !== nil)) {
         $Kernel.$raise($$$('ArgumentError'), "wrong number of arguments (0 for 1)")
       };
-      return $send($$$('Enumerator'), 'new', [], function $$56(yielder){var self = $$56.$$s == null ? this : $$56.$$s;
+      return $send($$$('Enumerator'), 'new', [], function $$55(yielder){var self = $$55.$$s == null ? this : $$55.$$s;
 
         
         
@@ -10979,7 +10922,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       ;
       ary = self.$to_a();
       if (!(block !== nil)) {
-        block = $lambda(function $$57(a, b){
+        block = $lambda(function $$56(a, b){
           
           
           if (a == null) a = nil;;
@@ -10997,23 +10940,23 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["sort_by"], function $$58(){var self = $$58.$$s == null ? this : $$58.$$s;
+        return $send(self, 'enum_for', ["sort_by"], function $$57(){var self = $$57.$$s == null ? this : $$57.$$s;
 
           return self.$enumerator_size()}, {$$arity: 0, $$s: self})
       };
-      dup = $send(self, 'map', [], function $$59(){var arg = nil;
+      dup = $send(self, 'map', [], function $$58(){var arg = nil;
 
         
         arg = $Opal.$destructure(arguments);
         return [Opal.yield1(block, arg), arg];}, 0);
-      $send(dup, 'sort!', [], function $$60(a, b){
+      $send(dup, 'sort!', [], function $$59(a, b){
         
         
         if (a == null) a = nil;;
         
         if (b == null) b = nil;;
         return (a[0])['$<=>'](b[0]);}, 2);
-      return $send(dup, 'map!', [], function $$61(i){
+      return $send(dup, 'map!', [], function $$60(i){
         
         
         if (i == null) i = nil;;
@@ -11029,7 +10972,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       if (initial == null) initial = 0;;
       result = initial;
       compensation = 0;
-      $send(self, 'each', [], function $$62($a){var $post_args, args, item = nil, y = nil, t = nil;
+      $send(self, 'each', [], function $$61($a){var $post_args, args, item = nil, y = nil, t = nil;
 
         
         
@@ -11066,7 +11009,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
         return self.$enum_for("take_while")
       };
       result = [];
-      return $send(self, 'each', [], function $$63($a){var $post_args, args, value = nil;
+      return $send(self, 'each', [], function $$62($a){var $post_args, args, value = nil;
 
         
         
@@ -11088,7 +11031,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       
       ;
       hash = $hash2([], {});
-      $send(self, 'each', [], function $$64($a){var $post_args, args, value = nil, produced = nil, $writer = nil;
+      $send(self, 'each', [], function $$63($a){var $post_args, args, $b, value = nil, produced = nil;
 
         
         
@@ -11100,10 +11043,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
         if ($truthy(hash['$key?'](produced))) {
           return nil
         } else {
-          
-          $writer = [produced, value];
-          $send(hash, '[]=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];
+          return ($b = [produced, value], $send(hash, '[]=', $b), $b[$b.length - 1])
         };}, -1);
       return hash.$values();
     }, 0);
@@ -11116,16 +11056,14 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
       out = $send($send(self, 'group_by', [], "itself".$to_proc()), 'transform_values', [], "count".$to_proc());
       if ($truthy(hash)) {
         
-        $send(out, 'each', [], function $$65(k, v){var $writer = nil;
+        $send(out, 'each', [], function $$64(k, v){var $a;
 
           
           
           if (k == null) k = nil;;
           
           if (v == null) v = nil;;
-          $writer = [k, $rb_plus(hash.$fetch(k, 0), v)];
-          $send(hash, '[]=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];}, 2);
+          return ($a = [k, $rb_plus(hash.$fetch(k, 0), v)], $send(hash, '[]=', $a), $a[$a.length - 1]);}, 2);
         return hash;
       } else {
         return out
@@ -11192,7 +11130,7 @@ Opal.modules["corelib/enumerable"] = function(Opal) {/* Generated by Opal 1.4.1 
   })('::')
 };
 
-Opal.modules["corelib/enumerator/arithmetic_sequence"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/enumerator/arithmetic_sequence"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $truthy = Opal.truthy, $to_a = Opal.to_a, $eqeq = Opal.eqeq, $Kernel = Opal.Kernel, $def = Opal.def, $rb_gt = Opal.rb_gt, $rb_lt = Opal.rb_lt, $rb_le = Opal.rb_le, $rb_ge = Opal.rb_ge, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $eqeqeq = Opal.eqeqeq, $not = Opal.not, $rb_times = Opal.rb_times, $rb_divide = Opal.rb_divide, $alias = Opal.alias;
 
   Opal.add_stubs('is_a?,==,raise,respond_to?,class,attr_reader,begin,end,exclude_end?,>,step,<,<=,>=,-@,_lesser_than_end?,<<,+,-,===,%,_greater_than_begin?,reverse,!,include?,*,to_i,abs,/,hash,inspect');
@@ -11419,7 +11357,7 @@ Opal.modules["corelib/enumerator/arithmetic_sequence"] = function(Opal) {/* Gene
   })('::', null, $nesting)
 };
 
-Opal.modules["corelib/enumerator/chain"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/enumerator/chain"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a, $truthy = Opal.truthy, $rb_plus = Opal.rb_plus;
 
   Opal.add_stubs('to_enum,size,each,<<,to_proc,include?,+,reverse_each,respond_to?,rewind,inspect');
@@ -11523,7 +11461,7 @@ Opal.modules["corelib/enumerator/chain"] = function(Opal) {/* Generated by Opal 
   })('::', null)
 };
 
-Opal.modules["corelib/enumerator/generator"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/enumerator/generator"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $breaker = Opal.breaker, $klass = Opal.klass, $truthy = Opal.truthy, $Kernel = Opal.Kernel, $def = Opal.def, $send = Opal.send;
 
   Opal.add_stubs('include,raise,new,to_proc');
@@ -11584,10 +11522,10 @@ Opal.modules["corelib/enumerator/generator"] = function(Opal) {/* Generated by O
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["corelib/enumerator/lazy"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $coerce_to = Opal.coerce_to, $yield1 = Opal.yield1, $yieldX = Opal.yieldX, $klass = Opal.klass, $send2 = Opal.send2, $find_super = Opal.find_super, $to_a = Opal.to_a, $defs = Opal.defs, $Kernel = Opal.Kernel, $send = Opal.send, $def = Opal.def, $Opal = Opal.Opal, $rb_lt = Opal.rb_lt, $eqeqeq = Opal.eqeqeq, $rb_plus = Opal.rb_plus, $alias = Opal.alias;
+Opal.modules["corelib/enumerator/lazy"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $coerce_to = Opal.coerce_to, $yield1 = Opal.yield1, $yieldX = Opal.yieldX, $klass = Opal.klass, $send2 = Opal.send2, $find_super = Opal.find_super, $to_a = Opal.to_a, $defs = Opal.defs, $Kernel = Opal.Kernel, $send = Opal.send, $def = Opal.def, $return_self = Opal.return_self, $Opal = Opal.Opal, $rb_lt = Opal.rb_lt, $eqeqeq = Opal.eqeqeq, $rb_plus = Opal.rb_plus, $alias = Opal.alias;
 
-  Opal.add_stubs('raise,each,new,enumerator_size,yield,respond_to?,try_convert,<,===,+,for,class,to_proc,destructure,inspect');
+  Opal.add_stubs('raise,each,new,enumerator_size,yield,respond_to?,try_convert,<,===,+,for,class,to_proc,destructure,inspect,to_a,find_all,collect_concat,collect,enum_for');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Enumerator');
 
@@ -11658,11 +11596,7 @@ Opal.modules["corelib/enumerator/lazy"] = function(Opal) {/* Generated by Opal 1
           };}, -2);
       }, -2);
       
-      $def(self, '$lazy', function $$lazy() {
-        var self = this;
-
-        return self
-      }, 0);
+      $def(self, '$lazy', $return_self, 0);
       
       $def(self, '$collect', function $$collect() {
         var block = $$collect.$$p || nil, self = this;
@@ -11986,7 +11920,7 @@ Opal.modules["corelib/enumerator/lazy"] = function(Opal) {/* Generated by Opal 1
   })('::', null, $nesting)
 };
 
-Opal.modules["corelib/enumerator/yielder"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/enumerator/yielder"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $breaker = Opal.breaker, $klass = Opal.klass, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a;
 
   Opal.add_stubs('yield,proc');
@@ -12055,10 +11989,10 @@ Opal.modules["corelib/enumerator/yielder"] = function(Opal) {/* Generated by Opa
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["corelib/enumerator"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/enumerator"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $slice = Opal.slice, $coerce_to = Opal.coerce_to, $klass = Opal.klass, $defs = Opal.defs, $truthy = Opal.truthy, $send = Opal.send, $not = Opal.not, $def = Opal.def, $rb_plus = Opal.rb_plus, $to_a = Opal.to_a, $Opal = Opal.Opal, $send2 = Opal.send2, $find_super = Opal.find_super, $rb_ge = Opal.rb_ge, $Kernel = Opal.Kernel, $rb_le = Opal.rb_le, $alias = Opal.alias;
 
-  Opal.add_stubs('require,include,allocate,new,to_proc,!,respond_to?,empty?,nil?,+,class,__send__,call,enum_for,size,destructure,map,>=,length,raise,[],peek_values,<=,next_values,inspect,any?,autoload');
+  Opal.add_stubs('require,include,allocate,new,to_proc,!,respond_to?,empty?,nil?,+,class,__send__,call,enum_for,size,destructure,map,>=,length,raise,[],peek_values,<=,next_values,inspect,any?,each_with_object,autoload');
   
   self.$require("corelib/enumerable");
   return (function($base, $super, $parent_nesting) {
@@ -12292,10 +12226,10 @@ Opal.modules["corelib/enumerator"] = function(Opal) {/* Generated by Opal 1.4.1 
   })('::', null, $nesting);
 };
 
-Opal.modules["corelib/numeric"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $truthy = Opal.truthy, $Kernel = Opal.Kernel, $def = Opal.def, $to_ary = Opal.to_ary, $eqeqeq = Opal.eqeqeq, $rb_minus = Opal.rb_minus, $rb_times = Opal.rb_times, $rb_lt = Opal.rb_lt, $eqeq = Opal.eqeq, $rb_divide = Opal.rb_divide, $Opal = Opal.Opal, $hash2 = Opal.hash2, $not = Opal.not, $send = Opal.send, $rb_ge = Opal.rb_ge, $rb_le = Opal.rb_le, $rb_plus = Opal.rb_plus, $rb_gt = Opal.rb_gt, $alias = Opal.alias;
+Opal.modules["corelib/numeric"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $truthy = Opal.truthy, $Kernel = Opal.Kernel, $def = Opal.def, $to_ary = Opal.to_ary, $return_self = Opal.return_self, $rb_minus = Opal.rb_minus, $rb_times = Opal.rb_times, $rb_lt = Opal.rb_lt, $eqeq = Opal.eqeq, $rb_divide = Opal.rb_divide, $return_val = Opal.return_val, $Opal = Opal.Opal, $hash2 = Opal.hash2, $not = Opal.not, $send = Opal.send, $rb_ge = Opal.rb_ge, $rb_le = Opal.rb_le, $rb_plus = Opal.rb_plus, $rb_gt = Opal.rb_gt, $alias = Opal.alias;
 
-  Opal.add_stubs('require,include,instance_of?,class,Float,respond_to?,coerce,__send__,===,raise,equal?,-,*,div,<,-@,ceil,to_f,denominator,to_r,==,floor,/,%,Complex,zero?,numerator,abs,arg,coerce_to!,round,<=>,compare,is_a?,!,new,enum_for,to_proc,negative?,>=,<=,+,to_i,truncate,>');
+  Opal.add_stubs('require,include,instance_of?,class,Float,respond_to?,coerce,__send__,raise,equal?,-,*,div,<,-@,ceil,to_f,denominator,to_r,==,floor,/,%,Complex,zero?,numerator,abs,arg,coerce_to!,round,<=>,compare,is_a?,!,new,enum_for,to_proc,negative?,>=,<=,+,to_i,truncate,>,angle,conj,imag,rect');
   
   self.$require("corelib/comparable");
   return (function($base, $super) {
@@ -12316,18 +12250,32 @@ Opal.modules["corelib/numeric"] = function(Opal) {/* Generated by Opal 1.4.1 */
     }, 1);
     
     $def(self, '$__coerced__', function $$__coerced__(method, other) {
-      var $a, $b, self = this, a = nil, b = nil, $ret_or_1 = nil;
+      var $a, $b, self = this, a = nil, b = nil;
 
       if ($truthy(other['$respond_to?']("coerce"))) {
         
         $b = other.$coerce(self), $a = $to_ary($b), (a = ($a[0] == null ? nil : $a[0])), (b = ($a[1] == null ? nil : $a[1])), $b;
         return a.$__send__(method, b);
-      } else if (($eqeqeq("+", ($ret_or_1 = method)) || (($eqeqeq("-", $ret_or_1) || (($eqeqeq("*", $ret_or_1) || (($eqeqeq("/", $ret_or_1) || (($eqeqeq("%", $ret_or_1) || (($eqeqeq("&", $ret_or_1) || (($eqeqeq("|", $ret_or_1) || (($eqeqeq("^", $ret_or_1) || ($eqeqeq("**", $ret_or_1)))))))))))))))))) {
-        return $Kernel.$raise($$$('TypeError'), "" + (other.$class()) + " can't be coerced into Numeric")
-      } else if (($eqeqeq(">", $ret_or_1) || (($eqeqeq(">=", $ret_or_1) || (($eqeqeq("<", $ret_or_1) || (($eqeqeq("<=", $ret_or_1) || ($eqeqeq("<=>", $ret_or_1)))))))))) {
-        return $Kernel.$raise($$$('ArgumentError'), "comparison of " + (self.$class()) + " with " + (other.$class()) + " failed")
-      } else {
-        return nil
+      } else 
+      switch (method) {
+        case "+":
+        case "-":
+        case "*":
+        case "/":
+        case "%":
+        case "&":
+        case "|":
+        case "^":
+        case "**":
+          return $Kernel.$raise($$$('TypeError'), "" + (other.$class()) + " can't be coerced into Numeric")
+        case ">":
+        case ">=":
+        case "<":
+        case "<=":
+        case "<=>":
+          return $Kernel.$raise($$$('ArgumentError'), "comparison of " + (self.$class()) + " with " + (other.$class()) + " failed")
+        default:
+          return nil
       }
     }, 2);
     
@@ -12341,19 +12289,15 @@ Opal.modules["corelib/numeric"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return nil;
     }, 1);
     
-    $def(self, '$+@', function $Numeric_$plus$$2() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$+@', $return_self, 0);
     
-    $def(self, '$-@', function $Numeric_$minus$$3() {
+    $def(self, '$-@', function $Numeric_$minus$$2() {
       var self = this;
 
       return $rb_minus(0, self)
     }, 0);
     
-    $def(self, '$%', function $Numeric_$percent$4(other) {
+    $def(self, '$%', function $Numeric_$percent$3(other) {
       var self = this;
 
       return $rb_minus(self, $rb_times(other, self.$div(other)))
@@ -12394,11 +12338,7 @@ Opal.modules["corelib/numeric"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self.$to_f().$ceil(ndigits);
     }, -1);
     
-    $def(self, '$conj', function $$conj() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$conj', $return_self, 0);
     
     $def(self, '$denominator', function $$denominator() {
       var self = this;
@@ -12443,17 +12383,11 @@ Opal.modules["corelib/numeric"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return $Kernel.$Complex(0, self)
     }, 0);
     
-    $def(self, '$imag', function $$imag() {
-      
-      return 0
-    }, 0);
+    $def(self, '$imag', $return_val(0), 0);
     
-    $def(self, '$integer?', function $Numeric_integer$ques$5() {
-      
-      return false
-    }, 0);
+    $def(self, '$integer?', $return_val(false), 0);
     
-    $def(self, '$nonzero?', function $Numeric_nonzero$ques$6() {
+    $def(self, '$nonzero?', function $Numeric_nonzero$ques$4() {
       var self = this;
 
       if ($truthy(self['$zero?']())) {
@@ -12481,16 +12415,9 @@ Opal.modules["corelib/numeric"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return $rb_divide($Opal['$coerce_to!'](self, $$$('Rational'), "to_r"), other)
     }, 1);
     
-    $def(self, '$real', function $$real() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$real', $return_self, 0);
     
-    $def(self, '$real?', function $Numeric_real$ques$7() {
-      
-      return true
-    }, 0);
+    $def(self, '$real?', $return_val(true), 0);
     
     $def(self, '$rect', function $$rect() {
       var self = this;
@@ -12709,29 +12636,25 @@ Opal.modules["corelib/numeric"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self.$to_f().$truncate(ndigits);
     }, -1);
     
-    $def(self, '$zero?', function $Numeric_zero$ques$8() {
+    $def(self, '$zero?', function $Numeric_zero$ques$5() {
       var self = this;
 
       return self['$=='](0)
     }, 0);
     
-    $def(self, '$positive?', function $Numeric_positive$ques$9() {
+    $def(self, '$positive?', function $Numeric_positive$ques$6() {
       var self = this;
 
       return $rb_gt(self, 0)
     }, 0);
     
-    $def(self, '$negative?', function $Numeric_negative$ques$10() {
+    $def(self, '$negative?', function $Numeric_negative$ques$7() {
       var self = this;
 
       return $rb_lt(self, 0)
     }, 0);
     
-    $def(self, '$dup', function $$dup() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$dup', $return_self, 0);
     
     $def(self, '$clone', function $$clone($kwargs) {
       var freeze, self = this;
@@ -12749,15 +12672,9 @@ Opal.modules["corelib/numeric"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, -1);
     
-    $def(self, '$finite?', function $Numeric_finite$ques$11() {
-      
-      return true
-    }, 0);
+    $def(self, '$finite?', $return_val(true), 0);
     
-    $def(self, '$infinite?', function $Numeric_infinite$ques$12() {
-      
-      return nil
-    }, 0);
+    $def(self, '$infinite?', $return_val(nil), 0);
     $alias(self, "arg", "angle");
     $alias(self, "conjugate", "conj");
     $alias(self, "imaginary", "imag");
@@ -12768,10 +12685,10 @@ Opal.modules["corelib/numeric"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', null);
 };
 
-Opal.modules["corelib/array"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $falsy = Opal.falsy, $hash_ids = Opal.hash_ids, $yield1 = Opal.yield1, $hash_get = Opal.hash_get, $hash_put = Opal.hash_put, $hash_delete = Opal.hash_delete, $coerce_to = Opal.coerce_to, $respond_to = Opal.respond_to, $klass = Opal.klass, $defs = Opal.defs, $Kernel = Opal.Kernel, $def = Opal.def, $Opal = Opal.Opal, $eqeqeq = Opal.eqeqeq, $hash2 = Opal.hash2, $send2 = Opal.send2, $find_super = Opal.find_super, $send = Opal.send, $rb_gt = Opal.rb_gt, $rb_times = Opal.rb_times, $eqeq = Opal.eqeq, $rb_minus = Opal.rb_minus, $to_a = Opal.to_a, $to_ary = Opal.to_ary, $gvars = Opal.gvars, $rb_ge = Opal.rb_ge, $rb_lt = Opal.rb_lt, $neqeq = Opal.neqeq, $alias = Opal.alias;
+Opal.modules["corelib/array"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $falsy = Opal.falsy, $hash_ids = Opal.hash_ids, $yield1 = Opal.yield1, $hash_get = Opal.hash_get, $hash_put = Opal.hash_put, $hash_delete = Opal.hash_delete, $coerce_to = Opal.coerce_to, $respond_to = Opal.respond_to, $klass = Opal.klass, $defs = Opal.defs, $Kernel = Opal.Kernel, $def = Opal.def, $Opal = Opal.Opal, $eqeqeq = Opal.eqeqeq, $hash2 = Opal.hash2, $send2 = Opal.send2, $find_super = Opal.find_super, $send = Opal.send, $rb_gt = Opal.rb_gt, $rb_times = Opal.rb_times, $eqeq = Opal.eqeq, $rb_minus = Opal.rb_minus, $to_a = Opal.to_a, $to_ary = Opal.to_ary, $gvars = Opal.gvars, $rb_ge = Opal.rb_ge, $assign_ivar = Opal.assign_ivar, $rb_lt = Opal.rb_lt, $return_self = Opal.return_self, $neqeq = Opal.neqeq, $alias = Opal.alias;
 
-  Opal.add_stubs('require,include,to_a,warn,raise,replace,respond_to?,to_ary,coerce_to?,===,join,to_str,hash,<=>,==,object_id,inspect,enum_for,class,bsearch_index,to_proc,nil?,coerce_to!,>,*,enumerator_size,empty?,size,map,equal?,dup,each,reduce,-,[],dig,eql?,length,exclude_end?,flatten,__id__,&,!,intersection,to_s,new,item,max,min,>=,**,delete_if,reverse,rotate,rand,at,keep_if,shuffle!,<,sort,sort_by,!=,times,[]=,<<,uniq,|,values,is_a?,end,begin,upto,reject,pristine,singleton_class');
+  Opal.add_stubs('require,include,to_a,warn,raise,replace,respond_to?,to_ary,coerce_to?,===,join,to_str,hash,<=>,==,object_id,inspect,enum_for,class,bsearch_index,to_proc,nil?,coerce_to!,>,*,enumerator_size,empty?,size,map,equal?,dup,each,reduce,-,[],dig,eql?,length,exclude_end?,flatten,__id__,&,!,intersection,to_s,new,item,max,min,>=,**,delete_if,reverse,rotate,rand,at,keep_if,shuffle!,<,sort,sort_by,!=,times,[]=,<<,uniq,|,values,is_a?,end,begin,upto,reject,push,select,select!,collect,collect!,unshift,pristine,singleton_class');
   
   self.$require("corelib/enumerable");
   self.$require("corelib/numeric");
@@ -13240,11 +13157,18 @@ Opal.modules["corelib/array"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
       
       ;
-            var i, size = self.length;;
-      if ($eqeqeq($$$('Range'), index)) {
-        
-        data = ($eqeqeq($$$('Array'), value) ? (value.$to_a()) : ($truthy(value['$respond_to?']("to_ary")) ? (value.$to_ary().$to_a()) : ([value])));
-        
+      data = nil;
+      
+      var i, size = self.length;
+
+      if (index.$$is_range) {
+        if (value.$$is_array)
+          data = value.$to_a();
+        else if (value['$respond_to?']("to_ary"))
+          data = value.$to_ary().$to_a();
+        else
+          data = [value];
+
         var exclude = index.excl,
             from    = index.begin === nil ? 0 : $coerce_to(index.begin, Opal.Integer, 'to_int'),
             to      = index.end === nil ? -1 : $coerce_to(index.end, Opal.Integer, 'to_int');
@@ -13279,18 +13203,21 @@ Opal.modules["corelib/array"] = function(Opal) {/* Generated by Opal 1.4.1 */
         }
 
         return value;
-      ;
       } else {
-        
-        if ($truthy(extra === undefined)) {
-          length = 1
+        if (extra === undefined) {
+          (length = 1)
         } else {
-          
           length = value;
-          value = extra;
-          data = ($eqeqeq($$$('Array'), value) ? (value.$to_a()) : ($truthy(value['$respond_to?']("to_ary")) ? (value.$to_ary().$to_a()) : ([value])));
-        };
-        
+          value  = extra;
+
+          if (value.$$is_array)
+            data = value.$to_a();
+          else if (value['$respond_to?']("to_ary"))
+            data = value.$to_ary().$to_a();
+          else
+            data = [value];
+        }
+
         var old;
 
         index  = $coerce_to(index, $$$('Integer'), 'to_int');
@@ -13323,8 +13250,8 @@ Opal.modules["corelib/array"] = function(Opal) {/* Generated by Opal 1.4.1 */
         }
 
         return value;
-      ;
-      };
+      }
+    ;
     }, -3);
     
     $def(self, '$any?', function $Array_any$ques$12(pattern) {
@@ -14921,11 +14848,7 @@ Opal.modules["corelib/array"] = function(Opal) {/* Generated by Opal 1.4.1 */
       $proto.rng = nil;
       
       
-      $def(self, '$initialize', function $$initialize(rng) {
-        var self = this;
-
-        return (self.rng = rng)
-      }, 1);
+      $def(self, '$initialize', $assign_ivar("rng"), 0);
       return $def(self, '$rand', function $$rand(size) {
         var self = this, random = nil;
 
@@ -15383,11 +15306,7 @@ Opal.modules["corelib/array"] = function(Opal) {/* Generated by Opal 1.4.1 */
     
     }, 0);
     
-    $def(self, '$to_ary', function $$to_ary() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$to_ary', $return_self, 0);
     
     $def(self, '$to_h', function $$to_h() {
       var block = $$to_h.$$p || nil, self = this, array = nil;
@@ -15438,12 +15357,12 @@ Opal.modules["corelib/array"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if ($neqeq(row.length, max)) {
           $Kernel.$raise($$$('IndexError'), "element size differs (" + (row.length) + " should be " + (max) + ")")
         };
-        return $send((row.length), 'times', [], function $$51(i){var entry = nil, $writer = nil;
+        return $send((row.length), 'times', [], function $$51(i){var $a, entry = nil;
 
           
           
           if (i == null) i = nil;;
-          entry = ($truthy(($ret_or_1 = result['$[]'](i))) ? ($ret_or_1) : ((($writer = [i, []]), $send(result, '[]=', $to_a($writer)), $writer[$rb_minus($writer["length"], 1)])));
+          entry = ($truthy(($ret_or_1 = result['$[]'](i))) ? ($ret_or_1) : (($a = [i, []], $send(result, '[]=', $a), $a[$a.length - 1])));
           return entry['$<<'](row.$at(i));}, 1);}, 1);
       return result;
     }, 0);
@@ -15701,10 +15620,10 @@ Opal.modules["corelib/array"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', Array, $nesting);
 };
 
-Opal.modules["corelib/hash"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $yield1 = Opal.yield1, $hash = Opal.hash, $hash_init = Opal.hash_init, $hash_get = Opal.hash_get, $hash_put = Opal.hash_put, $hash_delete = Opal.hash_delete, $klass = Opal.klass, $Opal = Opal.Opal, $Kernel = Opal.Kernel, $defs = Opal.defs, $def = Opal.def, $send = Opal.send, $rb_ge = Opal.rb_ge, $rb_gt = Opal.rb_gt, $hash2 = Opal.hash2, $truthy = Opal.truthy, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $alias = Opal.alias;
+Opal.modules["corelib/hash"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $yield1 = Opal.yield1, $hash = Opal.hash, $hash_init = Opal.hash_init, $hash_get = Opal.hash_get, $hash_put = Opal.hash_put, $hash_delete = Opal.hash_delete, $klass = Opal.klass, $Opal = Opal.Opal, $Kernel = Opal.Kernel, $defs = Opal.defs, $def = Opal.def, $send = Opal.send, $rb_ge = Opal.rb_ge, $rb_gt = Opal.rb_gt, $hash2 = Opal.hash2, $truthy = Opal.truthy, $to_a = Opal.to_a, $return_self = Opal.return_self, $alias = Opal.alias;
 
-  Opal.add_stubs('require,include,coerce_to?,[],merge!,allocate,raise,coerce_to!,each,fetch,>=,>,==,compare_by_identity,lambda?,abs,arity,enum_for,size,respond_to?,class,dig,except!,dup,delete,new,inspect,map,to_proc,flatten,eql?,default,default_proc,default_proc=,-,default=,to_h,proc');
+  Opal.add_stubs('require,include,coerce_to?,[],merge!,allocate,raise,coerce_to!,each,fetch,>=,>,==,compare_by_identity,lambda?,abs,arity,enum_for,size,respond_to?,class,dig,except!,dup,delete,new,inspect,map,to_proc,flatten,eql?,default,default_proc,default_proc=,default=,to_h,proc,clone,select,select!,has_key?,indexes,index,length,[]=,has_value?');
   
   self.$require("corelib/enumerable");
   return (function($base, $super, $parent_nesting) {
@@ -16201,7 +16120,7 @@ Opal.modules["corelib/hash"] = function(Opal) {/* Generated by Opal 1.4.1 */
           return self.$size()}, {$$arity: 0, $$s: self})
       };
       
-      for (var i = 0, keys = self.$$keys, length = keys.length, key, value; i < length; i++) {
+      for (var i = 0, keys = self.$$keys.slice(), length = keys.length, key, value; i < length; i++) {
         key = keys[i];
 
         if (key.$$is_string) {
@@ -16230,7 +16149,7 @@ Opal.modules["corelib/hash"] = function(Opal) {/* Generated by Opal 1.4.1 */
           return self.$size()}, {$$arity: 0, $$s: self})
       };
       
-      for (var i = 0, keys = self.$$keys, length = keys.length, key; i < length; i++) {
+      for (var i = 0, keys = self.$$keys.slice(), length = keys.length, key; i < length; i++) {
         key = keys[i];
 
         block(key.$$is_string ? key : key.key);
@@ -16806,7 +16725,7 @@ Opal.modules["corelib/hash"] = function(Opal) {/* Generated by Opal 1.4.1 */
     }, 0);
     
     $def(self, '$replace', function $$replace(other) {
-      var self = this, $writer = nil;
+      var self = this;
 
       
       other = $Opal['$coerce_to!'](other, $$$('Hash'), "to_hash");
@@ -16827,15 +16746,9 @@ Opal.modules["corelib/hash"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
     ;
       if ($truthy(other.$default_proc())) {
-        
-        $writer = [other.$default_proc()];
-        $send(self, 'default_proc=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];
+        self['$default_proc='](other.$default_proc())
       } else {
-        
-        $writer = [other.$default()];
-        $send(self, 'default=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];
+        self['$default='](other.$default())
       };
       return self;
     }, 1);
@@ -17002,11 +16915,7 @@ Opal.modules["corelib/hash"] = function(Opal) {/* Generated by Opal 1.4.1 */
     ;
     }, 0);
     
-    $def(self, '$to_hash', function $$to_hash() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$to_hash', $return_self, 0);
     
     $def(self, '$to_proc', function $$to_proc() {
       var self = this;
@@ -17193,10 +17102,10 @@ Opal.modules["corelib/hash"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', null, $nesting);
 };
 
-Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $Opal = Opal.Opal, $Kernel = Opal.Kernel, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $truthy = Opal.truthy, $rb_gt = Opal.rb_gt, $not = Opal.not, $rb_lt = Opal.rb_lt, $send2 = Opal.send2, $find_super = Opal.find_super, $send = Opal.send, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $eqeq = Opal.eqeq, $rb_divide = Opal.rb_divide, $to_ary = Opal.to_ary, $rb_times = Opal.rb_times, $rb_le = Opal.rb_le, $rb_ge = Opal.rb_ge, $alias = Opal.alias, $const_set = Opal.const_set;
+Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $Opal = Opal.Opal, $Kernel = Opal.Kernel, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $truthy = Opal.truthy, $rb_gt = Opal.rb_gt, $not = Opal.not, $rb_lt = Opal.rb_lt, $alias = Opal.alias, $send2 = Opal.send2, $find_super = Opal.find_super, $send = Opal.send, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $eqeq = Opal.eqeq, $return_self = Opal.return_self, $rb_divide = Opal.rb_divide, $to_ary = Opal.to_ary, $rb_times = Opal.rb_times, $rb_le = Opal.rb_le, $rb_ge = Opal.rb_ge, $return_val = Opal.return_val, $const_set = Opal.const_set;
 
-  Opal.add_stubs('require,bridge,raise,name,class,Float,respond_to?,coerce_to!,__coerced__,===,>,!,**,new,<,to_f,==,nan?,infinite?,enum_for,+,-,gcd,lcm,%,/,frexp,to_i,ldexp,rationalize,*,<<,to_r,truncate,-@,size,<=,>=,inspect,coerce_to?');
+  Opal.add_stubs('require,bridge,raise,name,class,Float,respond_to?,coerce_to!,__coerced__,===,>,!,**,new,<,to_f,==,nan?,infinite?,enum_for,+,-,gcd,lcm,%,/,frexp,to_i,ldexp,rationalize,*,<<,to_r,truncate,-@,size,<=,>=,inspect,angle,to_s,is_a?,abs,__id__,next,coerce_to?');
   
   self.$require("corelib/numeric");
   (function($base, $super, $parent_nesting) {
@@ -17520,7 +17429,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
     }, 1);
     
-    $def(self, '$===', function $Number_$eq_eq_eq$21(other) {
+    $def(self, '$==', function $Number_$eq_eq$21(other) {
       var self = this;
 
       
@@ -17535,22 +17444,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
     
     }, 1);
-    
-    $def(self, '$==', function $Number_$eq_eq$22(other) {
-      var self = this;
-
-      
-      if (other.$$is_number) {
-        return self.valueOf() === other.valueOf();
-      }
-      else if (other['$respond_to?']("==")) {
-        return other['$=='](self);
-      }
-      else {
-        return false;
-      }
-    
-    }, 1);
+    $alias(self, "===", "==");
     
     $def(self, '$abs', function $$abs() {
       var self = this;
@@ -17564,7 +17458,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return Math.abs(self * self);
     }, 0);
     
-    $def(self, '$allbits?', function $Number_allbits$ques$23(mask) {
+    $def(self, '$allbits?', function $Number_allbits$ques$22(mask) {
       var self = this;
 
       
@@ -17572,7 +17466,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return (self & mask) == mask;;
     }, 1);
     
-    $def(self, '$anybits?', function $Number_anybits$ques$24(mask) {
+    $def(self, '$anybits?', function $Number_anybits$ques$23(mask) {
       var self = this;
 
       
@@ -17679,7 +17573,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["downto", stop], function $$25(){var self = $$25.$$s == null ? this : $$25.$$s;
+        return $send(self, 'enum_for', ["downto", stop], function $$24(){var self = $$24.$$s == null ? this : $$24.$$s;
 
           
           if (!$eqeqeq($$$('Numeric'), stop)) {
@@ -17702,7 +17596,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, 1);
     
-    $def(self, '$equal?', function $Number_equal$ques$26(other) {
+    $def(self, '$equal?', function $Number_equal$ques$25(other) {
       var self = this, $ret_or_1 = nil;
 
       if ($truthy(($ret_or_1 = self['$=='](other)))) {
@@ -17712,7 +17606,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
     }, 1);
     
-    $def(self, '$even?', function $Number_even$ques$27() {
+    $def(self, '$even?', function $Number_even$ques$26() {
       var self = this;
 
       return self % 2 === 0;
@@ -17770,16 +17664,16 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return [self.$gcd(other), self.$lcm(other)]
     }, 1);
     
-    $def(self, '$integer?', function $Number_integer$ques$28() {
+    $def(self, '$integer?', function $Number_integer$ques$27() {
       var self = this;
 
       return self % 1 === 0;
     }, 0);
     
-    $def(self, '$is_a?', function $Number_is_a$ques$29(klass) {
-      var $yield = $Number_is_a$ques$29.$$p || nil, self = this;
+    $def(self, '$is_a?', function $Number_is_a$ques$28(klass) {
+      var $yield = $Number_is_a$ques$28.$$p || nil, self = this;
 
-      delete $Number_is_a$ques$29.$$p;
+      delete $Number_is_a$ques$28.$$p;
       
       if (($eqeq(klass, $$$('Integer')) && ($eqeqeq($$$('Integer'), self)))) {
         return true
@@ -17790,13 +17684,13 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       if (($eqeq(klass, $$$('Float')) && ($eqeqeq($$$('Float'), self)))) {
         return true
       };
-      return $send2(self, $find_super(self, 'is_a?', $Number_is_a$ques$29, false, true), 'is_a?', [klass], $yield);
+      return $send2(self, $find_super(self, 'is_a?', $Number_is_a$ques$28, false, true), 'is_a?', [klass], $yield);
     }, 1);
     
-    $def(self, '$instance_of?', function $Number_instance_of$ques$30(klass) {
-      var $yield = $Number_instance_of$ques$30.$$p || nil, self = this;
+    $def(self, '$instance_of?', function $Number_instance_of$ques$29(klass) {
+      var $yield = $Number_instance_of$ques$29.$$p || nil, self = this;
 
-      delete $Number_instance_of$ques$30.$$p;
+      delete $Number_instance_of$ques$29.$$p;
       
       if (($eqeq(klass, $$$('Integer')) && ($eqeqeq($$$('Integer'), self)))) {
         return true
@@ -17807,7 +17701,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       if (($eqeq(klass, $$$('Float')) && ($eqeqeq($$$('Float'), self)))) {
         return true
       };
-      return $send2(self, $find_super(self, 'instance_of?', $Number_instance_of$ques$30, false, true), 'instance_of?', [klass], $yield);
+      return $send2(self, $find_super(self, 'instance_of?', $Number_instance_of$ques$29, false, true), 'instance_of?', [klass], $yield);
     }, 1);
     
     $def(self, '$lcm', function $$lcm(other) {
@@ -17833,7 +17727,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self + 1;
     }, 0);
     
-    $def(self, '$nobits?', function $Number_nobits$ques$31(mask) {
+    $def(self, '$nobits?', function $Number_nobits$ques$30(mask) {
       var self = this;
 
       
@@ -17841,7 +17735,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return (self & mask) == 0;;
     }, 1);
     
-    $def(self, '$nonzero?', function $Number_nonzero$ques$32() {
+    $def(self, '$nonzero?', function $Number_nonzero$ques$31() {
       var self = this;
 
       return self == 0 ? nil : self;
@@ -17858,17 +17752,13 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
     }, 0);
     
-    $def(self, '$odd?', function $Number_odd$ques$33() {
+    $def(self, '$odd?', function $Number_odd$ques$32() {
       var self = this;
 
       return self % 2 !== 0;
     }, 0);
     
-    $def(self, '$ord', function $$ord() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$ord', $return_self, 0);
     
     $def(self, '$pow', function $$pow(b, m) {
       var self = this;
@@ -18020,7 +17910,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       
       ;
       if (!$truthy(block)) {
-        return $send(self, 'enum_for', ["times"], function $$34(){var self = $$34.$$s == null ? this : $$34.$$s;
+        return $send(self, 'enum_for', ["times"], function $$33(){var self = $$33.$$s == null ? this : $$33.$$s;
 
           return self}, {$$arity: 0, $$s: self})
       };
@@ -18032,11 +17922,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, 0);
     
-    $def(self, '$to_f', function $$to_f() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$to_f', $return_self, 0);
     
     $def(self, '$to_i', function $$to_i() {
       var self = this;
@@ -18149,7 +18035,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["upto", stop], function $$35(){var self = $$35.$$s == null ? this : $$35.$$s;
+        return $send(self, 'enum_for', ["upto", stop], function $$34(){var self = $$34.$$s == null ? this : $$34.$$s;
 
           
           if (!$eqeqeq($$$('Numeric'), stop)) {
@@ -18172,30 +18058,27 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, 1);
     
-    $def(self, '$zero?', function $Number_zero$ques$36() {
+    $def(self, '$zero?', function $Number_zero$ques$35() {
       var self = this;
 
       return self == 0;
     }, 0);
     
-    $def(self, '$size', function $$size() {
-      
-      return 4
-    }, 0);
+    $def(self, '$size', $return_val(4), 0);
     
-    $def(self, '$nan?', function $Number_nan$ques$37() {
+    $def(self, '$nan?', function $Number_nan$ques$36() {
       var self = this;
 
       return isNaN(self);
     }, 0);
     
-    $def(self, '$finite?', function $Number_finite$ques$38() {
+    $def(self, '$finite?', function $Number_finite$ques$37() {
       var self = this;
 
       return self != Infinity && self != -Infinity && !isNaN(self);
     }, 0);
     
-    $def(self, '$infinite?', function $Number_infinite$ques$39() {
+    $def(self, '$infinite?', function $Number_infinite$ques$38() {
       var self = this;
 
       
@@ -18211,16 +18094,87 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
     
     }, 0);
     
-    $def(self, '$positive?', function $Number_positive$ques$40() {
+    $def(self, '$positive?', function $Number_positive$ques$39() {
       var self = this;
 
       return self != 0 && (self == Infinity || 1 / self > 0);
     }, 0);
     
-    $def(self, '$negative?', function $Number_negative$ques$41() {
+    $def(self, '$negative?', function $Number_negative$ques$40() {
       var self = this;
 
       return self == -Infinity || 1 / self < 0;
+    }, 0);
+    
+    function numberToUint8Array(num) {
+      var uint8array = new Uint8Array(8);
+      new DataView(uint8array.buffer).setFloat64(0, num, true);
+      return uint8array;
+    }
+
+    function uint8ArrayToNumber(arr) {
+      return new DataView(arr.buffer).getFloat64(0, true);
+    }
+
+    function incrementNumberBit(num) {
+      var arr = numberToUint8Array(num);
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i] === 0xff) {
+          arr[i] = 0;
+        } else {
+          arr[i]++;
+          break;
+        }
+      }
+      return uint8ArrayToNumber(arr);
+    }
+
+    function decrementNumberBit(num) {
+      var arr = numberToUint8Array(num);
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i] === 0) {
+          arr[i] = 0xff;
+        } else {
+          arr[i]--;
+          break;
+        }
+      }
+      return uint8ArrayToNumber(arr);
+    }
+  ;
+    
+    $def(self, '$next_float', function $$next_float() {
+      var self = this;
+
+      
+      if ($eqeq(self, $$$($$$('Float'), 'INFINITY'))) {
+        return $$$($$$('Float'), 'INFINITY')
+      };
+      if ($truthy(self['$nan?']())) {
+        return $$$($$$('Float'), 'NAN')
+      };
+      if ($rb_ge(self, 0)) {
+        return incrementNumberBit(Math.abs(self));
+      } else {
+        return decrementNumberBit(self);
+      };
+    }, 0);
+    
+    $def(self, '$prev_float', function $$prev_float() {
+      var self = this;
+
+      
+      if ($eqeq(self, $$$($$$('Float'), 'INFINITY')['$-@']())) {
+        return $$$($$$('Float'), 'INFINITY')['$-@']()
+      };
+      if ($truthy(self['$nan?']())) {
+        return $$$($$$('Float'), 'NAN')
+      };
+      if ($rb_gt(self, 0)) {
+        return decrementNumberBit(self);
+      } else {
+        return -incrementNumberBit(Math.abs(self));
+      };
     }, 0);
     $alias(self, "arg", "angle");
     $alias(self, "eql?", "==");
@@ -18295,7 +18249,7 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }, 0);
       
       Opal.udef(self, '$' + "new");;
-      return $def(self, '$===', function $eq_eq_eq$42(other) {
+      return $def(self, '$===', function $eq_eq_eq$41(other) {
         
         return !!other.$$is_number;
       }, 1);
@@ -18311,10 +18265,10 @@ Opal.modules["corelib/number"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', $$$('Numeric'), $nesting);
 };
 
-Opal.modules["corelib/range"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $truthy = Opal.truthy, $Kernel = Opal.Kernel, $def = Opal.def, $not = Opal.not, $send2 = Opal.send2, $find_super = Opal.find_super, $rb_lt = Opal.rb_lt, $rb_le = Opal.rb_le, $send = Opal.send, $eqeq = Opal.eqeq, $eqeqeq = Opal.eqeqeq, $rb_gt = Opal.rb_gt, $rb_minus = Opal.rb_minus, $Opal = Opal.Opal, $rb_divide = Opal.rb_divide, $rb_plus = Opal.rb_plus, $rb_times = Opal.rb_times, $rb_ge = Opal.rb_ge, $alias = Opal.alias;
+Opal.modules["corelib/range"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $truthy = Opal.truthy, $Kernel = Opal.Kernel, $def = Opal.def, $not = Opal.not, $send2 = Opal.send2, $find_super = Opal.find_super, $rb_lt = Opal.rb_lt, $rb_le = Opal.rb_le, $send = Opal.send, $eqeq = Opal.eqeq, $eqeqeq = Opal.eqeqeq, $return_ivar = Opal.return_ivar, $rb_gt = Opal.rb_gt, $rb_minus = Opal.rb_minus, $Opal = Opal.Opal, $rb_divide = Opal.rb_divide, $rb_plus = Opal.rb_plus, $rb_times = Opal.rb_times, $rb_ge = Opal.rb_ge, $alias = Opal.alias;
 
-  Opal.add_stubs('require,include,attr_reader,raise,nil?,<=>,include?,!,<,<=,enum_for,size,upto,to_proc,respond_to?,class,succ,==,===,exclude_end?,eql?,begin,end,last,to_a,>,-@,-,to_i,coerce_to!,ceil,/,is_a?,new,loop,+,*,>=,each_with_index,%,step,bsearch,inspect,[],hash');
+  Opal.add_stubs('require,include,attr_reader,raise,nil?,<=>,include?,!,<,<=,enum_for,size,upto,to_proc,respond_to?,class,succ,==,===,exclude_end?,eql?,begin,end,last,to_a,>,-@,-,to_i,coerce_to!,ceil,/,is_a?,new,loop,+,*,>=,each_with_index,%,step,bsearch,inspect,[],hash,cover?');
   
   self.$require("corelib/enumerable");
   return (function($base, $super, $parent_nesting) {
@@ -18456,11 +18410,7 @@ Opal.modules["corelib/range"] = function(Opal) {/* Generated by Opal 1.4.1 */
       };
     }, 1);
     
-    $def(self, '$exclude_end?', function $Range_exclude_end$ques$5() {
-      var self = this;
-
-      return self.excl
-    }, 0);
+    $def(self, '$exclude_end?', $return_ivar("excl"), 0);
     
     $def(self, '$first', function $$first(n) {
       var $yield = $$first.$$p || nil, self = this;
@@ -18607,7 +18557,7 @@ Opal.modules["corelib/range"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if (((($truthy(self.begin['$is_a?']($$('Numeric'))) || ($truthy(self.begin['$nil?']()))) && (($truthy(self.end['$is_a?']($$('Numeric'))) || ($truthy(self.end['$nil?']()))))) && ($not(($truthy(($ret_or_1 = self.begin['$nil?']())) ? (self.end['$nil?']()) : ($ret_or_1)))))) {
           return $$$($$$('Enumerator'), 'ArithmeticSequence').$new(self, n, "step")
         } else {
-          return $send(self, 'enum_for', ["step", n], function $$6(){
+          return $send(self, 'enum_for', ["step", n], function $$5(){
             
             coerceStepSize();
             return enumeratorSize();
@@ -18618,7 +18568,7 @@ Opal.modules["corelib/range"] = function(Opal) {/* Generated by Opal 1.4.1 */
       if ($truthy(self.begin.$$is_number && self.end.$$is_number)) {
         
         i = 0;
-        (function(){var $brk = Opal.new_brk(); try {return $send(self, 'loop', [], function $$7(){var self = $$7.$$s == null ? this : $$7.$$s, current = nil;
+        (function(){var $brk = Opal.new_brk(); try {return $send(self, 'loop', [], function $$6(){var self = $$6.$$s == null ? this : $$6.$$s, current = nil;
           if (self.begin == null) self.begin = nil;
           if (self.excl == null) self.excl = nil;
           if (self.end == null) self.end = nil;
@@ -18644,7 +18594,7 @@ Opal.modules["corelib/range"] = function(Opal) {/* Generated by Opal 1.4.1 */
           $Kernel.$raise($$$('TypeError'), "no implicit conversion to float from string")
         }
       ;
-        $send(self, 'each_with_index', [], function $$8(value, idx){
+        $send(self, 'each_with_index', [], function $$7(value, idx){
           
           
           if (value == null) value = nil;;
@@ -18659,7 +18609,7 @@ Opal.modules["corelib/range"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, -1);
     
-    $def(self, '$%', function $Range_$percent$9(n) {
+    $def(self, '$%', function $Range_$percent$8(n) {
       var self = this;
 
       if (($truthy(self.begin['$is_a?']($$('Numeric'))) && ($truthy(self.end['$is_a?']($$('Numeric')))))) {
@@ -18719,10 +18669,10 @@ Opal.modules["corelib/range"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', null, $nesting);
 };
 
-Opal.modules["corelib/proc"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var nil = Opal.nil, $$$ = Opal.$$$, $slice = Opal.slice, $klass = Opal.klass, $truthy = Opal.truthy, $Kernel = Opal.Kernel, $defs = Opal.defs, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a, $Opal = Opal.Opal, $alias = Opal.alias;
+Opal.modules["corelib/proc"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var nil = Opal.nil, $$$ = Opal.$$$, $slice = Opal.slice, $klass = Opal.klass, $truthy = Opal.truthy, $Kernel = Opal.Kernel, $defs = Opal.defs, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a, $return_self = Opal.return_self, $Opal = Opal.Opal, $alias = Opal.alias;
 
-  Opal.add_stubs('raise,proc,call,to_proc,new,source_location,coerce_to!');
+  Opal.add_stubs('raise,proc,call,to_proc,new,source_location,coerce_to!,dup');
   return (function($base, $super) {
     var self = $klass($base, $super, 'Proc');
 
@@ -18823,11 +18773,7 @@ Opal.modules["corelib/proc"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return self.$call(out);}, {$$arity: -1, $$s: self})
     }, 1);
     
-    $def(self, '$to_proc', function $$to_proc() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$to_proc', $return_self, 0);
     
     $def(self, '$lambda?', function $Proc_lambda$ques$6() {
       var self = this;
@@ -18968,10 +18914,10 @@ Opal.modules["corelib/proc"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', Function)
 };
 
-Opal.modules["corelib/method"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/method"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $def = Opal.def, $truthy = Opal.truthy, $alias = Opal.alias, $Kernel = Opal.Kernel, $send = Opal.send, $to_a = Opal.to_a;
 
-  Opal.add_stubs('attr_reader,arity,curry,>>,<<,new,class,join,source_location,raise,call,bind,to_proc');
+  Opal.add_stubs('attr_reader,arity,curry,>>,<<,new,class,join,source_location,call,raise,bind,to_proc');
   
   (function($base, $super) {
     var self = $klass($base, $super, 'Method');
@@ -19172,7 +19118,7 @@ Opal.modules["corelib/method"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', null);
 };
 
-Opal.modules["corelib/variables"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/variables"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var nil = Opal.nil, $gvars = Opal.gvars, $const_set = Opal.const_set, $Object = Opal.Object, $hash2 = Opal.hash2;
 
   Opal.add_stubs('new');
@@ -19190,17 +19136,17 @@ Opal.modules["corelib/variables"] = function(Opal) {/* Generated by Opal 1.4.1 *
   return ($gvars.SAFE = 0);
 };
 
-Opal.modules["corelib/io"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $const_set = Opal.const_set, $not = Opal.not, $truthy = Opal.truthy, $def = Opal.def, $Kernel = Opal.Kernel, $gvars = Opal.gvars, $send = Opal.send, $to_a = Opal.to_a, $rb_plus = Opal.rb_plus, $neqeq = Opal.neqeq, $range = Opal.range, $hash2 = Opal.hash2, $eqeq = Opal.eqeq, $to_ary = Opal.to_ary, $rb_gt = Opal.rb_gt, $alias = Opal.alias, $rb_minus = Opal.rb_minus, $writer = nil;
+Opal.modules["corelib/io"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $a, nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $const_set = Opal.const_set, $not = Opal.not, $truthy = Opal.truthy, $def = Opal.def, $return_ivar = Opal.return_ivar, $return_val = Opal.return_val, $Kernel = Opal.Kernel, $gvars = Opal.gvars, $send = Opal.send, $to_a = Opal.to_a, $rb_plus = Opal.rb_plus, $neqeq = Opal.neqeq, $range = Opal.range, $hash2 = Opal.hash2, $eqeq = Opal.eqeq, $to_ary = Opal.to_ary, $rb_gt = Opal.rb_gt, $assign_ivar_val = Opal.assign_ivar_val, $alias = Opal.alias;
 
-  Opal.add_stubs('attr_reader,attr_accessor,!,match?,include?,size,write,String,flatten,puts,sysread_noraise,+,!=,[],ord,getc,readchar,raise,gets,==,to_str,length,split,sub,sysread,>,to_a,each_line,enum_for,getbyte,closed_write?,closed_read?,new,write_proc=,-,read_proc=');
+  Opal.add_stubs('attr_reader,attr_accessor,!,match?,include?,size,write,String,flatten,puts,sysread_noraise,+,!=,[],ord,getc,readchar,raise,gets,==,to_str,length,split,sub,sysread,>,to_a,each_line,enum_for,getbyte,closed_write?,closed_read?,each,eof,new,write_proc=,read_proc=');
   
   (function($base, $super) {
     var self = $klass($base, $super, 'IO');
 
     var $proto = self.$$prototype;
 
-    $proto.fd = $proto.read_buffer = $proto.closed = nil;
+    $proto.read_buffer = $proto.closed = nil;
     
     $const_set(self, 'SEEK_SET', 0);
     $const_set(self, 'SEEK_CUR', 1);
@@ -19230,11 +19176,7 @@ Opal.modules["corelib/io"] = function(Opal) {/* Generated by Opal 1.4.1 */
       };
     }, -2);
     
-    $def(self, '$fileno', function $$fileno() {
-      var self = this;
-
-      return self.fd
-    }, 0);
+    $def(self, '$fileno', $return_ivar("fd"), 0);
     
     $def(self, '$tty?', function $IO_tty$ques$1() {
       var self = this;
@@ -19250,10 +19192,7 @@ Opal.modules["corelib/io"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return string.$size();
     }, 1);
     
-    $def(self, '$flush', function $$flush() {
-      
-      return nil
-    }, 0);
+    $def(self, '$flush', $return_val(nil), 0);
     
     $def(self, '$<<', function $IO_$lt$lt$2(string) {
       var self = this;
@@ -19336,7 +19275,7 @@ Opal.modules["corelib/io"] = function(Opal) {/* Generated by Opal 1.4.1 */
     $def(self, '$getbyte', function $$getbyte() {
       var $a, self = this;
 
-      return ($a = self.$getc(), ($a === nil || $a == null) ? nil : $send($a, 'ord', []))
+      return ($a = self.$getc(), ($a === nil || $a == null) ? nil : self.$getc().$ord())
     }, 0);
     
     $def(self, '$readbyte', function $$readbyte() {
@@ -19571,11 +19510,7 @@ Opal.modules["corelib/io"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, 0);
     
-    $def(self, '$close', function $$close() {
-      var self = this;
-
-      return (self.closed = "both")
-    }, 0);
+    $def(self, '$close', $assign_ivar_val("closed", "both"), 0);
     
     $def(self, '$close_read', function $$close_read() {
       var self = this;
@@ -19649,21 +19584,12 @@ Opal.modules["corelib/io"] = function(Opal) {/* Generated by Opal 1.4.1 */
   $const_set('::', 'STDOUT', ($gvars.stdout = $$$('IO').$new(1, "w")));
   $const_set('::', 'STDERR', ($gvars.stderr = $$$('IO').$new(2, "w")));
   var console = Opal.global.console;
-  
-  $writer = [typeof(process) === 'object' && typeof(process.stdout) === 'object' ? function(s){process.stdout.write(s)} : function(s){console.log(s)}];
-  $send($$$('STDOUT'), 'write_proc=', $to_a($writer));
-  $writer[$rb_minus($writer["length"], 1)];;
-  
-  $writer = [typeof(process) === 'object' && typeof(process.stderr) === 'object' ? function(s){process.stderr.write(s)} : function(s){console.warn(s)}];
-  $send($$$('STDERR'), 'write_proc=', $to_a($writer));
-  $writer[$rb_minus($writer["length"], 1)];;
-  
-  $writer = [function(s) { var p = prompt(); if (p !== null) return p + "\n"; return nil; }];
-  $send($$$('STDIN'), 'read_proc=', $to_a($writer));
-  return $writer[$rb_minus($writer["length"], 1)];;
+  $$$('STDOUT')['$write_proc='](typeof(process) === 'object' && typeof(process.stdout) === 'object' ? function(s){process.stdout.write(s)} : function(s){console.log(s)});
+  $$$('STDERR')['$write_proc='](typeof(process) === 'object' && typeof(process.stderr) === 'object' ? function(s){process.stderr.write(s)} : function(s){console.warn(s)});
+  return ($a = [function(s) { var p = prompt(); if (p !== null) return p + "\n"; return nil; }], $send($$$('STDIN'), 'read_proc=', $a), $a[$a.length - 1]);
 };
 
-Opal.modules["opal/regexp_anchors"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["opal/regexp_anchors"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $const_set = Opal.const_set;
 
   Opal.add_stubs('new');
@@ -19683,7 +19609,7 @@ Opal.modules["opal/regexp_anchors"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["opal/mini"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["opal/mini"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var nil = Opal.nil, $Object = Opal.Object;
 
   Opal.add_stubs('require');
@@ -19707,10 +19633,10 @@ Opal.modules["opal/mini"] = function(Opal) {/* Generated by Opal 1.4.1 */
   return $Object.$require("opal/regexp_anchors");
 };
 
-Opal.modules["corelib/kernel/format"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/kernel/format"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var nil = Opal.nil, $$$ = Opal.$$$, $coerce_to = Opal.coerce_to, $module = Opal.module, $truthy = Opal.truthy, $eqeq = Opal.eqeq, $Opal = Opal.Opal, $Kernel = Opal.Kernel, $gvars = Opal.gvars, $def = Opal.def, $alias = Opal.alias;
 
-  Opal.add_stubs('respond_to?,[],==,length,coerce_to?,nil?,to_a,raise,to_int,fetch,Integer,Float,to_ary,to_str,inspect,to_s');
+  Opal.add_stubs('respond_to?,[],==,length,coerce_to?,nil?,to_a,raise,to_int,fetch,Integer,Float,to_ary,to_str,inspect,to_s,format');
   return (function($base) {
     var self = $module($base, 'Kernel');
 
@@ -20274,10 +20200,10 @@ Opal.modules["corelib/kernel/format"] = function(Opal) {/* Generated by Opal 1.4
   })('::')
 };
 
-Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $hash2 = Opal.hash2, $rb_plus = Opal.rb_plus, $truthy = Opal.truthy, $send = Opal.send, $defs = Opal.defs, $eqeq = Opal.eqeq, $def = Opal.def, $Kernel = Opal.Kernel, $Opal = Opal.Opal, $rb_lt = Opal.rb_lt, $alias = Opal.alias, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $writer = nil;
+Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $a, self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $hash2 = Opal.hash2, $rb_plus = Opal.rb_plus, $truthy = Opal.truthy, $send = Opal.send, $defs = Opal.defs, $eqeq = Opal.eqeq, $def = Opal.def, $return_ivar = Opal.return_ivar, $return_val = Opal.return_val, $Kernel = Opal.Kernel, $Opal = Opal.Opal, $rb_lt = Opal.rb_lt, $alias = Opal.alias;
 
-  Opal.add_stubs('require,+,[],clone,initialize,new,instance_eval,to_proc,each,const_set,tr,==,default_external,attr_accessor,singleton_class,attr_reader,raise,register,length,bytes,force_encoding,dup,bytesize,enum_for,each_byte,to_a,each_char,each_codepoint,coerce_to!,find,<,default_external=,-');
+  Opal.add_stubs('require,+,[],clone,initialize,new,instance_eval,to_proc,each,const_set,tr,==,default_external,attr_accessor,singleton_class,attr_reader,raise,register,length,bytes,force_encoding,dup,bytesize,enum_for,each_byte,to_a,each_char,each_codepoint,coerce_to!,find,<,default_external=');
   
   self.$require("corelib/string");
   (function($base, $super) {
@@ -20285,7 +20211,7 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
 
     var $proto = self.$$prototype;
 
-    $proto.ascii = $proto.dummy = $proto.name = nil;
+    $proto.name = $proto.dummy = nil;
     
     $defs(self, '$register', function $$register(name, options) {
       var block = $$register.$$p || nil, self = this, names = nil, $ret_or_1 = nil, ascii = nil, dummy = nil, encoding = nil, register = nil;
@@ -20339,28 +20265,13 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
       return (self.dummy = dummy);
     }, 4);
     
-    $def(self, '$ascii_compatible?', function $Encoding_ascii_compatible$ques$2() {
-      var self = this;
-
-      return self.ascii
-    }, 0);
+    $def(self, '$ascii_compatible?', $return_ivar("ascii"), 0);
     
-    $def(self, '$dummy?', function $Encoding_dummy$ques$3() {
-      var self = this;
-
-      return self.dummy
-    }, 0);
+    $def(self, '$dummy?', $return_ivar("dummy"), 0);
     
-    $def(self, '$binary?', function $Encoding_binary$ques$4() {
-      
-      return false
-    }, 0);
+    $def(self, '$binary?', $return_val(false), 0);
     
-    $def(self, '$to_s', function $$to_s() {
-      var self = this;
-
-      return self.name
-    }, 0);
+    $def(self, '$to_s', $return_ivar("name"), 0);
     
     $def(self, '$inspect', function $$inspect() {
       var self = this;
@@ -20433,7 +20344,7 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
     $klass('::', $$$('StandardError'), 'EncodingError');
     return ($klass('::', $$$('EncodingError'), 'CompatibilityError'), nil);
   })('::', null);
-  $send($$$('Encoding'), 'register', ["UTF-8", $hash2(["aliases", "ascii"], {"aliases": ["CP65001"], "ascii": true})], function $$5(){var self = $$5.$$s == null ? this : $$5.$$s;
+  $send($$$('Encoding'), 'register', ["UTF-8", $hash2(["aliases", "ascii"], {"aliases": ["CP65001"], "ascii": true})], function $$2(){var self = $$2.$$s == null ? this : $$2.$$s;
 
     
     
@@ -20535,7 +20446,7 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
       
       return string.$bytes().$length()
     }, 1);}, {$$arity: 0, $$s: self});
-  $send($$$('Encoding'), 'register', ["UTF-16LE"], function $$6(){var self = $$6.$$s == null ? this : $$6.$$s;
+  $send($$$('Encoding'), 'register', ["UTF-16LE"], function $$3(){var self = $$3.$$s == null ? this : $$3.$$s;
 
     
     
@@ -20558,7 +20469,7 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
       
       return string.length * 2;
     }, 1);}, {$$arity: 0, $$s: self});
-  $send($$$('Encoding'), 'register', ["UTF-16BE", $hash2(["inherits"], {"inherits": $$$($$$('Encoding'), 'UTF_16LE')})], function $$7(){var self = $$7.$$s == null ? this : $$7.$$s;
+  $send($$$('Encoding'), 'register', ["UTF-16BE", $hash2(["inherits"], {"inherits": $$$($$$('Encoding'), 'UTF_16LE')})], function $$4(){var self = $$4.$$s == null ? this : $$4.$$s;
 
     return $def(self, '$each_byte', function $$each_byte(string) {
       var block = $$each_byte.$$p || nil;
@@ -20575,7 +20486,7 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
       }
     ;
     }, 1)}, {$$arity: 0, $$s: self});
-  $send($$$('Encoding'), 'register', ["UTF-32LE"], function $$8(){var self = $$8.$$s == null ? this : $$8.$$s;
+  $send($$$('Encoding'), 'register', ["UTF-32LE"], function $$5(){var self = $$5.$$s == null ? this : $$5.$$s;
 
     
     
@@ -20600,7 +20511,7 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
       
       return string.length * 4;
     }, 1);}, {$$arity: 0, $$s: self});
-  $send($$$('Encoding'), 'register', ["UTF-32BE", $hash2(["inherits"], {"inherits": $$$($$$('Encoding'), 'UTF_32LE')})], function $$9(){var self = $$9.$$s == null ? this : $$9.$$s;
+  $send($$$('Encoding'), 'register', ["UTF-32BE", $hash2(["inherits"], {"inherits": $$$($$$('Encoding'), 'UTF_32LE')})], function $$6(){var self = $$6.$$s == null ? this : $$6.$$s;
 
     return $def(self, '$each_byte', function $$each_byte(string) {
       var block = $$each_byte.$$p || nil;
@@ -20619,7 +20530,7 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
       }
     ;
     }, 1)}, {$$arity: 0, $$s: self});
-  $send($$$('Encoding'), 'register', ["ASCII-8BIT", $hash2(["aliases", "ascii"], {"aliases": ["BINARY"], "ascii": true})], function $$10(){var self = $$10.$$s == null ? this : $$10.$$s;
+  $send($$$('Encoding'), 'register', ["ASCII-8BIT", $hash2(["aliases", "ascii"], {"aliases": ["BINARY"], "ascii": true})], function $$7(){var self = $$7.$$s == null ? this : $$7.$$s;
 
     
     
@@ -20661,10 +20572,7 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
       
       return string.length;
     }, 1);
-    return $def(self, '$binary?', function $binary$ques$11() {
-      
-      return true
-    }, 0);}, {$$arity: 0, $$s: self});
+    return $def(self, '$binary?', $return_val(true), 0);}, {$$arity: 0, $$s: self});
   $$$('Encoding').$register("ISO-8859-1", $hash2(["aliases", "ascii", "inherits"], {"aliases": ["ISO8859-1"], "ascii": true, "inherits": $$$($$$('Encoding'), 'ASCII_8BIT')}));
   $$$('Encoding').$register("US-ASCII", $hash2(["aliases", "ascii", "inherits"], {"aliases": ["ASCII"], "ascii": true, "inherits": $$$($$$('Encoding'), 'ASCII_8BIT')}));
   (function($base, $super) {
@@ -20699,7 +20607,7 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["each_byte"], function $$12(){var self = $$12.$$s == null ? this : $$12.$$s;
+        return $send(self, 'enum_for', ["each_byte"], function $$8(){var self = $$8.$$s == null ? this : $$8.$$s;
 
           return self.$bytesize()}, {$$arity: 0, $$s: self})
       };
@@ -20727,7 +20635,7 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
       
       ;
       if (!(block !== nil)) {
-        return $send(self, 'enum_for', ["each_char"], function $$13(){var self = $$13.$$s == null ? this : $$13.$$s;
+        return $send(self, 'enum_for', ["each_char"], function $$9(){var self = $$9.$$s == null ? this : $$9.$$s;
 
           return self.$length()}, {$$arity: 0, $$s: self})
       };
@@ -20824,21 +20732,15 @@ Opal.modules["corelib/string/encoding"] = function(Opal) {/* Generated by Opal 1
       return self.length;
     }, 0);
     $alias(self, "size", "length");
-    return $def(self, '$valid_encoding?', function $String_valid_encoding$ques$14() {
-      
-      return true
-    }, 0);
+    return $def(self, '$valid_encoding?', $return_val(true), 0);
   })('::', null);
-  
-  $writer = [$$$($$('Encoding'), 'UTF_8')];
-  $send($$$('Encoding'), 'default_external=', $to_a($writer));
-  return $writer[$rb_minus($writer["length"], 1)];;
+  return ($a = [$$$($$('Encoding'), 'UTF_8')], $send($$$('Encoding'), 'default_external=', $a), $a[$a.length - 1]);
 };
 
-Opal.modules["corelib/math"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $type_error = Opal.type_error, $module = Opal.module, $const_set = Opal.const_set, $Class = Opal.Class, $Kernel = Opal.Kernel, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy, $rb_minus = Opal.rb_minus, $eqeqeq = Opal.eqeqeq, $rb_divide = Opal.rb_divide;
+Opal.modules["corelib/math"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $type_error = Opal.type_error, $module = Opal.module, $const_set = Opal.const_set, $Class = Opal.Class, $Kernel = Opal.Kernel, $defs = Opal.defs, $truthy = Opal.truthy, $send = Opal.send, $def = Opal.def, $rb_minus = Opal.rb_minus, $eqeqeq = Opal.eqeqeq, $rb_divide = Opal.rb_divide;
 
-  Opal.add_stubs('new,raise,Float,Integer,module_function,checked,float!,===,gamma,-,integer!,/,infinite?');
+  Opal.add_stubs('new,raise,Float,Integer,module_function,each,define_method,checked,float!,===,gamma,-,integer!,/,infinite?');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Math');
 
@@ -20895,129 +20797,6 @@ Opal.modules["corelib/math"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
     }, 1);
     self.$module_function();
-    
-    $def(self, '$acos', function $$acos(x) {
-      
-      return $$$('Math').$checked("acos", $$$('Math')['$float!'](x))
-    }, 1);
-    if (!$truthy((typeof(Math.acosh) !== "undefined"))) {
-      
-      Math.acosh = function(x) {
-        return Math.log(x + Math.sqrt(x * x - 1));
-      }
-    
-    };
-    
-    $def(self, '$acosh', function $$acosh(x) {
-      
-      return $$$('Math').$checked("acosh", $$$('Math')['$float!'](x))
-    }, 1);
-    
-    $def(self, '$asin', function $$asin(x) {
-      
-      return $$$('Math').$checked("asin", $$$('Math')['$float!'](x))
-    }, 1);
-    if (!$truthy((typeof(Math.asinh) !== "undefined"))) {
-      
-      Math.asinh = function(x) {
-        return Math.log(x + Math.sqrt(x * x + 1))
-      }
-    
-    };
-    
-    $def(self, '$asinh', function $$asinh(x) {
-      
-      return $$$('Math').$checked("asinh", $$$('Math')['$float!'](x))
-    }, 1);
-    
-    $def(self, '$atan', function $$atan(x) {
-      
-      return $$$('Math').$checked("atan", $$$('Math')['$float!'](x))
-    }, 1);
-    
-    $def(self, '$atan2', function $$atan2(y, x) {
-      
-      return $$$('Math').$checked("atan2", $$$('Math')['$float!'](y), $$$('Math')['$float!'](x))
-    }, 2);
-    if (!$truthy((typeof(Math.atanh) !== "undefined"))) {
-      
-      Math.atanh = function(x) {
-        return 0.5 * Math.log((1 + x) / (1 - x));
-      }
-    
-    };
-    
-    $def(self, '$atanh', function $$atanh(x) {
-      
-      return $$$('Math').$checked("atanh", $$$('Math')['$float!'](x))
-    }, 1);
-    if (!$truthy((typeof(Math.cbrt) !== "undefined"))) {
-      
-      Math.cbrt = function(x) {
-        if (x == 0) {
-          return 0;
-        }
-
-        if (x < 0) {
-          return -Math.cbrt(-x);
-        }
-
-        var r  = x,
-            ex = 0;
-
-        while (r < 0.125) {
-          r *= 8;
-          ex--;
-        }
-
-        while (r > 1.0) {
-          r *= 0.125;
-          ex++;
-        }
-
-        r = (-0.46946116 * r + 1.072302) * r + 0.3812513;
-
-        while (ex < 0) {
-          r *= 0.5;
-          ex++;
-        }
-
-        while (ex > 0) {
-          r *= 2;
-          ex--;
-        }
-
-        r = (2.0 / 3.0) * r + (1.0 / 3.0) * x / (r * r);
-        r = (2.0 / 3.0) * r + (1.0 / 3.0) * x / (r * r);
-        r = (2.0 / 3.0) * r + (1.0 / 3.0) * x / (r * r);
-        r = (2.0 / 3.0) * r + (1.0 / 3.0) * x / (r * r);
-
-        return r;
-      }
-    
-    };
-    
-    $def(self, '$cbrt', function $$cbrt(x) {
-      
-      return $$$('Math').$checked("cbrt", $$$('Math')['$float!'](x))
-    }, 1);
-    
-    $def(self, '$cos', function $$cos(x) {
-      
-      return $$$('Math').$checked("cos", $$$('Math')['$float!'](x))
-    }, 1);
-    if (!$truthy((typeof(Math.cosh) !== "undefined"))) {
-      
-      Math.cosh = function(x) {
-        return (Math.exp(x) + Math.exp(-x)) / 2;
-      }
-    
-    };
-    
-    $def(self, '$cosh', function $$cosh(x) {
-      
-      return $$$('Math').$checked("cosh", $$$('Math')['$float!'](x))
-    }, 1);
     if (!$truthy((typeof(Math.erf) !== "undefined"))) {
       
       Opal.prop(Math, 'erf', function(x) {
@@ -21043,11 +20822,6 @@ Opal.modules["corelib/math"] = function(Opal) {/* Generated by Opal 1.4.1 */
       });
     
     };
-    
-    $def(self, '$erf', function $$erf(x) {
-      
-      return $$$('Math').$checked("erf", $$$('Math')['$float!'](x))
-    }, 1);
     if (!$truthy((typeof(Math.erfc) !== "undefined"))) {
       
       Opal.prop(Math, 'erfc', function(x) {
@@ -21076,16 +20850,26 @@ Opal.modules["corelib/math"] = function(Opal) {/* Generated by Opal 1.4.1 */
       });
     
     };
-    
-    $def(self, '$erfc', function $$erfc(x) {
+    $send(["acos", "acosh", "asin", "asinh", "atan", "atanh", "cbrt", "cos", "cosh", "erf", "erfc", "exp", "sin", "sinh", "sqrt", "tanh"], 'each', [], function $Math$3(method){var self = $Math$3.$$s == null ? this : $Math$3.$$s;
+
       
-      return $$$('Math').$checked("erfc", $$$('Math')['$float!'](x))
-    }, 1);
-    
-    $def(self, '$exp', function $$exp(x) {
       
-      return $$$('Math').$checked("exp", $$$('Math')['$float!'](x))
-    }, 1);
+      if (method == null) method = nil;;
+      return $send(self, 'define_method', [method], function $$4(x){
+        
+        
+        if (x == null) x = nil;;
+        return $$$('Math').$checked(method, $$$('Math')['$float!'](x));}, 1);}, {$$arity: 1, $$s: self});
+    
+    $def(self, '$atan2', function $$atan2(y, x) {
+      
+      return $$$('Math').$checked("atan2", $$$('Math')['$float!'](y), $$$('Math')['$float!'](x))
+    }, 2);
+    
+    $def(self, '$hypot', function $$hypot(x, y) {
+      
+      return $$$('Math').$checked("hypot", $$$('Math')['$float!'](x), $$$('Math')['$float!'](y))
+    }, 2);
     
     $def(self, '$frexp', function $$frexp(x) {
       
@@ -21199,18 +20983,6 @@ Opal.modules["corelib/math"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return Math.sqrt(2 * Math.PI) * Math.pow(t, n + 0.5) * Math.exp(-t) * x;
     ;
     }, 1);
-    if (!$truthy((typeof(Math.hypot) !== "undefined"))) {
-      
-      Math.hypot = function(x, y) {
-        return Math.sqrt(x * x + y * y)
-      }
-    
-    };
-    
-    $def(self, '$hypot', function $$hypot(x, y) {
-      
-      return $$$('Math').$checked("hypot", $$$('Math')['$float!'](x), $$$('Math')['$float!'](y))
-    }, 2);
     
     $def(self, '$ldexp', function $$ldexp(mantissa, exponent) {
       
@@ -21255,13 +21027,6 @@ Opal.modules["corelib/math"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return $rb_divide($$$('Math').$checked("log", $$$('Math')['$float!'](x)), $$$('Math').$checked("log", $$$('Math')['$float!'](base)));
       };
     }, -2);
-    if (!$truthy((typeof(Math.log10) !== "undefined"))) {
-      
-      Math.log10 = function(x) {
-        return Math.log(x) / Math.LN10;
-      }
-    
-    };
     
     $def(self, '$log10', function $$log10(x) {
       
@@ -21271,13 +21036,6 @@ Opal.modules["corelib/math"] = function(Opal) {/* Generated by Opal 1.4.1 */
       };
       return $$$('Math').$checked("log10", $$$('Math')['$float!'](x));
     }, 1);
-    if (!$truthy((typeof(Math.log2) !== "undefined"))) {
-      
-      Math.log2 = function(x) {
-        return Math.log(x) / Math.LN2;
-      }
-    
-    };
     
     $def(self, '$log2', function $$log2(x) {
       
@@ -21287,30 +21045,7 @@ Opal.modules["corelib/math"] = function(Opal) {/* Generated by Opal 1.4.1 */
       };
       return $$$('Math').$checked("log2", $$$('Math')['$float!'](x));
     }, 1);
-    
-    $def(self, '$sin', function $$sin(x) {
-      
-      return $$$('Math').$checked("sin", $$$('Math')['$float!'](x))
-    }, 1);
-    if (!$truthy((typeof(Math.sinh) !== "undefined"))) {
-      
-      Math.sinh = function(x) {
-        return (Math.exp(x) - Math.exp(-x)) / 2;
-      }
-    
-    };
-    
-    $def(self, '$sinh', function $$sinh(x) {
-      
-      return $$$('Math').$checked("sinh", $$$('Math')['$float!'](x))
-    }, 1);
-    
-    $def(self, '$sqrt', function $$sqrt(x) {
-      
-      return $$$('Math').$checked("sqrt", $$$('Math')['$float!'](x))
-    }, 1);
-    
-    $def(self, '$tan', function $$tan(x) {
+    return $def(self, '$tan', function $$tan(x) {
       
       
       x = $$$('Math')['$float!'](x);
@@ -21319,29 +21054,10 @@ Opal.modules["corelib/math"] = function(Opal) {/* Generated by Opal 1.4.1 */
       };
       return $$$('Math').$checked("tan", $$$('Math')['$float!'](x));
     }, 1);
-    if (!$truthy((typeof(Math.tanh) !== "undefined"))) {
-      
-      Math.tanh = function(x) {
-        if (x == Infinity) {
-          return 1;
-        }
-        else if (x == -Infinity) {
-          return -1;
-        }
-        else {
-          return (Math.exp(x) - Math.exp(-x)) / (Math.exp(x) + Math.exp(-x));
-        }
-      }
-    
-    };
-    return $def(self, '$tanh', function $$tanh(x) {
-      
-      return $$$('Math').$checked("tanh", $$$('Math')['$float!'](x))
-    }, 1);
   })('::', $nesting)
 };
 
-Opal.modules["corelib/complex/base"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/complex/base"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $truthy = Opal.truthy, $def = Opal.def, $klass = Opal.klass;
 
   Opal.add_stubs('new,from_string');
@@ -21376,10 +21092,10 @@ Opal.modules["corelib/complex/base"] = function(Opal) {/* Generated by Opal 1.4.
   })('::', null, $nesting);
 };
 
-Opal.modules["corelib/complex"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $truthy = Opal.truthy, $eqeqeq = Opal.eqeqeq, $Kernel = Opal.Kernel, $defs = Opal.defs, $rb_times = Opal.rb_times, $def = Opal.def, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $rb_divide = Opal.rb_divide, $eqeq = Opal.eqeq, $to_ary = Opal.to_ary, $rb_gt = Opal.rb_gt, $neqeq = Opal.neqeq, $const_set = Opal.const_set, $alias = Opal.alias;
+Opal.modules["corelib/complex"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $truthy = Opal.truthy, $eqeqeq = Opal.eqeqeq, $Kernel = Opal.Kernel, $defs = Opal.defs, $rb_times = Opal.rb_times, $def = Opal.def, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $rb_divide = Opal.rb_divide, $eqeq = Opal.eqeq, $to_ary = Opal.to_ary, $rb_gt = Opal.rb_gt, $neqeq = Opal.neqeq, $return_val = Opal.return_val, $const_set = Opal.const_set, $alias = Opal.alias;
 
-  Opal.add_stubs('require,real?,===,raise,new,*,cos,sin,attr_reader,class,==,real,imag,Complex,-@,+,__coerced__,-,nan?,/,conj,abs2,quo,polar,exp,log,>,!=,divmod,**,hypot,atan2,lcm,denominator,finite?,infinite?,numerator,abs,arg,rationalize,to_f,to_i,to_r,inspect,zero?,positive?,Rational');
+  Opal.add_stubs('require,real?,===,raise,new,*,cos,sin,attr_reader,class,==,real,imag,Complex,-@,+,__coerced__,-,nan?,/,conj,abs2,quo,polar,exp,log,>,!=,divmod,**,hypot,atan2,lcm,denominator,finite?,infinite?,numerator,abs,arg,rationalize,to_f,to_i,to_r,inspect,zero?,positive?,Rational,rect,angle');
   
   self.$require("corelib/numeric");
   self.$require("corelib/complex/base");
@@ -21672,10 +21388,7 @@ Opal.modules["corelib/complex"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self.$real().$rationalize(eps);
     }, -1);
     
-    $def(self, '$real?', function $Complex_real$ques$11() {
-      
-      return false
-    }, 0);
+    $def(self, '$real?', $return_val(false), 0);
     
     $def(self, '$rect', function $$rect() {
       var self = this;
@@ -21827,7 +21540,7 @@ Opal.modules["corelib/complex"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', $$$('Numeric'), $nesting);
 };
 
-Opal.modules["corelib/rational/base"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/rational/base"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $def = Opal.def, $klass = Opal.klass;
 
   Opal.add_stubs('convert,from_string');
@@ -21856,8 +21569,8 @@ Opal.modules["corelib/rational/base"] = function(Opal) {/* Generated by Opal 1.4
   })('::', null);
 };
 
-Opal.modules["corelib/rational"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $eqeq = Opal.eqeq, $Kernel = Opal.Kernel, $truthy = Opal.truthy, $rb_lt = Opal.rb_lt, $rb_divide = Opal.rb_divide, $defs = Opal.defs, $eqeqeq = Opal.eqeqeq, $not = Opal.not, $Opal = Opal.Opal, $def = Opal.def, $rb_minus = Opal.rb_minus, $rb_times = Opal.rb_times, $rb_plus = Opal.rb_plus, $rb_gt = Opal.rb_gt, $rb_le = Opal.rb_le, $alias = Opal.alias;
+Opal.modules["corelib/rational"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $eqeq = Opal.eqeq, $Kernel = Opal.Kernel, $truthy = Opal.truthy, $rb_lt = Opal.rb_lt, $rb_divide = Opal.rb_divide, $defs = Opal.defs, $eqeqeq = Opal.eqeqeq, $not = Opal.not, $Opal = Opal.Opal, $def = Opal.def, $return_ivar = Opal.return_ivar, $rb_minus = Opal.rb_minus, $rb_times = Opal.rb_times, $rb_plus = Opal.rb_plus, $rb_gt = Opal.rb_gt, $rb_le = Opal.rb_le, $return_self = Opal.return_self, $alias = Opal.alias;
 
   Opal.add_stubs('require,to_i,==,raise,<,-@,new,gcd,/,nil?,===,reduce,to_r,!,equal?,coerce_to!,to_f,numerator,denominator,<=>,-,*,__coerced__,+,Rational,>,**,abs,ceil,with_precision,floor,<=,truncate,send');
   
@@ -21921,17 +21634,9 @@ Opal.modules["corelib/rational"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return (self.den = den);
     }, 2);
     
-    $def(self, '$numerator', function $$numerator() {
-      var self = this;
-
-      return self.num
-    }, 0);
+    $def(self, '$numerator', $return_ivar("num"), 0);
     
-    $def(self, '$denominator', function $$denominator() {
-      var self = this;
-
-      return self.den
-    }, 0);
+    $def(self, '$denominator', $return_ivar("den"), 0);
     
     $def(self, '$coerce', function $$coerce(other) {
       var self = this, $ret_or_1 = nil;
@@ -22220,11 +21925,7 @@ Opal.modules["corelib/rational"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self.$truncate()
     }, 0);
     
-    $def(self, '$to_r', function $$to_r() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$to_r', $return_self, 0);
     
     $def(self, '$to_s', function $$to_s() {
       var self = this;
@@ -22309,10 +22010,10 @@ Opal.modules["corelib/rational"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', $$$('Numeric'));
 };
 
-Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $slice = Opal.slice, $klass = Opal.klass, $Kernel = Opal.Kernel, $Opal = Opal.Opal, $defs = Opal.defs, $eqeqeq = Opal.eqeqeq, $def = Opal.def, $truthy = Opal.truthy, $rb_gt = Opal.rb_gt, $rb_lt = Opal.rb_lt, $rb_plus = Opal.rb_plus, $rb_divide = Opal.rb_divide, $rb_minus = Opal.rb_minus, $range = Opal.range, $neqeq = Opal.neqeq, $rb_le = Opal.rb_le, $eqeq = Opal.eqeq, $alias = Opal.alias;
+Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $slice = Opal.slice, $klass = Opal.klass, $Kernel = Opal.Kernel, $Opal = Opal.Opal, $defs = Opal.defs, $eqeqeq = Opal.eqeqeq, $def = Opal.def, $truthy = Opal.truthy, $rb_gt = Opal.rb_gt, $rb_lt = Opal.rb_lt, $send = Opal.send, $rb_plus = Opal.rb_plus, $rb_divide = Opal.rb_divide, $rb_minus = Opal.rb_minus, $range = Opal.range, $neqeq = Opal.neqeq, $rb_le = Opal.rb_le, $eqeq = Opal.eqeq, $alias = Opal.alias;
 
-  Opal.add_stubs('require,include,===,raise,coerce_to!,respond_to?,to_str,to_i,new,<=>,to_f,nil?,>,<,strftime,year,month,day,+,round,/,-,copy_instance_variables,initialize_dup,is_a?,zero?,wday,utc?,mon,yday,hour,min,sec,rjust,ljust,zone,to_s,[],cweek_cyear,isdst,!=,<=,==,ceil');
+  Opal.add_stubs('require,include,===,raise,coerce_to!,respond_to?,to_str,to_i,_parse_offset,new,<=>,to_f,nil?,>,<,strftime,each,define_method,year,month,day,+,round,/,-,copy_instance_variables,initialize_dup,is_a?,zero?,wday,utc?,mon,yday,hour,min,sec,rjust,ljust,zone,to_s,[],cweek_cyear,jd,to_date,format,isdst,!=,<=,==,ceil,local,gm,asctime,getgm,gmt_offset,inspect,usec,gmtime,gmt?');
   
   self.$require("corelib/comparable");
   return (function($base, $super, $parent_nesting) {
@@ -22340,7 +22041,7 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
           $Kernel.$raise($$$('TypeError'), "can't convert Time into an exact number")
         }
         result = new Date(seconds.getTime());
-        result.is_utc = seconds.is_utc;
+        result.timezone = seconds.timezone;
         return result;
       }
 
@@ -22451,7 +22152,8 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
     }
   ;
     $defs(self, '$new', function $Time_new$1(year, month, day, hour, min, sec, utc_offset) {
-      
+      var self = this;
+
       
       ;
       
@@ -22467,14 +22169,10 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
       
       if (utc_offset == null) utc_offset = nil;;
       
-      var args, result;
+      var args, result, timezone;
 
       if (year === undefined) {
         return new Date();
-      }
-
-      if (utc_offset !== nil) {
-        $Kernel.$raise($$$('ArgumentError'), "Opal does not support explicitly specifying UTC offset for Time")
       }
 
       args  = time_params(year, month, day, hour, min, sec);
@@ -22489,9 +22187,49 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
       if (year < 100) {
         result.setFullYear(year);
       }
+
+      if (utc_offset !== nil) {
+        timezone = self.$_parse_offset(utc_offset);
+      }
+
+      if (timezone != null) {
+        result = new Date(result.getTime() - timezone * 3600000 - result.getTimezoneOffset() * 60000);
+        result.timezone = timezone;
+      }
+
       return result;
     ;
     }, -1);
+    $defs(self, '$_parse_offset', function $$_parse_offset(utc_offset) {
+      
+      
+      var timezone;
+      if (utc_offset.$$is_string) {
+        if (utc_offset == 'UTC') {
+          timezone = 0;
+        }
+        else if(/^[+-]\d\d:[0-5]\d$/.test(utc_offset)) {
+          var sign, hours, minutes;
+          sign = utc_offset[0];
+          hours = +(utc_offset[1] + utc_offset[2]);
+          minutes = +(utc_offset[4] + utc_offset[5]);
+
+          timezone = (sign == '-' ? -1 : 1) * (hours + minutes / 60);
+        }
+        else {
+          // Unsupported: "A".."I","K".."Z"
+          $Kernel.$raise($$$('ArgumentError'), "\"+HH:MM\", \"-HH:MM\", \"UTC\" expected for utc_offset: " + (utc_offset))
+        }
+      }
+      else if (utc_offset.$$is_number) {
+        timezone = utc_offset / 3600;
+      }
+      else {
+        $Kernel.$raise($$$('ArgumentError'), "Opal doesn't support other types for a timezone argument than Integer and String")
+      }
+      return timezone;
+    
+    }, 1);
     $defs(self, '$local', function $$local(year, month, day, hour, min, sec, millisecond, _dummy1, _dummy2, _dummy3) {
       
       
@@ -22587,7 +22325,7 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
       if (year < 100) {
         result.setUTCFullYear(year);
       }
-      result.is_utc = true;
+      result.timezone = 0;
       return result;
     ;
     }, -2);
@@ -22609,7 +22347,7 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
         other = $Opal['$coerce_to!'](other, $$$('Integer'), "to_int");
       }
       var result = new Date(self.getTime() + (other * 1000));
-      result.is_utc = self.is_utc;
+      result.timezone = self.timezone;
       return result;
     ;
     }, 1);
@@ -22626,7 +22364,7 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
         other = $Opal['$coerce_to!'](other, $$$('Integer'), "to_int");
       }
       var result = new Date(self.getTime() - (other * 1000));
-      result.is_utc = self.is_utc;
+      result.timezone = self.timezone;
       return result;
     ;
     }, 1);
@@ -22666,12 +22404,24 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
       return self.$strftime("%a %b %e %H:%M:%S %Y")
     }, 0);
-    
-    $def(self, '$day', function $$day() {
-      var self = this;
+    $send([["year", "getFullYear", "getUTCFullYear"], ["mon", "getMonth", "getUTCMonth", 1], ["wday", "getDay", "getUTCDay"], ["day", "getDate", "getUTCDate"], ["hour", "getHours", "getUTCHours"], ["min", "getMinutes", "getUTCMinutes"], ["sec", "getSeconds", "getUTCSeconds"]], 'each', [], function $Time$6(method, getter, utcgetter, difference){var self = $Time$6.$$s == null ? this : $Time$6.$$s;
 
-      return self.is_utc ? self.getUTCDate() : self.getDate();
-    }, 0);
+      
+      
+      if (method == null) method = nil;;
+      
+      if (getter == null) getter = nil;;
+      
+      if (utcgetter == null) utcgetter = nil;;
+      
+      if (difference == null) difference = 0;;
+      return $send(self, 'define_method', [method], function $$7(){var self = $$7.$$s == null ? this : $$7.$$s;
+
+        
+        return difference + ((self.timezone != null) ?
+          (new Date(self.getTime() + self.timezone * 3600000))[utcgetter]() :
+          self[getter]())
+      }, {$$arity: 0, $$s: self});}, {$$arity: -4, $$s: self});
     
     $def(self, '$yday', function $$yday() {
       var self = this, start_of_year = nil, start_of_day = nil, one_day = nil;
@@ -22703,7 +22453,7 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return copy;
     }, 0);
     
-    $def(self, '$eql?', function $Time_eql$ques$6(other) {
+    $def(self, '$eql?', function $Time_eql$ques$8(other) {
       var self = this, $ret_or_1 = nil;
 
       if ($truthy(($ret_or_1 = other['$is_a?']($$$('Time'))))) {
@@ -22712,23 +22462,21 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return $ret_or_1
       }
     }, 1);
-    
-    $def(self, '$friday?', function $Time_friday$ques$7() {
-      var self = this;
+    $send([["sunday?", 0], ["monday?", 1], ["tuesday?", 2], ["wednesday?", 3], ["thursday?", 4], ["friday?", 5], ["saturday?", 6]], 'each', [], function $Time$9(method, weekday){var self = $Time$9.$$s == null ? this : $Time$9.$$s;
 
-      return self.$wday() == 5
-    }, 0);
+      
+      
+      if (method == null) method = nil;;
+      
+      if (weekday == null) weekday = nil;;
+      return $send(self, 'define_method', [method], function $$10(){var self = $$10.$$s == null ? this : $$10.$$s;
+
+        return self.$wday() === weekday}, {$$arity: 0, $$s: self});}, {$$arity: 2, $$s: self});
     
     $def(self, '$hash', function $$hash() {
       var self = this;
 
       return 'Time:' + self.getTime();
-    }, 0);
-    
-    $def(self, '$hour', function $$hour() {
-      var self = this;
-
-      return self.is_utc ? self.getUTCHours() : self.getHours();
     }, 0);
     
     $def(self, '$inspect', function $$inspect() {
@@ -22741,42 +22489,12 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }
     }, 0);
     
-    $def(self, '$min', function $$min() {
-      var self = this;
-
-      return self.is_utc ? self.getUTCMinutes() : self.getMinutes();
-    }, 0);
-    
-    $def(self, '$mon', function $$mon() {
-      var self = this;
-
-      return (self.is_utc ? self.getUTCMonth() : self.getMonth()) + 1;
-    }, 0);
-    
-    $def(self, '$monday?', function $Time_monday$ques$8() {
-      var self = this;
-
-      return self.$wday() == 1
-    }, 0);
-    
-    $def(self, '$saturday?', function $Time_saturday$ques$9() {
-      var self = this;
-
-      return self.$wday() == 6
-    }, 0);
-    
-    $def(self, '$sec', function $$sec() {
-      var self = this;
-
-      return self.is_utc ? self.getUTCSeconds() : self.getSeconds();
-    }, 0);
-    
     $def(self, '$succ', function $$succ() {
       var self = this;
 
       
       var result = new Date(self.getTime() + 1000);
-      result.is_utc = self.is_utc;
+      result.timezone = self.timezone;
       return result;
     
     }, 0);
@@ -22791,6 +22509,9 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
       var self = this;
 
       
+      if (self.timezone === 0) return "UTC";
+      else if (self.timezone != null) return nil;
+
       var string = self.toString(),
           result;
 
@@ -22815,7 +22536,7 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
       
       var result = new Date(self.getTime());
-      result.is_utc = true;
+      result.timezone = 0;
       return result;
     
     }, 0);
@@ -22824,21 +22545,21 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
       var self = this;
 
       
-      self.is_utc = true;
+      self.timezone = 0;
       return self;
     
     }, 0);
     
-    $def(self, '$gmt?', function $Time_gmt$ques$10() {
+    $def(self, '$gmt?', function $Time_gmt$ques$11() {
       var self = this;
 
-      return self.is_utc === true;
+      return self.timezone === 0;
     }, 0);
     
     $def(self, '$gmt_offset', function $$gmt_offset() {
       var self = this;
 
-      return self.is_utc ? 0 : -self.getTimezoneOffset() * 60;
+      return (self.timezone != null) ? self.timezone * 60 : -self.getTimezoneOffset() * 60;
     }, 0);
     
     $def(self, '$strftime', function $$strftime(format) {
@@ -22846,7 +22567,7 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
       
       return format.replace(/%([\-_#^0]*:{0,2})(\d+)?([EO]*)(.)/g, function(full, flags, width, _, conv) {
-        var result = "",
+        var result = "", jd, c, s,
             zero   = flags.indexOf('0') !== -1,
             pad    = flags.indexOf('-') === -1,
             blank  = flags.indexOf('_') !== -1,
@@ -22962,7 +22683,7 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
             break;
 
           case 'z':
-            var offset  = self.getTimezoneOffset(),
+            var offset  = (self.timezone == null) ? self.getTimezoneOffset() : (-self.timezone * 60),
                 hours   = Math.floor(Math.abs(offset) / 60),
                 minutes = Math.abs(offset) % 60;
 
@@ -23061,6 +22782,28 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
             result += self.$strftime("%H:%M:%S");
             break;
 
+          // Non-standard: JIS X 0301 date format
+          case 'J':
+            jd = self.$to_date().$jd();
+            if (jd < 2405160) {
+              result += self.$strftime("%Y-%m-%d");
+              break;
+            }
+            else if (jd < 2419614)
+              c = 'M', s = 1867;
+            else if (jd < 2424875)
+              c = 'T', s = 1911;
+            else if (jd < 2447535)
+              c = 'S', s = 1925;
+            else if (jd < 2458605)
+              c = 'H', s = 1988;
+            else
+              c = 'R', s = 2018;
+
+            result += self.$format("%c%02d", c, $rb_minus(self.$year(), s));
+            result += self.$strftime("-%m-%d");
+            break;
+
           default:
             return full;
         }
@@ -23083,18 +22826,6 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
     
     }, 1);
     
-    $def(self, '$sunday?', function $Time_sunday$ques$11() {
-      var self = this;
-
-      return self.$wday() == 0
-    }, 0);
-    
-    $def(self, '$thursday?', function $Time_thursday$ques$12() {
-      var self = this;
-
-      return self.$wday() == 4
-    }, 0);
-    
     $def(self, '$to_a', function $$to_a() {
       var self = this;
 
@@ -23111,30 +22842,6 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
       var self = this;
 
       return parseInt(self.getTime() / 1000, 10);
-    }, 0);
-    
-    $def(self, '$tuesday?', function $Time_tuesday$ques$13() {
-      var self = this;
-
-      return self.$wday() == 2
-    }, 0);
-    
-    $def(self, '$wday', function $$wday() {
-      var self = this;
-
-      return self.is_utc ? self.getUTCDay() : self.getDay();
-    }, 0);
-    
-    $def(self, '$wednesday?', function $Time_wednesday$ques$14() {
-      var self = this;
-
-      return self.$wday() == 3
-    }, 0);
-    
-    $def(self, '$year', function $$year() {
-      var self = this;
-
-      return self.is_utc ? self.getUTCFullYear() : self.getFullYear();
     }, 0);
     
     $def(self, '$cweek_cyear', function $$cweek_cyear() {
@@ -23190,7 +22897,7 @@ Opal.modules["corelib/time"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', Date, $nesting);
 };
 
-Opal.modules["corelib/struct"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/struct"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $hash2 = Opal.hash2, $truthy = Opal.truthy, $neqeq = Opal.neqeq, $eqeq = Opal.eqeq, $Opal = Opal.Opal, $send = Opal.send, $Class = Opal.Class, $to_a = Opal.to_a, $def = Opal.def, $defs = Opal.defs, $Kernel = Opal.Kernel, $rb_gt = Opal.rb_gt, $rb_minus = Opal.rb_minus, $eqeqeq = Opal.eqeqeq, $rb_lt = Opal.rb_lt, $rb_ge = Opal.rb_ge, $rb_plus = Opal.rb_plus, $alias = Opal.alias;
 
   Opal.add_stubs('require,include,!=,upcase,[],==,class,unshift,const_name!,map,coerce_to!,new,each,define_struct_attribute,allocate,initialize,alias_method,module_eval,to_proc,const_set,raise,<<,members,define_method,instance_eval,last,>,length,-,keys,any?,join,[]=,each_with_index,hash,===,<,-@,size,>=,include?,to_sym,instance_of?,__id__,eql?,enum_for,+,name,each_pair,inspect,to_h,args,each_with_object,flatten,to_a,respond_to?,dig');
@@ -23343,29 +23050,25 @@ Opal.modules["corelib/struct"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if ($truthy(extra['$any?']())) {
           $Kernel.$raise($$$('ArgumentError'), "unknown keywords: " + (extra.$join(", ")))
         };
-        return $send(self.$class().$members(), 'each', [], function $$9(name){var self = $$9.$$s == null ? this : $$9.$$s, $writer = nil;
+        return $send(self.$class().$members(), 'each', [], function $$9(name){var $b, self = $$9.$$s == null ? this : $$9.$$s;
 
           
           
           if (name == null) name = nil;;
-          $writer = [name, kwargs['$[]'](name)];
-          $send(self, '[]=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});
+          return ($b = [name, kwargs['$[]'](name)], $send(self, '[]=', $b), $b[$b.length - 1]);}, {$$arity: 1, $$s: self});
       } else {
         
         if ($truthy($rb_gt(args.$length(), self.$class().$members().$length()))) {
           $Kernel.$raise($$$('ArgumentError'), "struct size differs")
         };
-        return $send(self.$class().$members(), 'each_with_index', [], function $$10(name, index){var self = $$10.$$s == null ? this : $$10.$$s, $writer = nil;
+        return $send(self.$class().$members(), 'each_with_index', [], function $$10(name, index){var $b, self = $$10.$$s == null ? this : $$10.$$s;
 
           
           
           if (name == null) name = nil;;
           
           if (index == null) index = nil;;
-          $writer = [name, args['$[]'](index)];
-          $send(self, '[]=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 2, $$s: self});
+          return ($b = [name, args['$[]'](index)], $send(self, '[]=', $b), $b[$b.length - 1]);}, {$$arity: 2, $$s: self});
       };
     }, -1);
     
@@ -23624,16 +23327,14 @@ Opal.modules["corelib/struct"] = function(Opal) {/* Generated by Opal 1.4.1 */
       if ((block !== nil)) {
         return $send($send(self, 'map', [], block.$to_proc()), 'to_h', $to_a(self.$args()))
       };
-      return $send(self.$class().$members(), 'each_with_object', [$hash2([], {})], function $$22(name, h){var self = $$22.$$s == null ? this : $$22.$$s, $writer = nil;
+      return $send(self.$class().$members(), 'each_with_object', [$hash2([], {})], function $$22(name, h){var $a, self = $$22.$$s == null ? this : $$22.$$s;
 
         
         
         if (name == null) name = nil;;
         
         if (h == null) h = nil;;
-        $writer = [name, self['$[]'](name)];
-        $send(h, '[]=', $to_a($writer));
-        return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 2, $$s: self});
+        return ($a = [name, self['$[]'](name)], $send(h, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 2, $$s: self});
     }, 0);
     
     $def(self, '$values_at', function $$values_at($a) {
@@ -23686,10 +23387,10 @@ Opal.modules["corelib/struct"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', null, $nesting);
 };
 
-Opal.modules["corelib/dir"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/dir"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $def = Opal.def, $truthy = Opal.truthy, $alias = Opal.alias;
 
-  Opal.add_stubs('[]');
+  Opal.add_stubs('[],pwd');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Dir');
 
@@ -23732,10 +23433,10 @@ Opal.modules["corelib/dir"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', null, $nesting)
 };
 
-Opal.modules["corelib/file"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/file"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $klass = Opal.klass, $const_set = Opal.const_set, $Opal = Opal.Opal, $regexp = Opal.regexp, $rb_plus = Opal.rb_plus, $def = Opal.def, $Kernel = Opal.Kernel, $eqeq = Opal.eqeq, $rb_lt = Opal.rb_lt, $rb_minus = Opal.rb_minus, $range = Opal.range, $send = Opal.send, $alias = Opal.alias;
 
-  Opal.add_stubs('respond_to?,to_path,coerce_to!,pwd,split,sub,+,unshift,join,home,raise,start_with?,absolute_path,==,<,dirname,-,basename,empty?,rindex,[],length,nil?,gsub,find,=~,map,each_with_index,flatten,reject,to_proc,end_with?');
+  Opal.add_stubs('respond_to?,to_path,coerce_to!,pwd,split,sub,+,unshift,join,home,raise,start_with?,absolute_path,==,<,dirname,-,basename,empty?,rindex,[],length,nil?,gsub,find,=~,map,each_with_index,flatten,reject,to_proc,end_with?,expand_path,exist?');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'File');
 
@@ -24023,8 +23724,8 @@ Opal.modules["corelib/file"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::', $$$('IO'), $nesting)
 };
 
-Opal.modules["corelib/process/base"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var nil = Opal.nil, $klass = Opal.klass, $defs = Opal.defs;
+Opal.modules["corelib/process/base"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var nil = Opal.nil, $klass = Opal.klass, $defs = Opal.defs, $return_val = Opal.return_val;
 
   
   (function($base, $super) {
@@ -24046,15 +23747,12 @@ Opal.modules["corelib/process/base"] = function(Opal) {/* Generated by Opal 1.4.
     var self = $klass($base, $super, 'GC');
 
     
-    return $defs(self, '$start', function $$start() {
-      
-      return nil
-    }, 0)
+    return $defs(self, '$start', $return_val(nil), 0)
   })('::', null);
 };
 
-Opal.modules["corelib/process"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $defs = Opal.defs, $truthy = Opal.truthy, $Kernel = Opal.Kernel;
+Opal.modules["corelib/process"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $defs = Opal.defs, $truthy = Opal.truthy, $return_val = Opal.return_val, $Kernel = Opal.Kernel;
 
   Opal.add_stubs('const_set,size,<<,__register_clock__,to_f,now,new,[],raise');
   return (function($base) {
@@ -24094,10 +23792,7 @@ Opal.modules["corelib/process"] = function(Opal) {/* Generated by Opal 1.4.1 */
     if ($truthy(monotonic)) {
       self.$__register_clock__("CLOCK_MONOTONIC", monotonic)
     };
-    $defs(self, '$pid', function $$pid() {
-      
-      return 0
-    }, 0);
+    $defs(self, '$pid', $return_val(0), 0);
     $defs(self, '$times', function $$times() {
       var t = nil;
 
@@ -24134,10 +23829,10 @@ Opal.modules["corelib/process"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })('::')
 };
 
-Opal.modules["corelib/random/formatter"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $module = Opal.module, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $range = Opal.range, $rb_divide = Opal.rb_divide, $Kernel = Opal.Kernel, $Opal = Opal.Opal;
+Opal.modules["corelib/random/formatter"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $module = Opal.module, $def = Opal.def, $range = Opal.range, $send = Opal.send, $rb_divide = Opal.rb_divide, $Kernel = Opal.Kernel, $Opal = Opal.Opal;
 
-  Opal.add_stubs('_verify_count,bytes,encode,strict_encode64,random_bytes,urlsafe_encode64,split,hex,[]=,-,[],map,to_proc,join,times,<<,|,ord,/,abs,random_float,raise,coerce_to!,flatten,new,random_number,length,include,extend');
+  Opal.add_stubs('_verify_count,bytes,encode,strict_encode64,random_bytes,urlsafe_encode64,split,hex,[]=,[],map,to_proc,join,times,<<,|,ord,/,abs,random_float,raise,coerce_to!,flatten,new,random_number,length,include,extend');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Random');
 
@@ -24198,18 +23893,12 @@ Opal.modules["corelib/random/formatter"] = function(Opal) {/* Generated by Opal 
       }, -1);
       
       $def(self, '$uuid', function $$uuid() {
-        var self = this, str = nil, $writer = nil;
+        var self = this, str = nil;
 
         
         str = self.$hex(16).$split("");
-        
-        $writer = [12, "4"];
-        $send(str, '[]=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];;
-        
-        $writer = [16, (parseInt(str['$[]'](16), 16) & 3 | 8).toString(16)];
-        $send(str, '[]=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];;
+        str['$[]='](12, "4");
+        str['$[]='](16, (parseInt(str['$[]'](16), 16) & 3 | 8).toString(16));
         str = [str['$[]']($range(0, 8, true)), str['$[]']($range(8, 12, true)), str['$[]']($range(12, 16, true)), str['$[]']($range(16, 20, true)), str['$[]']($range(20, 32, true))];
         str = $send(str, 'map', [], "join".$to_proc());
         return str.$join("-");
@@ -24316,10 +24005,10 @@ Opal.modules["corelib/random/formatter"] = function(Opal) {/* Generated by Opal 
   })('::', null, $nesting)
 };
 
-Opal.modules["corelib/random/mersenne_twister"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $const_set = Opal.const_set, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, mersenne_twister = nil;
+Opal.modules["corelib/random/mersenne_twister"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $const_set = Opal.const_set, $send = Opal.send, mersenne_twister = nil;
 
-  Opal.add_stubs('generator=,-');
+  Opal.add_stubs('generator=');
   
   mersenne_twister = (function() {
   /* Period parameters */
@@ -24405,7 +24094,7 @@ Opal.modules["corelib/random/mersenne_twister"] = function(Opal) {/* Generated b
   return (function($base, $super) {
     var self = $klass($base, $super, 'Random');
 
-    var $writer = nil;
+    var $a;
 
     
     var MAX_INT = Number.MAX_SAFE_INTEGER || Math.pow(2, 53) - 1;
@@ -24414,14 +24103,11 @@ Opal.modules["corelib/random/mersenne_twister"] = function(Opal) {/* Generated b
     reseed: function(seed) { return mersenne_twister.init(seed); },
     rand: function(mt) { return mersenne_twister.genrand_real(mt); }
   });
-    
-    $writer = [$$$(self, 'MERSENNE_TWISTER_GENERATOR')];
-    $send(self, 'generator=', $to_a($writer));
-    return $writer[$rb_minus($writer["length"], 1)];;
+    return ($a = [$$$(self, 'MERSENNE_TWISTER_GENERATOR')], $send(self, 'generator=', $a), $a[$a.length - 1]);
   })('::', null);
 };
 
-Opal.modules["corelib/random"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/random"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $klass = Opal.klass, $Kernel = Opal.Kernel, $defs = Opal.defs, $Opal = Opal.Opal, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $send = Opal.send;
 
   Opal.add_stubs('require,attr_reader,to_int,raise,new_seed,coerce_to!,reseed,rand,seed,bytes,===,==,state,_verify_count,encode,join,new,chr,random_number,random_float,const_defined?,const_set');
@@ -24554,10 +24240,10 @@ Opal.modules["corelib/random"] = function(Opal) {/* Generated by Opal 1.4.1 */
   return self.$require("corelib/random/mersenne_twister");
 };
 
-Opal.modules["corelib/unsupported"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $Kernel = Opal.Kernel, $klass = Opal.klass, $send = Opal.send, $module = Opal.module, $def = Opal.def, $alias = Opal.alias, $defs = Opal.defs;
+Opal.modules["corelib/unsupported"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $Kernel = Opal.Kernel, $klass = Opal.klass, $send = Opal.send, $module = Opal.module, $def = Opal.def, $return_val = Opal.return_val, $alias = Opal.alias, $defs = Opal.defs;
 
-  Opal.add_stubs('raise,warn,each,define_method,%');
+  Opal.add_stubs('raise,warn,each,define_method,%,public,private_method_defined?,private_class_method,instance_method,instance_methods,method_defined?,private_methods');
   
   
   var warnings = {};
@@ -24688,10 +24374,7 @@ Opal.modules["corelib/unsupported"] = function(Opal) {/* Generated by Opal 1.4.1
       return (methods.length === 1) ? methods[0] : methods;;
     }, -1);
     
-    $def(self, '$private_method_defined?', function $Module_private_method_defined$ques$6(obj) {
-      
-      return false
-    }, 1);
+    $def(self, '$private_method_defined?', $return_val(false), 0);
     
     $def(self, '$private_constant', function $$private_constant($a) {
       var $post_args, $rest_arg;
@@ -24735,7 +24418,7 @@ Opal.modules["corelib/unsupported"] = function(Opal) {/* Generated by Opal 1.4.1
 
     var $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting);
 
-    return $def(self, '$eval', function $Kernel_eval$7($a) {
+    return $def(self, '$eval', function $Kernel_eval$6($a) {
       var $post_args, $rest_arg;
 
       
@@ -24746,7 +24429,7 @@ Opal.modules["corelib/unsupported"] = function(Opal) {/* Generated by Opal 1.4.1
       return $Kernel.$raise($$$('NotImplementedError'), "To use Kernel#eval, you must first require 'opal-parser'. " + ("See https://github.com/opal/opal/blob/" + ($$('RUBY_ENGINE_VERSION')) + "/docs/opal_parser.md for details."));
     }, -1)
   })('::', $nesting);
-  $defs(self, '$public', function $public$8($a) {
+  $defs(self, '$public', function $public$7($a) {
     var $post_args, methods;
 
     
@@ -24756,7 +24439,7 @@ Opal.modules["corelib/unsupported"] = function(Opal) {/* Generated by Opal 1.4.1
     methods = $post_args;;
     return (methods.length === 1) ? methods[0] : methods;;
   }, -1);
-  return $defs(self, '$private', function $private$9($a) {
+  return $defs(self, '$private', function $private$8($a) {
     var $post_args, methods;
 
     
@@ -24768,7 +24451,372 @@ Opal.modules["corelib/unsupported"] = function(Opal) {/* Generated by Opal 1.4.1
   }, -1);
 };
 
-Opal.modules["opal"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["corelib/binding"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a, $Kernel = Opal.Kernel, $return_ivar = Opal.return_ivar, $eqeq = Opal.eqeq, $module = Opal.module, $const_set = Opal.const_set;
+
+  Opal.add_stubs('js_eval,call,raise,inspect,include?,==,receiver,eval,attr_reader,new');
+  
+  (function($base, $super) {
+    var self = $klass($base, $super, 'Binding');
+
+    var $proto = self.$$prototype;
+
+    $proto.jseval = $proto.scope_variables = nil;
+    
+    
+    $def(self, '$initialize', function $$initialize(jseval, scope_variables, receiver, source_location) {
+      var $a, self = this;
+
+      
+      
+      if (scope_variables == null) scope_variables = [];;
+      ;
+      
+      if (source_location == null) source_location = nil;;
+      $a = [jseval, scope_variables, receiver, source_location], (self.jseval = $a[0]), (self.scope_variables = $a[1]), (self.receiver = $a[2]), (self.source_location = $a[3]), $a;
+      if ($truthy(typeof receiver !== undefined)) {
+        return nil
+      } else {
+        return (receiver = self.$js_eval("self"))
+      };
+    }, -2);
+    
+    $def(self, '$js_eval', function $$js_eval($a) {
+      var $post_args, args, self = this;
+
+      
+      
+      $post_args = Opal.slice.call(arguments);
+      
+      args = $post_args;;
+      if ($truthy(self.jseval)) {
+        return $send(self.jseval, 'call', $to_a(args))
+      } else {
+        return $Kernel.$raise("Evaluation on a Proc#binding is not supported")
+      };
+    }, -1);
+    
+    $def(self, '$local_variable_get', function $$local_variable_get(symbol) {
+      var self = this;
+
+      try {
+        return self.$js_eval(symbol)
+      } catch ($err) {
+        if (Opal.rescue($err, [$$$('Exception')])) {
+          try {
+            return $Kernel.$raise($$$('NameError'), "local variable `" + (symbol) + "' is not defined for " + (self.$inspect()))
+          } finally { Opal.pop_exception(); }
+        } else { throw $err; }
+      }
+    }, 1);
+    
+    $def(self, '$local_variable_set', function $$local_variable_set(symbol, value) {
+      var self = this;
+
+      
+      Opal.Binding.tmp_value = value;
+      self.$js_eval("" + (symbol) + " = Opal.Binding.tmp_value");
+      delete Opal.Binding.tmp_value;
+      return value;
+    }, 2);
+    
+    $def(self, '$local_variables', $return_ivar("scope_variables"), 0);
+    
+    $def(self, '$local_variable_defined?', function $Binding_local_variable_defined$ques$1(value) {
+      var self = this;
+
+      return self.scope_variables['$include?'](value)
+    }, 1);
+    
+    $def(self, '$eval', function $Binding_eval$2(str, file, line) {
+      var self = this;
+
+      
+      
+      if (file == null) file = nil;;
+      
+      if (line == null) line = nil;;
+      if ($eqeq(str, "self")) {
+        return self.$receiver()
+      };
+      return $Kernel.$eval(str, self, file, line);
+    }, -2);
+    return self.$attr_reader("receiver", "source_location");
+  })('::', null);
+  (function($base) {
+    var self = $module($base, 'Kernel');
+
+    
+    return $def(self, '$binding', function $$binding() {
+      
+      return $Kernel.$raise("Opal doesn't support dynamic calls to binding")
+    }, 0)
+  })('::');
+  return $const_set($nesting[0], 'TOPLEVEL_BINDING', $$$('Binding').$new(
+    function(js) {
+      return (new Function("self", "return " + js))(self);
+    }
+  , [], self, ["<main>", 0]));
+};
+
+Opal.modules["corelib/irb"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $truthy = Opal.truthy, $Kernel = Opal.Kernel, $defs = Opal.defs, $hash = Opal.hash, $gvars = Opal.gvars, $lambda = Opal.lambda, $send = Opal.send, $rb_plus = Opal.rb_plus, $const_set = Opal.const_set, $klass = Opal.klass, $def = Opal.def, $Opal = Opal.Opal, $range = Opal.range, $eqeq = Opal.eqeq;
+
+  Opal.add_stubs('include?,raise,attr_accessor,singleton_class,output=,browser?,each,dup,write_proc=,proc,+,output,join,last,split,end_with?,call,write_proc,tty=,read_proc,read_proc=,freeze,new,string,ensure_loaded,prepare_console,loop,print,gets,puts,start_with?,[],==,silence,message,empty?,warnings,warn,full_message,eval_and_print,irb');
+  
+  (function($base, $parent_nesting) {
+    var self = $module($base, 'Opal');
+
+    var $nesting = [self].concat($parent_nesting);
+
+    return (function($base, $parent_nesting) {
+      var self = $module($base, 'IRB');
+
+      var $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting);
+
+      
+      $defs(self, '$ensure_loaded', function $$ensure_loaded(library) {
+        var version = nil, url = nil;
+
+        
+        if ($truthy((Opal.loaded_features)['$include?'](library))) {
+          return nil
+        };
+        version = ($truthy($$('RUBY_ENGINE_VERSION')['$include?']("dev")) ? ("master") : ($$('RUBY_ENGINE_VERSION')));
+        url = "https://cdn.opalrb.com/opal/" + (version) + "/" + (library) + ".js";
+        
+        var libcode;
+
+        if (typeof XMLHttpRequest !== 'undefined') { // Browser
+          var r = new XMLHttpRequest();
+          r.open("GET", url, false);
+          r.send('');
+          libcode = r.responseText;
+        }
+        else {
+          $Kernel.$raise("You need to provision " + (library) + " yourself in this environment")
+        }
+
+        (new Function('Opal', libcode))(Opal);
+
+        Opal.require(library);
+      ;
+        if ($truthy((Opal.loaded_features)['$include?'](library))) {
+          return nil
+        } else {
+          return $Kernel.$raise("Could not load " + (library) + " for some reason")
+        };
+      }, 1);
+      self.$singleton_class().$attr_accessor("output");
+      $defs(self, '$prepare_console', function $$prepare_console() {
+        var block = $$prepare_console.$$p || nil, $a, self = this, original = nil, original_read_proc = nil;
+        if ($gvars.stdout == null) $gvars.stdout = nil;
+        if ($gvars.stderr == null) $gvars.stderr = nil;
+        if ($gvars.stdin == null) $gvars.stdin = nil;
+
+        delete $$prepare_console.$$p;
+        
+        ;
+        return (function() { try {
+        
+        self['$output=']("");
+        original = $hash($gvars.stdout, $lambda(function $$1(i){
+          
+          
+          if (i == null) i = nil;;
+          return ($gvars.stdout = i);}, 1), $gvars.stderr, $lambda(function $$2(i){
+          
+          
+          if (i == null) i = nil;;
+          return ($gvars.stderr = i);}, 1));
+        if ($truthy(self['$browser?']())) {
+          
+          $send(original, 'each', [], function $$3(pipe, pipe_setter){var self = $$3.$$s == null ? this : $$3.$$s, new_pipe = nil;
+
+            
+            
+            if (pipe == null) pipe = nil;;
+            
+            if (pipe_setter == null) pipe_setter = nil;;
+            new_pipe = pipe.$dup();
+            new_pipe['$write_proc=']($send(self, 'proc', [], function $$4(str){var self = $$4.$$s == null ? this : $$4.$$s;
+
+              
+              
+              if (str == null) str = nil;;
+              self['$output=']($rb_plus(self.$output(), str));
+              self['$output='](self.$output().$split("\n").$last(30).$join("\n"));
+              if ($truthy(str['$end_with?']("\n"))) {
+                self['$output=']($rb_plus(self.$output(), "\n"))
+              };
+              return pipe.$write_proc().$call(str);}, {$$arity: 1, $$s: self}));
+            new_pipe['$tty='](false);
+            return pipe_setter.$call(new_pipe);}, {$$arity: 2, $$s: self});
+          original_read_proc = $gvars.stdin.$read_proc();
+          $gvars.stdin['$read_proc='](function(s) { var p = prompt(self.$output()); if (p !== null) return p + "\n"; return nil; });
+        };
+        return Opal.yieldX(block, []);;
+        } finally {
+          ($send(original, 'each', [], function $$5(pipe, pipe_setter){
+            
+            
+            if (pipe == null) pipe = nil;;
+            
+            if (pipe_setter == null) pipe_setter = nil;;
+            return pipe_setter.$call(pipe);}, 2), ($a = [original_read_proc], $send($gvars.stdin, 'read_proc=', $a), $a[$a.length - 1]), ($a = [""], $send(self, 'output=', $a), $a[$a.length - 1]))
+        }; })();
+      }, 0);
+      $defs(self, '$browser?', function $IRB_browser$ques$6() {
+        
+        return typeof(document) !== 'undefined' && typeof(prompt) !== 'undefined';
+      }, 0);
+      $const_set($nesting[0], 'LINEBREAKS', ["unexpected token $end", "unterminated string meets end of file"].$freeze());
+      return (function($base, $super) {
+        var self = $klass($base, $super, 'Silencer');
+
+        var $proto = self.$$prototype;
+
+        $proto.collector = $proto.stderr = nil;
+        
+        
+        $def(self, '$initialize', function $$initialize() {
+          var self = this;
+          if ($gvars.stderr == null) $gvars.stderr = nil;
+
+          return (self.stderr = $gvars.stderr)
+        }, 0);
+        
+        $def(self, '$silence', function $$silence() {
+          var $yield = $$silence.$$p || nil, self = this;
+
+          delete $$silence.$$p;
+          return (function() { try {
+          
+          self.collector = $$$('StringIO').$new();
+          $gvars.stderr = self.collector;
+          return Opal.yieldX($yield, []);;
+          } finally {
+            ($gvars.stderr = self.stderr)
+          }; })()
+        }, 0);
+        return $def(self, '$warnings', function $$warnings() {
+          var self = this;
+
+          return self.collector.$string()
+        }, 0);
+      })($nesting[0], null);
+    })($nesting[0], $nesting)
+  })($nesting[0], $nesting);
+  (function($base, $super, $parent_nesting) {
+    var self = $klass($base, $super, 'Binding');
+
+    var $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting);
+
+    return $def(self, '$irb', function $$irb() {try {
+
+      var self = this, silencer = nil;
+
+      
+      $$$($Opal, 'IRB').$ensure_loaded("opal-replutils");
+      silencer = $$$($$$($Opal, 'IRB'), 'Silencer').$new();
+      return (function(){var $brk = Opal.new_brk(); try {return $send($$$($Opal, 'IRB'), 'prepare_console', [], function $$7(){var self = $$7.$$s == null ? this : $$7.$$s;
+
+        return (function(){var $brk = Opal.new_brk(); try {return $send(self, 'loop', [], function $$8(){var self = $$8.$$s == null ? this : $$8.$$s, line = nil, code = nil, mode = nil, js_code = nil, e = nil;
+
+          
+          self.$print(">> ");
+          line = self.$gets();
+          if (!$truthy(line)) {
+            
+            Opal.brk(nil, $brk)
+          };
+          code = "";
+          if ($truthy($$$($Opal, 'IRB')['$browser?']())) {
+            self.$puts(line)
+          };
+          if ($truthy(line['$start_with?']("ls "))) {
+            
+            code = line['$[]']($range(3, -1, false));
+            mode = "ls";
+          } else if ($eqeq(line, "ls\n")) {
+            
+            code = "self";
+            mode = "ls";
+          } else if ($truthy(line['$start_with?']("show "))) {
+            
+            code = line['$[]']($range(5, -1, false));
+            mode = "show";
+          } else {
+            
+            code = line;
+            mode = "inspect";
+          };
+          js_code = nil;
+          
+          retry_1: do { try {
+            $send(silencer, 'silence', [], function $$9(){
+              return (js_code = Opal.compile(code, {irb: true}))}, 0)
+          } catch ($err) {
+            if (Opal.rescue($err, [$$('SyntaxError')])) {(e = $err)
+              try {
+                if ($truthy($$$($$$($Opal, 'IRB'), 'LINEBREAKS')['$include?'](e.$message()))) {
+                  
+                  self.$print(".. ");
+                  line = self.$gets();
+                  if (!$truthy(line)) {
+                    Opal.ret(nil)
+                  };
+                  if ($truthy($$$($Opal, 'IRB')['$browser?']())) {
+                    self.$puts(line)
+                  };
+                  code = $rb_plus(code, line);
+                  continue retry_1;
+                } else if ($truthy(silencer.$warnings()['$empty?']())) {
+                  self.$warn(e.$full_message())
+                } else {
+                  self.$warn(silencer.$warnings())
+                }
+              } finally { Opal.pop_exception(); }
+            } else { throw $err; }
+          } break; } while(1);;
+          if ($eqeq(mode, "show")) {
+            
+            self.$puts(js_code);
+            Opal.ret(nil);
+          };
+          return self.$puts($$$('REPLUtils').$eval_and_print(js_code, mode, false, self));}, {$$arity: 0, $$s: self, $$brk: $brk})
+        } catch (err) { if (err === $brk) { return err.$v } else { throw err } }})()}, {$$arity: 0, $$s: self, $$brk: $brk})
+      } catch (err) { if (err === $brk) { return err.$v } else { throw err } }})();
+      } catch ($returner) { if ($returner === Opal.returner) { return $returner.$v } throw $returner; }
+    }, 0)
+  })('::', null, $nesting);
+  
+  // Run in WebTools console with: Opal.irb(c => eval(c))
+  Opal.irb = function(fun) {
+    $$$('Binding').$new(fun).$irb()
+  }
+
+  Opal.load_parser = function() {
+    Opal.Opal.IRB.$ensure_loaded('opal-parser');
+  }
+
+  if (typeof Opal.eval === 'undefined') {
+    Opal.eval = function(str) {
+      Opal.load_parser();
+      return Opal.eval(str);
+    }
+  }
+
+  if (typeof Opal.compile === 'undefined') {
+    Opal.compile = function(str, options) {
+      Opal.load_parser();
+      return Opal.compile(str, options);
+    }
+  }
+;
+};
+
+Opal.modules["opal"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var nil = Opal.nil, $Object = Opal.Object;
 
   Opal.add_stubs('require,autoload');
@@ -24784,18 +24832,20 @@ Opal.modules["opal"] = function(Opal) {/* Generated by Opal 1.4.1 */
   $Object.$autoload("Rational", "corelib/rational");
   $Object.$require("corelib/time");
   $Object.$autoload("Struct", "corelib/struct");
-  $Object.$require("corelib/dir");
+  $Object.$autoload("Dir", "corelib/dir");
   $Object.$autoload("File", "corelib/file");
   $Object.$require("corelib/process/base");
   $Object.$autoload("Process", "corelib/process");
   $Object.$autoload("Random", "corelib/random");
-  return $Object.$require("corelib/unsupported");
+  $Object.$require("corelib/unsupported");
+  $Object.$require("corelib/binding");
+  return $Object.$require("corelib/irb");
 };
 
-Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $defs = Opal.defs, $truthy = Opal.truthy, $send = Opal.send, $Kernel = Opal.Kernel, $hash2 = Opal.hash2, $range = Opal.range, $to_a = Opal.to_a, $def = Opal.def, $alias = Opal.alias, $klass = Opal.klass, $rb_minus = Opal.rb_minus, $send2 = Opal.send2, $find_super = Opal.find_super, $eqeqeq = Opal.eqeqeq, $rb_ge = Opal.rb_ge, $gvars = Opal.gvars;
+Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $defs = Opal.defs, $truthy = Opal.truthy, $send = Opal.send, $Kernel = Opal.Kernel, $hash2 = Opal.hash2, $range = Opal.range, $to_a = Opal.to_a, $def = Opal.def, $return_ivar = Opal.return_ivar, $alias = Opal.alias, $klass = Opal.klass, $rb_minus = Opal.rb_minus, $return_val = Opal.return_val, $send2 = Opal.send2, $find_super = Opal.find_super, $eqeqeq = Opal.eqeqeq, $rb_ge = Opal.rb_ge, $return_self = Opal.return_self, $gvars = Opal.gvars;
 
-  Opal.add_stubs('try_convert,native?,respond_to?,to_n,raise,inspect,Native,proc,map!,end_with?,define_method,[],convert,call,to_proc,new,each,native_reader,native_writer,extend,warn,include,is_a?,map,to_a,_Array,method_missing,bind,instance_method,slice,-,length,[]=,enum_for,===,>=,<<,each_pair,method_defined?,_initialize,name,native_module');
+  Opal.add_stubs('try_convert,native?,respond_to?,to_n,raise,inspect,Native,proc,map!,end_with?,define_method,[],convert,call,to_proc,new,each,native_reader,native_writer,extend,warn,include,is_a?,map,Array,to_a,_Array,method_missing,bind,instance_method,[]=,slice,-,length,has_key?,enum_for,===,>=,<<,each_pair,method_defined?,initialize,_initialize,name,native_module');
   
   (function($base, $parent_nesting) {
     var self = $module($base, 'Native');
@@ -25060,12 +25110,7 @@ Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return (self["native"] = native$);
       }, 1);
       
-      $def(self, '$to_n', function $$to_n() {
-        var self = this;
-        if (self["native"] == null) self["native"] = nil;
-
-        return self["native"]
-      }, 0);
+      $def(self, '$to_n', $return_ivar("native"), 0);
       return $defs(self, '$included', function $$included(klass) {
         
         return klass.$extend($$('Helpers'))
@@ -25241,7 +25286,7 @@ Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
     }, -2);
     
     $def(self, '$method_missing', function $$method_missing(mid, $a) {
-      var block = $$method_missing.$$p || nil, $post_args, args, self = this, $writer = nil;
+      var block = $$method_missing.$$p || nil, $post_args, args, $b, self = this;
 
       delete $$method_missing.$$p;
       
@@ -25252,7 +25297,7 @@ Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
       args = $post_args;;
       
       if (mid.charAt(mid.length - 1) === '=') {
-        return (($writer = [mid.$slice(0, $rb_minus(mid.$length(), 1)), args['$[]'](0)]), $send(self, '[]=', $to_a($writer)), $writer[$rb_minus($writer["length"], 1)]);
+        return ($b = [mid.$slice(0, $rb_minus(mid.$length(), 1)), args['$[]'](0)], $send(self, '[]=', $b), $b[$b.length - 1]);
       }
       else {
         return $send($$$('Native'), 'call', [self["native"], mid].concat($to_a(args)), block.$to_proc());
@@ -25260,24 +25305,21 @@ Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
     ;
     }, -2);
     
-    $def(self, '$nil?', function $Object_nil$ques$21() {
-      
-      return false
-    }, 0);
+    $def(self, '$nil?', $return_val(false), 0);
     
-    $def(self, '$is_a?', function $Object_is_a$ques$22(klass) {
+    $def(self, '$is_a?', function $Object_is_a$ques$21(klass) {
       var self = this;
 
       return Opal.is_a(self, klass);
     }, 1);
     
-    $def(self, '$instance_of?', function $Object_instance_of$ques$23(klass) {
+    $def(self, '$instance_of?', function $Object_instance_of$ques$22(klass) {
       var self = this;
 
       return self.$$class === klass;
     }, 1);
     
-    $def(self, '$class', function $Object_class$24() {
+    $def(self, '$class', function $Object_class$23() {
       var self = this;
 
       return self.$$class;
@@ -25352,7 +25394,7 @@ Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, 0);
     
-    $def(self, '$[]', function $Array_$$$25(index) {
+    $def(self, '$[]', function $Array_$$$24(index) {
       var self = this, result = nil, $ret_or_1 = nil;
 
       
@@ -25368,7 +25410,7 @@ Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
       };
     }, 1);
     
-    $def(self, '$[]=', function $Array_$$$eq$26(index, value) {
+    $def(self, '$[]=', function $Array_$$$eq$25(index, value) {
       var self = this;
 
       if ($truthy(self.set)) {
@@ -25426,11 +25468,7 @@ Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
     var self = $klass($base, $super, 'Proc');
 
     
-    return $def(self, '$to_n', function $$to_n() {
-      var self = this;
-
-      return self
-    }, 0)
+    return $def(self, '$to_n', $return_self, 0)
   })($nesting[0], null);
   (function($base, $super) {
     var self = $klass($base, $super, 'String');
@@ -25455,14 +25493,8 @@ Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
   (function($base, $super) {
     var self = $klass($base, $super, 'MatchData');
 
-    var $proto = self.$$prototype;
-
-    $proto.matches = nil;
-    return $def(self, '$to_n', function $$to_n() {
-      var self = this;
-
-      return self.matches
-    }, 0)
+    
+    return $def(self, '$to_n', $return_ivar("matches"), 0)
   })($nesting[0], null);
   (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Struct');
@@ -25474,7 +25506,7 @@ Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
       
       result = {};
-      $send(self, 'each_pair', [], function $$27(name, value){
+      $send(self, 'each_pair', [], function $$26(name, value){
         
         
         if (name == null) name = nil;;
@@ -25519,11 +25551,7 @@ Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
     var self = $klass($base, $super, 'Time');
 
     
-    return $def(self, '$to_n', function $$to_n() {
-      var self = this;
-
-      return self
-    }, 0)
+    return $def(self, '$to_n', $return_self, 0)
   })($nesting[0], null);
   (function($base, $super) {
     var self = $klass($base, $super, 'NilClass');
@@ -25655,7 +25683,7 @@ Opal.modules["native"] = function(Opal) {/* Generated by Opal 1.4.1 */
   return ($gvars.$ = ($gvars.global = self.$Native(Opal.global)));
 };
 
-Opal.modules["opal/jquery/constants"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["opal/jquery/constants"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $a, self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $truthy = Opal.truthy, $const_set = Opal.const_set;
 
   Opal.add_stubs('require,raise');
@@ -25674,10 +25702,10 @@ Opal.modules["opal/jquery/constants"] = function(Opal) {/* Generated by Opal 1.4
   };
 };
 
-Opal.modules["opal/jquery/element"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $klass = Opal.klass, $defs = Opal.defs, $send = Opal.send, $to_a = Opal.to_a, $def = Opal.def, $alias = Opal.alias, $truthy = Opal.truthy, $send2 = Opal.send2, $find_super = Opal.find_super;
+Opal.modules["opal/jquery/element"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $klass = Opal.klass, $defs = Opal.defs, $send = Opal.send, $to_a = Opal.to_a, $def = Opal.def, $alias = Opal.alias, $return_self = Opal.return_self, $truthy = Opal.truthy, $send2 = Opal.send2, $find_super = Opal.find_super;
 
-  Opal.add_stubs('require,to_n,include,each,alias_native,attr_reader,call,nil?,raise,is_a?,has_key?,delete,from_object,gsub,upcase,[],compact,map,respond_to?,<<,Native,arity,new');
+  Opal.add_stubs('require,to_n,include,each,alias_native,attr_reader,call,next,append,nil?,raise,is_a?,has_key?,delete,from_object,gsub,upcase,[],compact,map,respond_to?,<<,Native,none?,arity,new,length');
   
   self.$require("native");
   self.$require("opal/jquery/constants");
@@ -25810,11 +25838,7 @@ Opal.modules["opal/jquery/element"] = function(Opal) {/* Generated by Opal 1.4.1
     self.$alias_native("outer_width", "outerWidth");
     self.$alias_native("outer_height", "outerHeight");
     
-    $def(self, '$to_n', function $$to_n() {
-      var self = this;
-
-      return self
-    }, 0);
+    $def(self, '$to_n', $return_self, 0);
     
     $def(self, '$[]', function $Element_$$$4(name) {
       var self = this;
@@ -26308,7 +26332,7 @@ Opal.modules["opal/jquery/element"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $$('JQUERY_CLASS').$to_n(), $nesting);
 };
 
-Opal.modules["opal/jquery/window"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["opal/jquery/window"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a, $const_set = Opal.const_set, $gvars = Opal.gvars;
 
   Opal.add_stubs('require,include,find,on,element,to_proc,off,trigger,new');
@@ -26375,7 +26399,7 @@ Opal.modules["opal/jquery/window"] = function(Opal) {/* Generated by Opal 1.4.1 
   return ($gvars.window = $$('Window'));
 };
 
-Opal.modules["opal/jquery/document"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["opal/jquery/document"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $class_variable_set = Opal.class_variable_set, $truthy = Opal.truthy, $class_variable_get = Opal.class_variable_get, $def = Opal.def, $send = Opal.send, $const_set = Opal.const_set, $gvars = Opal.gvars;
 
   Opal.add_stubs('require,to_n,call,new,ready?,resolve,module_function,find,extend');
@@ -26451,10 +26475,10 @@ Opal.modules["opal/jquery/document"] = function(Opal) {/* Generated by Opal 1.4.
   return ($gvars.document = $$('Document'));
 };
 
-Opal.modules["opal/jquery/event"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $klass = Opal.klass, $def = Opal.def, $alias = Opal.alias;
+Opal.modules["opal/jquery/event"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $klass = Opal.klass, $assign_ivar = Opal.assign_ivar, $def = Opal.def, $return_ivar = Opal.return_ivar, $alias = Opal.alias;
 
-  Opal.add_stubs('require,to_n,stop,prevent');
+  Opal.add_stubs('require,to_n,element,stop,prevent,prevented?,stopped?,stop_immediate');
   
   self.$require("opal/jquery/constants");
   return (function($base, $super, $parent_nesting) {
@@ -26466,17 +26490,9 @@ Opal.modules["opal/jquery/event"] = function(Opal) {/* Generated by Opal 1.4.1 *
     
     var $ = $$('JQUERY_SELECTOR').$to_n();
     
-    $def(self, '$initialize', function $$initialize(native$) {
-      var self = this;
-
-      return (self["native"] = native$)
-    }, 1);
+    $def(self, '$initialize', $assign_ivar("native"), 0);
     
-    $def(self, '$to_n', function $$to_n() {
-      var self = this;
-
-      return self["native"]
-    }, 0);
+    $def(self, '$to_n', $return_ivar("native"), 0);
     
     $def(self, '$[]', function $Event_$$$1(name) {
       var self = this;
@@ -26608,15 +26624,15 @@ Opal.modules["opal/jquery/event"] = function(Opal) {/* Generated by Opal 1.4.1 *
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["json"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $Object = Opal.Object, $hash2 = Opal.hash2, $eqeqeq = Opal.eqeqeq, $defs = Opal.defs, $truthy = Opal.truthy, $def = Opal.def;
+Opal.modules["json"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $send = Opal.send, $Object = Opal.Object, $hash2 = Opal.hash2, $eqeqeq = Opal.eqeqeq, $defs = Opal.defs, $truthy = Opal.truthy, $def = Opal.def, $return_val = Opal.return_val;
 
-  Opal.add_stubs('raise,new,push,[]=,-,[],create_id,json_create,const_get,attr_accessor,create_id=,===,parse,generate,from_object,merge,to_json,responds_to?,to_io,write,to_s,to_a,strftime');
+  Opal.add_stubs('raise,new,push,[]=,[],create_id,json_create,const_get,attr_accessor,create_id=,===,parse,generate,from_object,merge,to_json,responds_to?,to_io,write,to_s,to_a,strftime');
   
   (function($base, $parent_nesting) {
     var self = $module($base, 'JSON');
 
-    var $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting), $writer = nil;
+    var $a, $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting);
 
     
     $klass($nesting[0], $$('StandardError'), 'JSONError');
@@ -26665,7 +26681,7 @@ Opal.modules["json"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
             for (k in value) {
               if ($hasOwn.call(value, k)) {
-                (($writer = [k, to_opal(value[k], options)]), $send((hash), '[]=', $to_a($writer)), $writer[$rb_minus($writer["length"], 1)]);
+                ($a = [k, to_opal(value[k], options)], $send((hash), '[]=', $a), $a[$a.length - 1]);
               }
             }
 
@@ -26683,10 +26699,7 @@ Opal.modules["json"] = function(Opal) {/* Generated by Opal 1.4.1 */
       
       return self.$attr_accessor("create_id")
     })(Opal.get_singleton_class(self), $nesting);
-    
-    $writer = ["json_class"];
-    $send(self, 'create_id=', $to_a($writer));
-    $writer[$rb_minus($writer["length"], 1)];;
+    self['$create_id=']("json_class");
     $defs(self, '$[]', function $JSON_$$$1(value, options) {
       var self = this;
 
@@ -26724,7 +26737,7 @@ Opal.modules["json"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self.$from_object($parse(source), options);
     }, -2);
     $defs(self, '$from_object', function $$from_object(js_object, options) {
-      var $ret_or_1 = nil, $writer = nil;
+      var $ret_or_1 = nil;
 
       
       
@@ -26732,18 +26745,12 @@ Opal.modules["json"] = function(Opal) {/* Generated by Opal 1.4.1 */
       if ($truthy(($ret_or_1 = options['$[]']("object_class")))) {
         $ret_or_1
       } else {
-        
-        $writer = ["object_class", $$('Hash')];
-        $send(options, '[]=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];
+        options['$[]=']("object_class", $$('Hash'))
       };
       if ($truthy(($ret_or_1 = options['$[]']("array_class")))) {
         $ret_or_1
       } else {
-        
-        $writer = ["array_class", $$('Array')];
-        $send(options, '[]=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];
+        options['$[]=']("array_class", $$('Array'))
       };
       return to_opal(js_object, options.$$smap);;
     }, -2);
@@ -26854,10 +26861,7 @@ Opal.modules["json"] = function(Opal) {/* Generated by Opal 1.4.1 */
     var self = $klass($base, $super, 'NilClass');
 
     
-    return $def(self, '$to_json', function $$to_json() {
-      
-      return "null"
-    }, 0)
+    return $def(self, '$to_json', $return_val("null"), 0)
   })($nesting[0], null);
   (function($base, $super) {
     var self = $klass($base, $super, 'Numeric');
@@ -26908,17 +26912,17 @@ Opal.modules["json"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null);
 };
 
-Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $klass = Opal.klass, $defs = Opal.defs, $hash2 = Opal.hash2, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $truthy = Opal.truthy, $not = Opal.not, $send = Opal.send, $to_a = Opal.to_a, $rb_plus = Opal.rb_plus, $alias = Opal.alias, $send2 = Opal.send2, $find_super = Opal.find_super, $rb_le = Opal.rb_le, $rb_minus = Opal.rb_minus, $const_set = Opal.const_set;
+Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $klass = Opal.klass, $defs = Opal.defs, $hash2 = Opal.hash2, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $truthy = Opal.truthy, $return_ivar = Opal.return_ivar, $not = Opal.not, $send = Opal.send, $to_a = Opal.to_a, $rb_plus = Opal.rb_plus, $alias = Opal.alias, $send2 = Opal.send2, $find_super = Opal.find_super, $rb_le = Opal.rb_le, $rb_minus = Opal.rb_minus, $const_set = Opal.const_set;
 
-  Opal.add_stubs('resolve,new,reject,attr_reader,===,value,key?,keys,!=,==,<<,>>,exception?,[],resolved?,rejected?,!,error,include?,action,realized?,raise,^,call,resolve!,exception!,any?,each,reject!,there_can_be_only_one!,then,to_proc,fail,always,trace,class,object_id,+,inspect,rescue,nil?,prev,act?,push,concat,it,proc,reverse,pop,<=,length,shift,-,wait,map,reduce,try,tap,all?,find');
+  Opal.add_stubs('resolve,new,reject,attr_reader,===,value,key?,keys,!=,==,<<,>>,exception?,[],resolved?,rejected?,!,error,include?,action,realized?,raise,^,call,resolve!,exception!,any?,each,reject!,there_can_be_only_one!,then,to_proc,fail,always,trace,class,object_id,+,inspect,rescue,fail!,then!,always!,to_v2,itself,nil?,prev,act?,push,concat,it,proc,reverse,pop,<=,length,shift,-,wait,map,reduce,try,tap,all?,find,collect,inject');
   
   (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Promise');
 
     var $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting), $proto = self.$$prototype;
 
-    $proto.value = $proto.action = $proto.exception = $proto.realized = $proto.next = $proto.delayed = $proto.error = $proto.prev = nil;
+    $proto.value = $proto.action = $proto.realized = $proto.next = $proto.delayed = $proto.error = $proto.prev = nil;
     
     $defs(self, '$value', function $$value(value) {
       var self = this;
@@ -26984,31 +26988,27 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self.action.$keys()
     }, 0);
     
-    $def(self, '$exception?', function $Promise_exception$ques$2() {
-      var self = this;
-
-      return self.exception
-    }, 0);
+    $def(self, '$exception?', $return_ivar("exception"), 0);
     
-    $def(self, '$realized?', function $Promise_realized$ques$3() {
+    $def(self, '$realized?', function $Promise_realized$ques$2() {
       var self = this;
 
       return self.realized['$!='](false)
     }, 0);
     
-    $def(self, '$resolved?', function $Promise_resolved$ques$4() {
+    $def(self, '$resolved?', function $Promise_resolved$ques$3() {
       var self = this;
 
       return self.realized['$==']("resolve")
     }, 0);
     
-    $def(self, '$rejected?', function $Promise_rejected$ques$5() {
+    $def(self, '$rejected?', function $Promise_rejected$ques$4() {
       var self = this;
 
       return self.realized['$==']("reject")
     }, 0);
     
-    $def(self, '$^', function $Promise_$$6(promise) {
+    $def(self, '$^', function $Promise_$$5(promise) {
       var self = this;
 
       
@@ -27017,7 +27017,7 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return promise;
     }, 1);
     
-    $def(self, '$<<', function $Promise_$lt$lt$7(promise) {
+    $def(self, '$<<', function $Promise_$lt$lt$6(promise) {
       var self = this;
 
       
@@ -27025,7 +27025,7 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, 1);
     
-    $def(self, '$>>', function $Promise_$gt$gt$8(promise) {
+    $def(self, '$>>', function $Promise_$gt$gt$7(promise) {
       var self = this;
 
       
@@ -27074,14 +27074,14 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, -1);
     
-    $def(self, '$resolve!', function $Promise_resolve$excl$9(value) {
+    $def(self, '$resolve!', function $Promise_resolve$excl$8(value) {
       var self = this;
 
       
       self.realized = "resolve";
       self.value = value;
       if ($truthy(self.next['$any?']())) {
-        return $send(self.next, 'each', [], function $$10(p){
+        return $send(self.next, 'each', [], function $$9(p){
           
           
           if (p == null) p = nil;;
@@ -27125,14 +27125,14 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self;
     }, -1);
     
-    $def(self, '$reject!', function $Promise_reject$excl$11(value) {
+    $def(self, '$reject!', function $Promise_reject$excl$10(value) {
       var self = this;
 
       
       self.realized = "reject";
       self.error = value;
       if ($truthy(self.next['$any?']())) {
-        return $send(self.next, 'each', [], function $$12(p){
+        return $send(self.next, 'each', [], function $$11(p){
           
           
           if (p == null) p = nil;;
@@ -27142,7 +27142,7 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
       };
     }, 1);
     
-    $def(self, '$exception!', function $Promise_exception$excl$13(error) {
+    $def(self, '$exception!', function $Promise_exception$excl$12(error) {
       var self = this;
 
       
@@ -27159,10 +27159,10 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self['$^']($$('Promise').$new($hash2(["success"], {"success": block})));
     }, 0);
     
-    $def(self, '$then!', function $Promise_then$excl$14() {
-      var block = $Promise_then$excl$14.$$p || nil, self = this;
+    $def(self, '$then!', function $Promise_then$excl$13() {
+      var block = $Promise_then$excl$13.$$p || nil, self = this;
 
-      delete $Promise_then$excl$14.$$p;
+      delete $Promise_then$excl$13.$$p;
       
       ;
       self['$there_can_be_only_one!']();
@@ -27178,10 +27178,10 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self['$^']($$('Promise').$new($hash2(["failure"], {"failure": block})));
     }, 0);
     
-    $def(self, '$fail!', function $Promise_fail$excl$15() {
-      var block = $Promise_fail$excl$15.$$p || nil, self = this;
+    $def(self, '$fail!', function $Promise_fail$excl$14() {
+      var block = $Promise_fail$excl$14.$$p || nil, self = this;
 
-      delete $Promise_fail$excl$15.$$p;
+      delete $Promise_fail$excl$14.$$p;
       
       ;
       self['$there_can_be_only_one!']();
@@ -27197,10 +27197,10 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self['$^']($$('Promise').$new($hash2(["always"], {"always": block})));
     }, 0);
     
-    $def(self, '$always!', function $Promise_always$excl$16() {
-      var block = $Promise_always$excl$16.$$p || nil, self = this;
+    $def(self, '$always!', function $Promise_always$excl$15() {
+      var block = $Promise_always$excl$15.$$p || nil, self = this;
 
-      delete $Promise_always$excl$16.$$p;
+      delete $Promise_always$excl$15.$$p;
       
       ;
       self['$there_can_be_only_one!']();
@@ -27218,10 +27218,10 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self['$^']($$('Trace').$new(depth, block));
     }, -1);
     
-    $def(self, '$trace!', function $Promise_trace$excl$17($a) {
-      var block = $Promise_trace$excl$17.$$p || nil, $post_args, args, self = this;
+    $def(self, '$trace!', function $Promise_trace$excl$16($a) {
+      var block = $Promise_trace$excl$16.$$p || nil, $post_args, args, self = this;
 
-      delete $Promise_trace$excl$17.$$p;
+      delete $Promise_trace$excl$16.$$p;
       
       ;
       
@@ -27232,7 +27232,7 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return $send(self, 'trace', $to_a(args), block.$to_proc());
     }, -1);
     
-    $def(self, '$there_can_be_only_one!', function $Promise_there_can_be_only_one$excl$18() {
+    $def(self, '$there_can_be_only_one!', function $Promise_there_can_be_only_one$excl$17() {
       var self = this;
 
       if ($truthy(self.next['$any?']())) {
@@ -27259,11 +27259,11 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
       
       v2 = $$('PromiseV2').$new();
-      $send($send(self, 'then', [], function $$19(i){
+      $send($send(self, 'then', [], function $$18(i){
         
         
         if (i == null) i = nil;;
-        return v2.$resolve(i);}, 1), 'rescue', [], function $$20(i){
+        return v2.$resolve(i);}, 1), 'rescue', [], function $$19(i){
         
         
         if (i == null) i = nil;;
@@ -27309,7 +27309,7 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
         delete $$initialize.$$p;
         
         self.depth = depth;
-        return $send2(self, $find_super(self, 'initialize', $$initialize, false, true), 'initialize', [$hash2(["success"], {"success": $send(self, 'proc', [], function $$21(){var self = $$21.$$s == null ? this : $$21.$$s, trace = nil;
+        return $send2(self, $find_super(self, 'initialize', $$initialize, false, true), 'initialize', [$hash2(["success"], {"success": $send(self, 'proc', [], function $$20(){var self = $$20.$$s == null ? this : $$20.$$s, trace = nil;
 
           
           trace = $$('Trace').$it(self).$reverse();
@@ -27337,7 +27337,7 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if (promises == null) promises = [];;
         $send2(self, $find_super(self, 'initialize', $$initialize, false, true), 'initialize', [], null);
         self.wait = [];
-        return $send(promises, 'each', [], function $$22(promise){var self = $$22.$$s == null ? this : $$22.$$s;
+        return $send(promises, 'each', [], function $$21(promise){var self = $$21.$$s == null ? this : $$21.$$s;
 
           
           
@@ -27354,7 +27354,7 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if (!$truthy(block)) {
           self.$raise($$('ArgumentError'), "no block given")
         };
-        return $send(self, 'then', [], function $$23(values){
+        return $send(self, 'then', [], function $$22(values){
           
           
           if (values == null) values = nil;;
@@ -27370,7 +27370,7 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if (!$truthy(block)) {
           self.$raise($$('ArgumentError'), "no block given")
         };
-        return $send(self, 'then', [], function $$24(values){
+        return $send(self, 'then', [], function $$23(values){
           
           
           if (values == null) values = nil;;
@@ -27387,7 +27387,7 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
         $post_args = Opal.slice.call(arguments);
         
         args = $post_args;;
-        return $send(self, 'then', [], function $$25(values){
+        return $send(self, 'then', [], function $$24(values){
           
           
           if (values == null) values = nil;;
@@ -27405,7 +27405,7 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
           promise = promise.$then()
         };
         self.wait['$<<'](promise);
-        $send(promise, 'always', [], function $$26(){var self = $$26.$$s == null ? this : $$26.$$s;
+        $send(promise, 'always', [], function $$25(){var self = $$25.$$s == null ? this : $$25.$$s;
           if (self.next == null) self.next = nil;
 
           if ($truthy(self.next['$any?']())) {
@@ -27416,21 +27416,21 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return self;
       }, 1);
       
-      $def(self, '$>>', function $When_$gt$gt$27($a) {
-        var $post_args, $rest_arg, $yield = $When_$gt$gt$27.$$p || nil, self = this;
+      $def(self, '$>>', function $When_$gt$gt$26($a) {
+        var $post_args, $rest_arg, $yield = $When_$gt$gt$26.$$p || nil, self = this;
 
-        delete $When_$gt$gt$27.$$p;
+        delete $When_$gt$gt$26.$$p;
         
         
         $post_args = Opal.slice.call(arguments);
         
         $rest_arg = $post_args;;
-        return $send($send2(self, $find_super(self, '>>', $When_$gt$gt$27, false, true), '>>', $to_a($rest_arg), $yield), 'tap', [], function $$28(){var self = $$28.$$s == null ? this : $$28.$$s;
+        return $send($send2(self, $find_super(self, '>>', $When_$gt$gt$26, false, true), '>>', $to_a($rest_arg), $yield), 'tap', [], function $$27(){var self = $$27.$$s == null ? this : $$27.$$s;
 
           return self.$try()}, {$$arity: 0, $$s: self});
       }, -1);
       
-      $def(self, '$try', function $When_try$29() {
+      $def(self, '$try', function $When_try$28() {
         var self = this, promise = nil;
 
         if ($truthy($send(self.wait, 'all?', [], "realized?".$to_proc()))) {
@@ -27453,8 +27453,8 @@ Opal.modules["promise"] = function(Opal) {/* Generated by Opal 1.4.1 */
   return $const_set($nesting[0], 'PromiseV1', $$('Promise'));
 };
 
-Opal.modules["opal/jquery/http"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $klass = Opal.klass, $const_set = Opal.const_set, $send = Opal.send, $hash2 = Opal.hash2, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
+Opal.modules["opal/jquery/http"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $klass = Opal.klass, $const_set = Opal.const_set, $send = Opal.send, $hash2 = Opal.hash2, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy, $return_ivar = Opal.return_ivar;
 
   Opal.add_stubs('require,to_n,each,define_singleton_method,send,new,define_method,attr_reader,delete,update,upcase,succeed,fail,promise,parse,private,tap,proc,ok?,resolve,reject,from_object,call');
   
@@ -27467,7 +27467,7 @@ Opal.modules["opal/jquery/http"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
     var $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting), $proto = self.$$prototype;
 
-    $proto.settings = $proto.payload = $proto.url = $proto.method = $proto.handler = $proto.json = $proto.body = $proto.ok = $proto.xhr = $proto.promise = $proto.status_code = nil;
+    $proto.settings = $proto.payload = $proto.url = $proto.method = $proto.handler = $proto.json = $proto.body = $proto.xhr = $proto.promise = $proto.status_code = nil;
     
     var $ = $$('JQUERY_SELECTOR').$to_n();
     $const_set($nesting[0], 'ACTIONS', ["get", "post", "put", "delete", "patch", "head"]);
@@ -27559,11 +27559,7 @@ Opal.modules["opal/jquery/http"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return (self.json = ($truthy(($ret_or_1 = self.json)) ? ($ret_or_1) : ($$('JSON').$parse(self.body))))
     }, 0);
     
-    $def(self, '$ok?', function $HTTP_ok$ques$6() {
-      var self = this;
-
-      return self.ok
-    }, 0);
+    $def(self, '$ok?', $return_ivar("ok"), 0);
     
     $def(self, '$get_header', function $$get_header(key) {
       var self = this;
@@ -27588,12 +27584,12 @@ Opal.modules["opal/jquery/http"] = function(Opal) {/* Generated by Opal 1.4.1 */
       if ($truthy(self.promise)) {
         return self.promise
       };
-      return (self.promise = $send($$('Promise').$new(), 'tap', [], function $$7(promise){var self = $$7.$$s == null ? this : $$7.$$s;
+      return (self.promise = $send($$('Promise').$new(), 'tap', [], function $$6(promise){var self = $$6.$$s == null ? this : $$6.$$s;
 
         
         
         if (promise == null) promise = nil;;
-        return (self.handler = $send(self, 'proc', [], function $$8(res){
+        return (self.handler = $send(self, 'proc', [], function $$7(res){
           
           
           if (res == null) res = nil;;
@@ -27642,7 +27638,7 @@ Opal.modules["opal/jquery/http"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["opal/jquery/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["opal/jquery/kernel"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $def = Opal.def;
 
   return (function($base) {
@@ -27658,7 +27654,7 @@ Opal.modules["opal/jquery/kernel"] = function(Opal) {/* Generated by Opal 1.4.1 
   })($nesting[0])
 };
 
-Opal.modules["opal/jquery"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["opal/jquery"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, nil = Opal.nil;
 
   Opal.add_stubs('require');
@@ -27671,14 +27667,14 @@ Opal.modules["opal/jquery"] = function(Opal) {/* Generated by Opal 1.4.1 */
   return self.$require("opal/jquery/kernel");
 };
 
-Opal.modules["opal-jquery"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["opal-jquery"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, nil = Opal.nil;
 
   Opal.add_stubs('require');
   return self.$require("opal/jquery")
 };
 
-Opal.modules["paggio/utils"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["paggio/utils"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $module = Opal.module, $regexp = Opal.regexp, $defs = Opal.defs, $send = Opal.send, $eqeqeq = Opal.eqeqeq;
 
   Opal.add_stubs('size,min,scan,gsub,proc,===,merge,to_proc,merge!');
@@ -27752,10 +27748,10 @@ Opal.modules["paggio/utils"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/helpers"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $to_a = Opal.to_a, $truthy = Opal.truthy, $defs = Opal.defs, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/helpers"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $to_a = Opal.to_a, $truthy = Opal.truthy, $defs = Opal.defs;
 
-  Opal.add_stubs('define_method,instance_exec,to_proc,do,defhelper,[]=,-');
+  Opal.add_stubs('define_method,instance_exec,to_proc,do,defhelper,[]=');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -27798,23 +27794,20 @@ Opal.modules["paggio/html/helpers"] = function(Opal) {/* Generated by Opal 1.4.1
           
           
           if (attribute == null) attribute = name;;
-          return $send(self, 'defhelper', ["" + (name) + "!"], function $$3(){var self = $$3.$$s == null ? this : $$3.$$s, $writer = nil;
+          return $send(self, 'defhelper', ["" + (name) + "!"], function $$3(){var $a, self = $$3.$$s == null ? this : $$3.$$s;
             if (self.attributes == null) self.attributes = nil;
 
-            
-            $writer = [attribute, true];
-            $send(self.attributes, '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 0, $$s: self});
+            return ($a = [attribute, true], $send(self.attributes, '[]=', $a), $a[$a.length - 1])}, {$$arity: 0, $$s: self});
         }, -2);
       })($nesting[0], $$('BasicObject'))
     })($nesting[0], $$('BasicObject'), $nesting)
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/a"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/a"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2;
 
-  Opal.add_stubs('each,defhelper,to_s,[]=,-,defhelper!,<<');
+  Opal.add_stubs('each,defhelper,[]=,to_s,defhelper!,<<');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -27842,15 +27835,13 @@ Opal.modules["paggio/html/element/a"] = function(Opal) {/* Generated by Opal 1.4
             if (name == null) name = nil;;
             
             if (attribute == null) attribute = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value.$to_s()];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self});
+              return ($a = [name, value.$to_s()], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self});
           self['$defhelper!']("download");
           self['$defhelper!']("ping");
           return $send(self, 'defhelper', ["text"], function $A$3(string){var self = $A$3.$$s == null ? this : $A$3.$$s;
@@ -27865,10 +27856,10 @@ Opal.modules["paggio/html/element/a"] = function(Opal) {/* Generated by Opal 1.4
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/base"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/base"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2;
 
-  Opal.add_stubs('each,defhelper,to_s,[]=,-');
+  Opal.add_stubs('each,defhelper,[]=,to_s');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -27895,25 +27886,23 @@ Opal.modules["paggio/html/element/base"] = function(Opal) {/* Generated by Opal 
             if (name == null) name = nil;;
             
             if (attribute == null) attribute = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value.$to_s()];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
+              return ($a = [name, value.$to_s()], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
         })($nesting[0], self)
       })($nesting[0], $$('BasicObject'), $nesting)
     })($nesting[0], $$('BasicObject'), $nesting)
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/blockquote"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/blockquote"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send;
 
-  Opal.add_stubs('defhelper,to_s,[]=,-');
+  Opal.add_stubs('defhelper,[]=,to_s');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -27933,25 +27922,23 @@ Opal.modules["paggio/html/element/blockquote"] = function(Opal) {/* Generated by
           var self = $klass($base, $super, 'Blockquote');
 
           
-          return $send(self, 'defhelper', ["cite"], function $Blockquote$1(value){var self = $Blockquote$1.$$s == null ? this : $Blockquote$1.$$s, $writer = nil;
+          return $send(self, 'defhelper', ["cite"], function $Blockquote$1(value){var $a, self = $Blockquote$1.$$s == null ? this : $Blockquote$1.$$s;
             if (self.attributes == null) self.attributes = nil;
 
             
             
             if (value == null) value = nil;;
-            $writer = ["cite", value.$to_s()];
-            $send(self.attributes, '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self})
+            return ($a = ["cite", value.$to_s()], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self})
         })($nesting[0], self)
       })($nesting[0], $$('BasicObject'), $nesting)
     })($nesting[0], $$('BasicObject'), $nesting)
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/button"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/button"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2;
 
-  Opal.add_stubs('each,defhelper,to_s,[]=,-,defhelper!');
+  Opal.add_stubs('each,defhelper,[]=,to_s,defhelper!');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -27979,15 +27966,13 @@ Opal.modules["paggio/html/element/button"] = function(Opal) {/* Generated by Opa
             if (name == null) name = nil;;
             
             if (attributes == null) attributes = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value.$to_s()];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self});
+              return ($a = [name, value.$to_s()], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self});
           self['$defhelper!']("autofocus");
           return self['$defhelper!']("disabled");
         })($nesting[0], self)
@@ -27996,10 +27981,10 @@ Opal.modules["paggio/html/element/button"] = function(Opal) {/* Generated by Opa
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/canvas"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/canvas"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2;
 
-  Opal.add_stubs('each,defhelper,to_s,[]=,-');
+  Opal.add_stubs('each,defhelper,[]=,to_s');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -28026,25 +28011,23 @@ Opal.modules["paggio/html/element/canvas"] = function(Opal) {/* Generated by Opa
             if (name == null) name = nil;;
             
             if (attribute == null) attribute = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value.$to_s()];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
+              return ($a = [name, value.$to_s()], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
         })($nesting[0], self)
       })($nesting[0], $$('BasicObject'), $nesting)
     })($nesting[0], $$('BasicObject'), $nesting)
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/embed"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/embed"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2;
 
-  Opal.add_stubs('each,defhelper,[]=,-');
+  Opal.add_stubs('each,defhelper,[]=');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -28071,25 +28054,23 @@ Opal.modules["paggio/html/element/embed"] = function(Opal) {/* Generated by Opal
             if (name == null) name = nil;;
             
             if (attribute == null) attribute = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
+              return ($a = [name, value], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
         })($nesting[0], self)
       })($nesting[0], $$('BasicObject'), $nesting)
     })($nesting[0], $$('BasicObject'), $nesting)
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/img"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/img"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2;
 
-  Opal.add_stubs('each,defhelper,to_s,[]=,-');
+  Opal.add_stubs('each,defhelper,[]=,to_s');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -28117,32 +28098,27 @@ Opal.modules["paggio/html/element/img"] = function(Opal) {/* Generated by Opal 1
             if (name == null) name = nil;;
             
             if (attribute == null) attribute = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value.$to_s()];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self});
-          return $send(self, 'defhelper', ["map!"], function $Img$3(){var self = $Img$3.$$s == null ? this : $Img$3.$$s, $writer = nil;
+              return ($a = [name, value.$to_s()], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self});
+          return $send(self, 'defhelper', ["map!"], function $Img$3(){var $a, self = $Img$3.$$s == null ? this : $Img$3.$$s;
             if (self.attributes == null) self.attributes = nil;
 
-            
-            $writer = ["ismap", true];
-            $send(self.attributes, '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 0, $$s: self});
+            return ($a = ["ismap", true], $send(self.attributes, '[]=', $a), $a[$a.length - 1])}, {$$arity: 0, $$s: self});
         })($nesting[0], self)
       })($nesting[0], $$('BasicObject'), $nesting)
     })($nesting[0], $$('BasicObject'), $nesting)
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/input"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/input"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2;
 
-  Opal.add_stubs('each,defhelper,[]=,-');
+  Opal.add_stubs('each,defhelper,[]=');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -28169,25 +28145,23 @@ Opal.modules["paggio/html/element/input"] = function(Opal) {/* Generated by Opal
             if (name == null) name = nil;;
             
             if (attribute == null) attribute = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
+              return ($a = [name, value], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
         })($nesting[0], self)
       })($nesting[0], $$('BasicObject'), $nesting)
     })($nesting[0], $$('BasicObject'), $nesting)
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/link"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/link"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2;
 
-  Opal.add_stubs('each,defhelper,to_s,[]=,-');
+  Opal.add_stubs('each,defhelper,[]=,to_s');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -28214,25 +28188,23 @@ Opal.modules["paggio/html/element/link"] = function(Opal) {/* Generated by Opal 
             if (name == null) name = nil;;
             
             if (attribute == null) attribute = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value.$to_s()];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
+              return ($a = [name, value.$to_s()], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
         })($nesting[0], self)
       })($nesting[0], $$('BasicObject'), $nesting)
     })($nesting[0], $$('BasicObject'), $nesting)
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/object"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/object"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $hash2 = Opal.hash2;
 
-  Opal.add_stubs('each,defhelper,[]=,-');
+  Opal.add_stubs('each,defhelper,[]=');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -28259,25 +28231,23 @@ Opal.modules["paggio/html/element/object"] = function(Opal) {/* Generated by Opa
             if (name == null) name = nil;;
             
             if (attribute == null) attribute = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
+              return ($a = [name, value], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 2, $$s: self})
         })($nesting[0], self)
       })($nesting[0], $$('BasicObject'), $nesting)
     })($nesting[0], $$('BasicObject'), $nesting)
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/option"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/option"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send;
 
-  Opal.add_stubs('each,defhelper,[]=,-,defhelper!');
+  Opal.add_stubs('each,defhelper,[]=,defhelper!');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -28303,15 +28273,13 @@ Opal.modules["paggio/html/element/option"] = function(Opal) {/* Generated by Opa
             
             
             if (name == null) name = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 1, $$s: self});
+              return ($a = [name, value], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 1, $$s: self});
           self['$defhelper!']("disabled");
           return self['$defhelper!']("selected");
         })($nesting[0], self)
@@ -28320,10 +28288,10 @@ Opal.modules["paggio/html/element/option"] = function(Opal) {/* Generated by Opa
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/optgroup"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/optgroup"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send;
 
-  Opal.add_stubs('each,defhelper,[]=,-,defhelper!');
+  Opal.add_stubs('each,defhelper,[]=,defhelper!');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -28349,15 +28317,13 @@ Opal.modules["paggio/html/element/optgroup"] = function(Opal) {/* Generated by O
             
             
             if (name == null) name = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 1, $$s: self});
+              return ($a = [name, value], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 1, $$s: self});
           self['$defhelper!']("disabled");
           return self['$defhelper!']("selected");
         })($nesting[0], self)
@@ -28366,10 +28332,10 @@ Opal.modules["paggio/html/element/optgroup"] = function(Opal) {/* Generated by O
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/select"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/select"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send;
 
-  Opal.add_stubs('each,defhelper,[]=,-,defhelper!');
+  Opal.add_stubs('each,defhelper,[]=,defhelper!');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -28395,15 +28361,13 @@ Opal.modules["paggio/html/element/select"] = function(Opal) {/* Generated by Opa
             
             
             if (name == null) name = nil;;
-            return $send(self, 'defhelper', [name], function $$2(value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            return $send(self, 'defhelper', [name], function $$2(value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
               if (self.attributes == null) self.attributes = nil;
 
               
               
               if (value == null) value = nil;;
-              $writer = [name, value];
-              $send(self.attributes, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});}, {$$arity: 1, $$s: self});
+              return ($a = [name, value], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});}, {$$arity: 1, $$s: self});
           self['$defhelper!']("auto_focus", "autofocus");
           self['$defhelper!']("disabled");
           return self['$defhelper!']("required");
@@ -28413,10 +28377,10 @@ Opal.modules["paggio/html/element/select"] = function(Opal) {/* Generated by Opa
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element/td"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["paggio/html/element/td"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send;
 
-  Opal.add_stubs('defhelper,to_s,[]=,-,join');
+  Opal.add_stubs('defhelper,[]=,to_s,join');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
 
@@ -28437,25 +28401,21 @@ Opal.modules["paggio/html/element/td"] = function(Opal) {/* Generated by Opal 1.
 
           
           
-          $send(self, 'defhelper', ["columns"], function $Td$1(value){var self = $Td$1.$$s == null ? this : $Td$1.$$s, $writer = nil;
+          $send(self, 'defhelper', ["columns"], function $Td$1(value){var $a, self = $Td$1.$$s == null ? this : $Td$1.$$s;
             if (self.attributes == null) self.attributes = nil;
 
             
             
             if (value == null) value = nil;;
-            $writer = ["colspan", value.$to_s()];
-            $send(self.attributes, '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});
-          $send(self, 'defhelper', ["rows"], function $Td$2(value){var self = $Td$2.$$s == null ? this : $Td$2.$$s, $writer = nil;
+            return ($a = ["colspan", value.$to_s()], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});
+          $send(self, 'defhelper', ["rows"], function $Td$2(value){var $a, self = $Td$2.$$s == null ? this : $Td$2.$$s;
             if (self.attributes == null) self.attributes = nil;
 
             
             
             if (value == null) value = nil;;
-            $writer = ["rowspan", value.$to_s()];
-            $send(self.attributes, '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});
-          return $send(self, 'defhelper', ["headers"], function $Td$3($a){var $post_args, args, self = $Td$3.$$s == null ? this : $Td$3.$$s, $writer = nil;
+            return ($a = ["rowspan", value.$to_s()], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});
+          return $send(self, 'defhelper', ["headers"], function $Td$3($a){var $post_args, args, $b, self = $Td$3.$$s == null ? this : $Td$3.$$s;
             if (self.attributes == null) self.attributes = nil;
 
             
@@ -28463,19 +28423,17 @@ Opal.modules["paggio/html/element/td"] = function(Opal) {/* Generated by Opal 1.
             $post_args = Opal.slice.call(arguments);
             
             args = $post_args;;
-            $writer = ["headers", args.$join(" ")];
-            $send(self.attributes, '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: -1, $$s: self});
+            return ($b = ["headers", args.$join(" ")], $send(self.attributes, '[]=', $b), $b[$b.length - 1]);}, {$$arity: -1, $$s: self});
         })($nesting[0], self)
       })($nesting[0], $$('BasicObject'), $nesting)
     })($nesting[0], $$('BasicObject'), $nesting)
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/html/element"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $hash2 = Opal.hash2, $eqeq = Opal.eqeq, $send2 = Opal.send2, $find_super = Opal.find_super, $truthy = Opal.truthy, $not = Opal.not, $defs = Opal.defs, $def = Opal.def, $send = Opal.send, $range = Opal.range, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $eqeqeq = Opal.eqeqeq;
+Opal.modules["paggio/html/element"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $hash2 = Opal.hash2, $eqeq = Opal.eqeq, $send2 = Opal.send2, $find_super = Opal.find_super, $truthy = Opal.truthy, $not = Opal.not, $defs = Opal.defs, $def = Opal.def, $send = Opal.send, $range = Opal.range, $eqeqeq = Opal.eqeqeq, $to_a = Opal.to_a;
 
-  Opal.add_stubs('require,==,capitalize,const_defined?,!,include?,to_s,new,const_get,each,to_proc,<<,end_with?,[],[]=,-,===,has_key?,unshift,|,split,delete,to_a,deep_merge!,>>,extend!,pop,join,heredoc,defhelper,map,empty?,upcase,inspect');
+  Opal.add_stubs('require,==,capitalize,const_defined?,!,include?,to_s,new,const_get,each,to_proc,<<,end_with?,[]=,[],===,has_key?,unshift,|,split,delete,to_a,deep_merge!,>>,extend!,pop,join,heredoc,defhelper,map,empty?,upcase,inspect');
   
   self.$require("paggio/html/element/a");
   self.$require("paggio/html/element/base");
@@ -28557,7 +28515,7 @@ Opal.modules["paggio/html/element"] = function(Opal) {/* Generated by Opal 1.4.1
         }, 1);
         
         $def(self, '$method_missing', function $$method_missing(name, content) {
-          var block = $$method_missing.$$p || nil, self = this, $writer = nil;
+          var block = $$method_missing.$$p || nil, self = this;
 
           delete $$method_missing.$$p;
           
@@ -28565,10 +28523,7 @@ Opal.modules["paggio/html/element"] = function(Opal) {/* Generated by Opal 1.4.1
           
           if (content == null) content = nil;;
           if ($truthy(name.$to_s()['$end_with?']("!"))) {
-            
-            $writer = ["id", name['$[]']($range(0, -2, false))];
-            $send(self.attributes, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];
+            self.attributes['$[]=']("id", name['$[]']($range(0, -2, false)))
           } else {
             self.class_names['$<<'](name)
           };
@@ -28618,27 +28573,25 @@ Opal.modules["paggio/html/element"] = function(Opal) {/* Generated by Opal 1.4.1
           self['$<<']($$$($$$('Paggio'), 'Utils').$heredoc(content.$to_s()));
           return self;
         }, 1);
-        $send(self, 'defhelper', ["style"], function $Element$6(hash){var self = $Element$6.$$s == null ? this : $Element$6.$$s, $writer = nil;
+        $send(self, 'defhelper', ["style"], function $Element$6(hash){var $a, self = $Element$6.$$s == null ? this : $Element$6.$$s;
           if (self.attributes == null) self.attributes = nil;
 
           
           
           if (hash == null) hash = nil;;
-          $writer = ["style", $send(hash, 'map', [], function $$7(name, value){
+          return ($a = ["style", $send(hash, 'map', [], function $$7(name, value){
             
             
             if (name == null) name = nil;;
             
             if (value == null) value = nil;;
-            return "" + (name) + ": " + (value);}, 2).$join(";")];
-          $send(self.attributes, '[]=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});
+            return "" + (name) + ": " + (value);}, 2).$join(";")], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});
         $send(self, 'defhelper', ["data"], function $Element$8(hash){var self = $Element$8.$$s == null ? this : $Element$8.$$s;
 
           
           
           if (hash == null) hash = nil;;
-          return $send(hash, 'each', [], function $$9(name, value){var self = $$9.$$s == null ? this : $$9.$$s, $writer = nil;
+          return $send(hash, 'each', [], function $$9(name, value){var $a, self = $$9.$$s == null ? this : $$9.$$s;
             if (self.attributes == null) self.attributes = nil;
 
             
@@ -28646,9 +28599,7 @@ Opal.modules["paggio/html/element"] = function(Opal) {/* Generated by Opal 1.4.1
             if (name == null) name = nil;;
             
             if (value == null) value = nil;;
-            $writer = ["data-" + (name), value.$to_s()];
-            $send(self.attributes, '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 2, $$s: self});}, {$$arity: 1, $$s: self});
+            return ($a = ["data-" + (name), value.$to_s()], $send(self.attributes, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 2, $$s: self});}, {$$arity: 1, $$s: self});
         return $def(self, '$inspect', function $$inspect() {
           var self = this;
 
@@ -28663,10 +28614,10 @@ Opal.modules["paggio/html/element"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["paggio/html"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $hash2 = Opal.hash2, $truthy = Opal.truthy, $Kernel = Opal.Kernel, $def = Opal.def, $eqeq = Opal.eqeq, $not = Opal.not, $send = Opal.send, $eqeqeq = Opal.eqeqeq, $send2 = Opal.send2, $find_super = Opal.find_super, $to_a = Opal.to_a, $alias = Opal.alias, $range = Opal.range;
+Opal.modules["paggio/html"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $hash2 = Opal.hash2, $truthy = Opal.truthy, $Kernel = Opal.Kernel, $def = Opal.def, $eqeq = Opal.eqeq, $not = Opal.not, $send = Opal.send, $return_ivar = Opal.return_ivar, $eqeqeq = Opal.eqeqeq, $send2 = Opal.send2, $find_super = Opal.find_super, $to_a = Opal.to_a, $alias = Opal.alias, $range = Opal.range;
 
-  Opal.add_stubs('require,attr_reader,raise,build!,<<,==,arity,!,instance_exec,to_proc,call,first,===,instance_eval,each,end_with?,to_s,empty?,heredoc,shift,new,[],inspect');
+  Opal.add_stubs('require,attr_reader,raise,build!,<<,==,arity,!,instance_exec,to_proc,call,first,===,instance_eval,each,end_with?,to_s,empty?,heredoc,shift,new,method_missing,[],inspect');
   
   self.$require("paggio/html/helpers");
   self.$require("paggio/html/element");
@@ -28753,22 +28704,14 @@ Opal.modules["paggio/html"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return self.roots.$first()
       }, 0);
       
-      $def(self, '$roots!', function $HTML_roots$excl$4() {
-        var self = this;
-
-        return self.roots
-      }, 0);
+      $def(self, '$roots!', $return_ivar("roots"), 0);
       
-      $def(self, '$element!', function $HTML_element$excl$5() {
-        var self = this;
-
-        return self.current
-      }, 0);
+      $def(self, '$element!', $return_ivar("current"), 0);
       
-      $def(self, '$extend!', function $HTML_extend$excl$6(element) {
-        var block = $HTML_extend$excl$6.$$p || nil, $a, self = this, old = nil, result = nil;
+      $def(self, '$extend!', function $HTML_extend$excl$4(element) {
+        var block = $HTML_extend$excl$4.$$p || nil, $a, self = this, old = nil, result = nil;
 
-        delete $HTML_extend$excl$6.$$p;
+        delete $HTML_extend$excl$4.$$p;
         
         ;
         
@@ -28776,7 +28719,7 @@ Opal.modules["paggio/html"] = function(Opal) {/* Generated by Opal 1.4.1 */
         $a = [self.current, element], (old = $a[0]), (self.current = $a[1]), $a;
         result = block.$call(self);
         if ($eqeqeq($$$('String'), result)) {
-          $send(self.current, 'instance_eval', [], function $$7(){var self = $$7.$$s == null ? this : $$7.$$s;
+          $send(self.current, 'instance_eval', [], function $$5(){var self = $$5.$$s == null ? this : $$5.$$s;
 
             return (self.inner_html = result)}, {$$arity: 0, $$s: self})
         };
@@ -28806,7 +28749,7 @@ Opal.modules["paggio/html"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if ($truthy(block)) {
           fragments['$<<'](Opal.yieldX(block, []))
         };
-        return $send(fragments, 'each', [], function $$8(fragment){var self = $$8.$$s == null ? this : $$8.$$s;
+        return $send(fragments, 'each', [], function $$6(fragment){var self = $$6.$$s == null ? this : $$6.$$s;
 
           
           
@@ -28841,7 +28784,7 @@ Opal.modules["paggio/html"] = function(Opal) {/* Generated by Opal 1.4.1 */
           result = block.$call(self);
           self.current = parent;
           if ($eqeqeq($$$('String'), result)) {
-            $send(element, 'instance_eval', [], function $$9(){var self = $$9.$$s == null ? this : $$9.$$s;
+            $send(element, 'instance_eval', [], function $$7(){var self = $$7.$$s == null ? this : $$7.$$s;
 
               return (self.inner_html = result)}, {$$arity: 0, $$s: self})
           };
@@ -28863,10 +28806,10 @@ Opal.modules["paggio/html"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["paggio/css/unit"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $const_set = Opal.const_set, $send = Opal.send, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $truthy = Opal.truthy, $alias = Opal.alias, $rb_plus = Opal.rb_plus, $eqeq = Opal.eqeq, $rb_minus = Opal.rb_minus, $rb_times = Opal.rb_times, $rb_divide = Opal.rb_divide;
+Opal.modules["paggio/css/unit"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $const_set = Opal.const_set, $send = Opal.send, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $truthy = Opal.truthy, $alias = Opal.alias, $rb_plus = Opal.rb_plus, $eqeq = Opal.eqeq, $rb_minus = Opal.rb_minus, $rb_times = Opal.rb_times, $rb_divide = Opal.rb_divide, $return_self = Opal.return_self, $return_val = Opal.return_val;
 
-  Opal.add_stubs('map,to_proc,attr_reader,===,respond_to?,raise,class,to_u,new,==,convert,type,number,hash,each,define_method,+,compatible?,-,*,/,to_i,to_f,private,include?,class_eval,old_percent,match,[],__send__,downcase');
+  Opal.add_stubs('map,to_proc,attr_reader,===,respond_to?,raise,class,to_u,new,==,convert,type,number,hash,each,define_method,+,compatible?,-,*,/,to_i,to_f,to_s,private,include?,class_eval,%,old_percent,match,[],__send__,downcase');
   
   (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Paggio');
@@ -29033,11 +28976,7 @@ Opal.modules["paggio/css/unit"] = function(Opal) {/* Generated by Opal 1.4.1 */
           return self.number.$to_f()
         }, 0);
         
-        $def(self, '$to_u', function $$to_u() {
-          var self = this;
-
-          return self
-        }, 0);
+        $def(self, '$to_u', $return_self, 0);
         
         $def(self, '$to_s', function $$to_s() {
           var self = this;
@@ -29061,20 +29000,22 @@ Opal.modules["paggio/css/unit"] = function(Opal) {/* Generated by Opal 1.4.1 */
             return value
           };
           px = ($eqeqeq("in", ($ret_or_1 = unit.$type())) ? ($rb_times(value, 96)) : ($eqeqeq("pt", $ret_or_1) ? ($rb_divide($rb_times(value, 4.0), 3.0)) : ($eqeqeq("pc", $ret_or_1) ? ($rb_divide($rb_times($rb_divide(value, 12), 4.0), 3.0)) : ($eqeqeq("mm", $ret_or_1) ? ($rb_times(value, 3.77953)) : ($eqeqeq("cm", $ret_or_1) ? ($rb_times($rb_times(value, 10), 3.77953)) : ($eqeqeq("px", $ret_or_1) ? (value) : (nil)))))));
-          if ($eqeqeq("in", ($ret_or_1 = type))) {
-            return $rb_divide(px, 96.0)
-          } else if ($eqeqeq("pt", $ret_or_1)) {
-            return $rb_divide($rb_divide(px, 4.0), 3.0)
-          } else if ($eqeqeq("pc", $ret_or_1)) {
-            return $rb_divide($rb_divide($rb_times(px, 12), 4.0), 3.0)
-          } else if ($eqeqeq("mm", $ret_or_1)) {
-            return $rb_divide(px, 3.77953)
-          } else if ($eqeqeq("cm", $ret_or_1)) {
-            return $rb_divide($rb_divide(px, 10), 3.77953)
-          } else if ($eqeqeq("px", $ret_or_1)) {
-            return px
-          } else {
-            return nil
+          
+          switch (type) {
+            case "in":
+              return $rb_divide(px, 96.0)
+            case "pt":
+              return $rb_divide($rb_divide(px, 4.0), 3.0)
+            case "pc":
+              return $rb_divide($rb_divide($rb_times(px, 12), 4.0), 3.0)
+            case "mm":
+              return $rb_divide(px, 3.77953)
+            case "cm":
+              return $rb_divide($rb_divide(px, 10), 3.77953)
+            case "px":
+              return px
+            default:
+              return nil
           };
         }, 2);
       })($nesting[0], null, $nesting)
@@ -29094,11 +29035,7 @@ Opal.modules["paggio/css/unit"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return $send(self, 'define_method', [name], function $$13(){var self = $$13.$$s == null ? this : $$13.$$s;
 
         return $$$($$$($$('Paggio'), 'CSS'), 'Unit').$new(self, name)}, {$$arity: 0, $$s: self});}, {$$arity: 1, $$s: self});
-    return $def(self, '$to_u', function $$to_u() {
-      var self = this;
-
-      return self
-    }, 0);
+    return $def(self, '$to_u', $return_self, 0);
   })($nesting[0], null, $nesting);
   $send([$$('Fixnum'), $$('Float')], 'each', [], function $$14(klass){var self = $$14.$$s == null ? this : $$14.$$s;
 
@@ -29145,14 +29082,11 @@ Opal.modules["paggio/css/unit"] = function(Opal) {/* Generated by Opal 1.4.1 */
     var self = $klass($base, $super, 'NilClass');
 
     
-    return $def(self, '$to_u', function $$to_u() {
-      
-      return 0
-    }, 0)
+    return $def(self, '$to_u', $return_val(0), 0)
   })($nesting[0], null);
 };
 
-Opal.modules["paggio/css/color"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["paggio/css/color"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $def = Opal.def, $send = Opal.send;
 
   Opal.add_stubs('each,map,to_proc,define_method,new');
@@ -29211,7 +29145,7 @@ Opal.modules["paggio/css/color"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["paggio/css/definition"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["paggio/css/definition"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $const_set = Opal.const_set, $truthy = Opal.truthy, $eqeq = Opal.eqeq, $send = Opal.send, $def = Opal.def, $to_a = Opal.to_a, $eqeqeq = Opal.eqeqeq, $rb_gt = Opal.rb_gt, $rb_times = Opal.rb_times, $range = Opal.range, $hash2 = Opal.hash2, $not = Opal.not;
 
   Opal.add_stubs('new,==,arity,instance_exec,to_proc,call,empty?,each,inspect,to_s,define_method,a,===,first,>,length,raise,style,name,value,[],join,map,to_i,*,end_with?,__send__,<<,last,pop,!,other,shift,horizontal?,private');
@@ -29376,66 +29310,74 @@ Opal.modules["paggio/css/definition"] = function(Opal) {/* Generated by Opal 1.4
             if ($eqeq(args.$length(), 1)) {
               options = args.$first()
             };
-            return $send(options, 'each', [], function $$10(name, value){var self = $$10.$$s == null ? this : $$10.$$s, $ret_or_1 = nil;
+            return $send(options, 'each', [], function $$10(name, value){var self = $$10.$$s == null ? this : $$10.$$s;
 
               
               
               if (name == null) name = nil;;
               
               if (value == null) value = nil;;
-              if (($eqeqeq("top", ($ret_or_1 = name)) || (($eqeqeq("bottom", $ret_or_1) || (($eqeqeq("left", $ret_or_1) || ($eqeqeq("right", $ret_or_1)))))))) {
-                if ($eqeqeq($$$('Hash'), value)) {
-                  return $send(value, 'each', [], function $$11(n, v){var self = $$11.$$s == null ? this : $$11.$$s;
-
-                    
-                    
-                    if (n == null) n = nil;;
-                    
-                    if (v == null) v = nil;;
-                    return self.$style("border-" + (name) + "-" + (n), v);}, {$$arity: 2, $$s: self})
-                } else {
-                  return self.$style("border-" + (name), value)
-                }
-              } else if ($eqeqeq("radius", $ret_or_1)) {
-                if ($eqeqeq($$$('Hash'), value)) {
-                  return $send(value, 'each', [], function $$12(horizontal, value){var self = $$12.$$s == null ? this : $$12.$$s;
-
-                    
-                    
-                    if (horizontal == null) horizontal = nil;;
-                    
-                    if (value == null) value = nil;;
-                    return $send(value, 'each', [], function $$13(vertical, value){var self = $$13.$$s == null ? this : $$13.$$s;
+              
+              switch (name) {
+                case "top":
+                case "bottom":
+                case "left":
+                case "right":
+                  if ($eqeqeq($$$('Hash'), value)) {
+                    return $send(value, 'each', [], function $$11(n, v){var self = $$11.$$s == null ? this : $$11.$$s;
 
                       
                       
-                      if (vertical == null) vertical = nil;;
+                      if (n == null) n = nil;;
+                      
+                      if (v == null) v = nil;;
+                      return self.$style("border-" + (name) + "-" + (n), v);}, {$$arity: 2, $$s: self})
+                  } else {
+                    return self.$style("border-" + (name), value)
+                  }
+                  break;
+                case "radius":
+                  if ($eqeqeq($$$('Hash'), value)) {
+                    return $send(value, 'each', [], function $$12(horizontal, value){var self = $$12.$$s == null ? this : $$12.$$s;
+
+                      
+                      
+                      if (horizontal == null) horizontal = nil;;
                       
                       if (value == null) value = nil;;
-                      self.$style("-moz-border-radius-" + (horizontal) + (vertical), value);
-                      self.$style("-webkit-border-" + (horizontal) + "-" + (vertical) + "-radius", value);
-                      return self.$style("border-" + (horizontal) + "-" + (vertical) + "-radius", value);}, {$$arity: 2, $$s: self});}, {$$arity: 2, $$s: self})
-                } else {
-                  
-                  self.$style("-moz-border-radius", value);
-                  self.$style("-webkit-border-radius", value);
-                  return self.$style("border-radius", value);
-                }
-              } else if ($eqeqeq("color", $ret_or_1)) {
-                if ($eqeqeq($$$('Hash'), value)) {
-                  return $send(value, 'each', [], function $$14(name, value){var self = $$14.$$s == null ? this : $$14.$$s;
+                      return $send(value, 'each', [], function $$13(vertical, value){var self = $$13.$$s == null ? this : $$13.$$s;
 
+                        
+                        
+                        if (vertical == null) vertical = nil;;
+                        
+                        if (value == null) value = nil;;
+                        self.$style("-moz-border-radius-" + (horizontal) + (vertical), value);
+                        self.$style("-webkit-border-" + (horizontal) + "-" + (vertical) + "-radius", value);
+                        return self.$style("border-" + (horizontal) + "-" + (vertical) + "-radius", value);}, {$$arity: 2, $$s: self});}, {$$arity: 2, $$s: self})
+                  } else {
                     
-                    
-                    if (name == null) name = nil;;
-                    
-                    if (value == null) value = nil;;
-                    return self.$style("border-" + (name) + "-color", value);}, {$$arity: 2, $$s: self})
-                } else {
-                  return self.$style("border-color", value)
-                }
-              } else {
-                return self.$style("border-" + (name), value)
+                    self.$style("-moz-border-radius", value);
+                    self.$style("-webkit-border-radius", value);
+                    return self.$style("border-radius", value);
+                  }
+                  break;
+                case "color":
+                  if ($eqeqeq($$$('Hash'), value)) {
+                    return $send(value, 'each', [], function $$14(name, value){var self = $$14.$$s == null ? this : $$14.$$s;
+
+                      
+                      
+                      if (name == null) name = nil;;
+                      
+                      if (value == null) value = nil;;
+                      return self.$style("border-" + (name) + "-color", value);}, {$$arity: 2, $$s: self})
+                  } else {
+                    return self.$style("border-color", value)
+                  }
+                  break;
+                default:
+                  return self.$style("border-" + (name), value)
               };}, {$$arity: 2, $$s: self});
           } else {
             return self.$style("border", args)
@@ -29446,31 +29388,33 @@ Opal.modules["paggio/css/definition"] = function(Opal) {/* Generated by Opal 1.4
           var self = this;
 
           if ($eqeqeq($$$('Hash'), options)) {
-            return $send(options, 'each', [], function $$15(name, value){var self = $$15.$$s == null ? this : $$15.$$s, $ret_or_1 = nil;
+            return $send(options, 'each', [], function $$15(name, value){var self = $$15.$$s == null ? this : $$15.$$s;
 
               
               
               if (name == null) name = nil;;
               
               if (value == null) value = nil;;
-              if ($eqeqeq("shadow", ($ret_or_1 = name))) {
-                
-                if ($eqeqeq($$$('Array'), value)) {
-                  if ($eqeqeq($$$('Array'), value['$[]'](0))) {
-                    value = $send(value, 'map', [], function $$16(v){
-                      
-                      
-                      if (v == null) v = nil;;
-                      return v.$join(" ");}, 1).$join(", ")
-                  } else {
-                    value = value.$join(" ")
-                  }
-                };
-                self.$style("-moz-box-shadow", value);
-                self.$style("-webkit-box-shadow", value);
-                return self.$style("box-shadow", value);
-              } else {
-                return self.$style("box-" + (name), value)
+              
+              switch (name) {
+                case "shadow":
+                  
+                  if ($eqeqeq($$$('Array'), value)) {
+                    if ($eqeqeq($$$('Array'), value['$[]'](0))) {
+                      value = $send(value, 'map', [], function $$16(v){
+                        
+                        
+                        if (v == null) v = nil;;
+                        return v.$join(" ");}, 1).$join(", ")
+                    } else {
+                      value = value.$join(" ")
+                    }
+                  };
+                  self.$style("-moz-box-shadow", value);
+                  self.$style("-webkit-box-shadow", value);
+                  return self.$style("box-shadow", value);
+                default:
+                  return self.$style("box-" + (name), value)
               };}, {$$arity: 2, $$s: self})
           } else {
             return self.$style("box", options)
@@ -29708,18 +29652,19 @@ Opal.modules["paggio/css/definition"] = function(Opal) {/* Generated by Opal 1.4
           self.$private();
           
           $def(self, '$other', function $$other(side) {
-            var $ret_or_1 = nil;
-
-            if ($eqeqeq("left", ($ret_or_1 = side))) {
-              return "right"
-            } else if ($eqeqeq("right", $ret_or_1)) {
-              return "left"
-            } else if ($eqeqeq("top", $ret_or_1)) {
-              return "bottom"
-            } else if ($eqeqeq("bottom", $ret_or_1)) {
-              return "top"
-            } else {
-              return nil
+            
+            
+            switch (side) {
+              case "left":
+                return "right"
+              case "right":
+                return "left"
+              case "top":
+                return "bottom"
+              case "bottom":
+                return "top"
+              default:
+                return nil
             }
           }, 1);
           return $def(self, '$style', function $$style($a) {
@@ -29742,7 +29687,7 @@ Opal.modules["paggio/css/definition"] = function(Opal) {/* Generated by Opal 1.4
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/css/rule"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["paggio/css/rule"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a;
 
   Opal.add_stubs('attr_reader,new,__send__,to_proc');
@@ -29790,7 +29735,7 @@ Opal.modules["paggio/css/rule"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/css/font"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["paggio/css/font"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $hash2 = Opal.hash2, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a;
 
   Opal.add_stubs('attr_reader,new,font,__send__,to_proc');
@@ -29838,7 +29783,7 @@ Opal.modules["paggio/css/font"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/css/animation"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["paggio/css/animation"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a;
 
   Opal.add_stubs('attr_reader,new,__send__,to_proc,<<,call,%,last');
@@ -29944,7 +29889,7 @@ Opal.modules["paggio/css/animation"] = function(Opal) {/* Generated by Opal 1.4.
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["paggio/css"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["paggio/css"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $send = Opal.send, $truthy = Opal.truthy, $rb_plus = Opal.rb_plus, $range = Opal.range, $eqeq = Opal.eqeq, $defs = Opal.defs, $hash2 = Opal.hash2, $Kernel = Opal.Kernel, $def = Opal.def, $not = Opal.not, $to_a = Opal.to_a;
 
   Opal.add_stubs('require,each,start_with?,+,[],==,attr_reader,raise,build!,arity,!,instance_exec,to_proc,call,any?,include?,<<,new,selector,pop,method_missing,__send__,last');
@@ -30168,10 +30113,10 @@ Opal.modules["paggio/css"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["stringio"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $defs = Opal.defs, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $truthy = Opal.truthy, $rb_ge = Opal.rb_ge, $rb_gt = Opal.rb_gt, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $eqeq = Opal.eqeq, $alias = Opal.alias;
+Opal.modules["stringio"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $defs = Opal.defs, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $truthy = Opal.truthy, $rb_ge = Opal.rb_ge, $rb_gt = Opal.rb_gt, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $return_ivar = Opal.return_ivar, $eqeq = Opal.eqeq, $alias = Opal.alias;
 
-  Opal.add_stubs('new,call,close,attr_accessor,check_readable,==,length,===,>=,raise,>,+,-,seek,check_writable,String,[],eof?,write,read');
+  Opal.add_stubs('new,call,close,attr_accessor,check_readable,==,length,===,>=,raise,>,+,-,seek,check_writable,String,[],eof?,write,read,tell');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'StringIO');
 
@@ -30249,11 +30194,7 @@ Opal.modules["stringio"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return 0;
     }, -2);
     
-    $def(self, '$tell', function $$tell() {
-      var self = this;
-
-      return self.position
-    }, 0);
+    $def(self, '$tell', $return_ivar("position"), 0);
     
     $def(self, '$rewind', function $$rewind() {
       var self = this;
@@ -30315,10 +30256,10 @@ Opal.modules["stringio"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $$('IO'), $nesting)
 };
 
-Opal.modules["paggio/formatter"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $truthy = Opal.truthy, $hash2 = Opal.hash2, $defs = Opal.defs, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $const_set = Opal.const_set, $eqeqeq = Opal.eqeqeq, $def = Opal.def, $rb_plus = Opal.rb_plus, $rb_times = Opal.rb_times, $to_ary = Opal.to_ary;
+Opal.modules["paggio/formatter"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $truthy = Opal.truthy, $hash2 = Opal.hash2, $defs = Opal.defs, $send = Opal.send, $const_set = Opal.const_set, $eqeqeq = Opal.eqeqeq, $def = Opal.def, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $rb_times = Opal.rb_times, $to_ary = Opal.to_ary;
 
-  Opal.add_stubs('require,[]=,to_h,-,[],dup,deep_merge!,call,replace,===,new,merge,each,string,indent?,+,lines,puts,*,chomp,print,gsub,to_s,for,version,indent,format,instance_eval,empty?,map,escape,<<,join,include?,downcase,name,value,important,fonts,animations,steps,reverse,rules,media,selector,deindent');
+  Opal.add_stubs('require,[]=,to_h,[],dup,deep_merge!,call,replace,===,new,merge,each,string,indent?,+,-,lines,puts,*,chomp,print,gsub,to_s,for,version,indent,format,instance_eval,empty?,map,escape,<<,join,include?,downcase,name,value,important,fonts,animations,steps,reverse,rules,media,selector,deindent');
   
   self.$require("stringio");
   return (function($base, $super, $parent_nesting) {
@@ -30341,16 +30282,13 @@ Opal.modules["paggio/formatter"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return (self.formatters = ($truthy(($ret_or_1 = self.formatters)) ? ($ret_or_1) : ($hash2([], {}))))
       }, 0);
       $defs(self, '$for', function $Formatter_for$1(klass) {
-        var block = $Formatter_for$1.$$p || nil, self = this, $writer = nil;
+        var block = $Formatter_for$1.$$p || nil, $a, self = this;
 
         delete $Formatter_for$1.$$p;
         
         ;
         if ($truthy(block)) {
-          
-          $writer = [klass, block];
-          $send(self.$to_h(), '[]=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];
+          return ($a = [klass, block], $send(self.$to_h(), '[]=', $a), $a[$a.length - 1])
         } else {
           return self.$to_h()['$[]'](klass)
         };
@@ -30436,7 +30374,7 @@ Opal.modules["paggio/formatter"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }, 0);
       
       $def(self, '$indent', function $$indent() {
-        var block = $$indent.$$p || nil, self = this, $binary_op_recvr_tmp_1 = nil, $writer = nil, $binary_op_recvr_tmp_2 = nil, $binary_op_recvr_tmp_3 = nil;
+        var block = $$indent.$$p || nil, $a, self = this, $binary_op_recvr_tmp_1 = nil, $binary_op_recvr_tmp_2 = nil, $binary_op_recvr_tmp_3 = nil;
 
         delete $$indent.$$p;
         
@@ -30446,24 +30384,15 @@ Opal.modules["paggio/formatter"] = function(Opal) {/* Generated by Opal 1.4.1 */
             
             
             $binary_op_recvr_tmp_1 = self.options['$[]']("indent");
-            
-            $writer = ["level", $rb_plus($binary_op_recvr_tmp_1['$[]']("level"), 1)];
-            $send($binary_op_recvr_tmp_1, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];;;
+            $binary_op_recvr_tmp_1['$[]=']("level", $rb_plus($binary_op_recvr_tmp_1['$[]']("level"), 1));;
             block.$call();
             
             $binary_op_recvr_tmp_2 = self.options['$[]']("indent");
-            
-            $writer = ["level", $rb_minus($binary_op_recvr_tmp_2['$[]']("level"), 1)];
-            $send($binary_op_recvr_tmp_2, '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];;;
+            return ($a = ["level", $rb_minus($binary_op_recvr_tmp_2['$[]']("level"), 1)], $send($binary_op_recvr_tmp_2, '[]=', $a), $a[$a.length - 1]);;
           } else {
             
             $binary_op_recvr_tmp_3 = self.options['$[]']("indent");
-            
-            $writer = ["level", $rb_plus($binary_op_recvr_tmp_3['$[]']("level"), 1)];
-            $send($binary_op_recvr_tmp_3, '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];;
+            return ($a = ["level", $rb_plus($binary_op_recvr_tmp_3['$[]']("level"), 1)], $send($binary_op_recvr_tmp_3, '[]=', $a), $a[$a.length - 1]);
           }
         } else if ($truthy(block)) {
           return block.$call()
@@ -30473,15 +30402,12 @@ Opal.modules["paggio/formatter"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }, 0);
       
       $def(self, '$deindent', function $$deindent() {
-        var self = this, $binary_op_recvr_tmp_4 = nil, $writer = nil;
+        var $a, self = this, $binary_op_recvr_tmp_4 = nil;
 
         if ($truthy(self['$indent?']())) {
           
           $binary_op_recvr_tmp_4 = self.options['$[]']("indent");
-          
-          $writer = ["level", $rb_minus($binary_op_recvr_tmp_4['$[]']("level"), 1)];
-          $send($binary_op_recvr_tmp_4, '[]=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];;
+          return ($a = ["level", $rb_minus($binary_op_recvr_tmp_4['$[]']("level"), 1)], $send($binary_op_recvr_tmp_4, '[]=', $a), $a[$a.length - 1]);
         } else {
           return nil
         }
@@ -30508,17 +30434,19 @@ Opal.modules["paggio/formatter"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return string.$to_s().$gsub(/["><']|&(?!([a-zA-Z]+|(#\d+));)/, $hash2(["&", ">", "<", "\"", "'"], {"&": "&amp;", ">": "&gt;", "<": "&lt;", "\"": "&quot;", "'": "&#39;"}))
       }, 1);
     })($nesting[0], null, $nesting);
-    $send($$('Formatter'), 'for', [$$('HTML')], function $Paggio$5(f, item){var $ret_or_1 = nil;
-
+    $send($$('Formatter'), 'for', [$$('HTML')], function $Paggio$5(f, item){
       
       
       if (f == null) f = nil;;
       
       if (item == null) item = nil;;
-      if ($eqeqeq(5, ($ret_or_1 = item.$version()))) {
-        f.$print("<!DOCTYPE html>")
-      } else {
-        nil
+      
+      switch (item.$version()) {
+        case 5:
+          f.$print("<!DOCTYPE html>")
+          break;
+        default:
+          nil
       };
       f.$print("<html>");
       $send(f, 'indent', [], function $$6(){
@@ -30663,7 +30591,7 @@ Opal.modules["paggio/formatter"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["paggio"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["paggio"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], nil = Opal.nil, $klass = Opal.klass, $send = Opal.send, $defs = Opal.defs, $hash2 = Opal.hash2, $to_a = Opal.to_a;
 
   Opal.add_stubs('require,options,to_proc,to_s,format,new,tap,each');
@@ -30737,7 +30665,7 @@ Opal.modules["paggio"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["browser/version"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/version"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $const_set = Opal.const_set;
 
   return (function($base, $parent_nesting) {
@@ -30749,7 +30677,7 @@ Opal.modules["browser/version"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/utils"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/utils"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $const_set = Opal.const_set, $truthy = Opal.truthy, $defs = Opal.defs, $def = Opal.def, $not = Opal.not, $send2 = Opal.send2, $find_super = Opal.find_super, $klass = Opal.klass;
 
   Opal.add_stubs('new,include,extend,!,private,restricted?,allocate,instance_variable_set,native?,raise,warn,encode_uri,to_s,encode,decode,decode_uri,parse_query,build_query');
@@ -30913,10 +30841,10 @@ Opal.modules["browser/utils"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["browser/form_data"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $send = Opal.send, $neqeq = Opal.neqeq, $rb_plus = Opal.rb_plus, $hash2 = Opal.hash2, $truthy = Opal.truthy, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $not = Opal.not, $defs = Opal.defs, $to_ary = Opal.to_ary, $alias = Opal.alias;
+Opal.modules["browser/form_data"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $send = Opal.send, $neqeq = Opal.neqeq, $rb_plus = Opal.rb_plus, $hash2 = Opal.hash2, $truthy = Opal.truthy, $not = Opal.not, $defs = Opal.defs, $to_ary = Opal.to_ary, $alias = Opal.alias;
 
-  Opal.add_stubs('include,===,each,!=,+,flatten,first,split,scan,proc,call,<<,last,[],[]=,-,!,any?,include?,class,join,map,encode,to_s,create,unflatten,to_proc,method,new,extend,build_form_data,to_n,convert,from_native,to_a,to_h');
+  Opal.add_stubs('include,===,each,!=,+,flatten,first,split,scan,proc,call,<<,last,[],[]=,!,any?,include?,class,join,map,encode,to_s,create,unflatten,to_proc,method,new,extend,build_form_data,to_n,convert,from_native,set,to_a,to_h');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -31015,47 +30943,43 @@ Opal.modules["browser/form_data"] = function(Opal) {/* Generated by Opal 1.4.1 *
               
               if (weak == null) weak = nil;;
               return nil;}, 2);
-            $send(path, 'each', [], function $$5(i){var self = $$5.$$s == null ? this : $$5.$$s, $ret_or_1 = nil;
+            $send(path, 'each', [], function $$5(i){var self = $$5.$$s == null ? this : $$5.$$s;
 
               
               
               if (i == null) i = nil;;
-              if ($eqeqeq("", ($ret_or_1 = i))) {
-                
-                set.$call([], true);
-                return (set = $send(self, 'proc', [], function $$6(v, weak){
+              
+              switch (i) {
+                case "":
                   
+                  set.$call([], true);
+                  return (set = $send(self, 'proc', [], function $$6(v, weak){
+                    
+                    
+                    if (v == null) v = nil;;
+                    
+                    if (weak == null) weak = nil;;
+                    c['$<<'](v);
+                    return (c = c.$last());}, 2));
+                default:
                   
-                  if (v == null) v = nil;;
-                  
-                  if (weak == null) weak = nil;;
-                  c['$<<'](v);
-                  return (c = c.$last());}, 2));
-              } else {
-                
-                set.$call($hash2([], {}), true);
-                return (set = $send(self, 'proc', [], function $$7(v, weak){var $ret_or_2 = nil, $writer = nil;
+                  set.$call($hash2([], {}), true);
+                  return (set = $send(self, 'proc', [], function $$7(v, weak){var $ret_or_2 = nil;
 
-                  
-                  
-                  if (v == null) v = nil;;
-                  
-                  if (weak == null) weak = nil;;
-                  if ($truthy(($ret_or_2 = c['$[]'](i)))) {
-                    $ret_or_2
-                  } else {
                     
-                    $writer = [i, v];
-                    $send(c, '[]=', $to_a($writer));
-                    $writer[$rb_minus($writer["length"], 1)];
-                  };
-                  if ($not(weak)) {
                     
-                    $writer = [i, v];
-                    $send(c, '[]=', $to_a($writer));
-                    $writer[$rb_minus($writer["length"], 1)];
-                  };
-                  return (c = c['$[]'](i));}, 2));
+                    if (v == null) v = nil;;
+                    
+                    if (weak == null) weak = nil;;
+                    if ($truthy(($ret_or_2 = c['$[]'](i)))) {
+                      $ret_or_2
+                    } else {
+                      c['$[]='](i, v)
+                    };
+                    if ($not(weak)) {
+                      c['$[]='](i, v)
+                    };
+                    return (c = c['$[]'](i));}, 2));
               };}, {$$arity: 1, $$s: self});
             return set.$call(v, false);}, {$$arity: 2, $$s: self});
           return out;
@@ -31182,7 +31106,7 @@ Opal.modules["browser/form_data"] = function(Opal) {/* Generated by Opal 1.4.1 *
       $alias(self, "[]=", "set");
       
       $def(self, '$to_h', function $$to_h() {
-        var self = this, hash = nil, $writer = nil;
+        var $a, self = this, hash = nil;
 
         
         hash = $hash2([], {});
@@ -31192,7 +31116,7 @@ Opal.modules["browser/form_data"] = function(Opal) {/* Generated by Opal 1.4.1 *
         v = e.next();
         if (v.done) break;
         pair = v.value;
-        (($writer = [pair[0], $$('FormData').$from_native(pair[1])]), $send(hash, '[]=', $to_a($writer)), $writer[$rb_minus($writer["length"], 1)])
+        ($a = [pair[0], $$('FormData').$from_native(pair[1])], $send(hash, '[]=', $a), $a[$a.length - 1])
       }
     ;
         return hash;
@@ -31227,7 +31151,7 @@ Opal.modules["browser/form_data"] = function(Opal) {/* Generated by Opal 1.4.1 *
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/support"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/support"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $const_set = Opal.const_set, $module = Opal.module, $truthy = Opal.truthy, $eqeqeq = Opal.eqeqeq, $not = Opal.not, $gvars = Opal.gvars, $defs = Opal.defs;
 
   Opal.add_stubs('downcase,===,!,supports?');
@@ -31473,20 +31397,21 @@ Opal.modules["browser/support"] = function(Opal) {/* Generated by Opal 1.4.1 */
       return self.support[feature] = support;
     }, 1);
     return $defs(self, '$loaded?', function $Browser_loaded$ques$2(name) {
-      var $ret_or_1 = nil;
-
-      if ($eqeqeq("Sizzle", ($ret_or_1 = name))) {
-        return (typeof(window.Sizzle) !== "undefined")
-      } else if ($eqeqeq("wicked-good-xpath", $ret_or_1)) {
-        return (typeof(window.wgxpath) !== "undefined")
-      } else {
-        return nil
+      
+      
+      switch (name) {
+        case "Sizzle":
+          return (typeof(window.Sizzle) !== "undefined")
+        case "wicked-good-xpath":
+          return (typeof(window.wgxpath) !== "undefined")
+        default:
+          return nil
       }
     }, 1);
   })($nesting[0], $nesting);
 };
 
-Opal.modules["browser/setup/base"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/setup/base"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, nil = Opal.nil;
 
   Opal.add_stubs('require');
@@ -31497,10 +31422,10 @@ Opal.modules["browser/setup/base"] = function(Opal) {/* Generated by Opal 1.4.1 
   return self.$require("browser/support");
 };
 
-Opal.modules["browser/event/base"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $send2 = Opal.send2, $find_super = Opal.find_super, $truthy = Opal.truthy, $defs = Opal.defs, $def = Opal.def, $send = Opal.send, $lambda = Opal.lambda, $to_a = Opal.to_a, $const_set = Opal.const_set, $rb_minus = Opal.rb_minus, $eqeq = Opal.eqeq, $eqeqeq = Opal.eqeqeq, $hash2 = Opal.hash2;
+Opal.modules["browser/event/base"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $send2 = Opal.send2, $find_super = Opal.find_super, $truthy = Opal.truthy, $defs = Opal.defs, $def = Opal.def, $send = Opal.send, $lambda = Opal.lambda, $to_a = Opal.to_a, $const_set = Opal.const_set, $eqeq = Opal.eqeq, $eqeqeq = Opal.eqeqeq, $hash2 = Opal.hash2;
 
-  Opal.add_stubs('include,call,to_n,<<,converters,native?,each,instance_eval,register,to_proc,attr_reader,new,stopped?,arguments,!,prevented?,class_for,off,target,[],delegated,delete,last,empty?,first,raise,name_for,handlers,[]=,-,include?,on!,delegate,callback=,on,handlers=,push,callbacks,attach,attach!,supports?,name,==,event,===,warn,detach,gsub,delete_if,=~,clear,none?,is_a?,create,dispatch,trigger,bubbles=,private,nil?,dup,on=,parent');
+  Opal.add_stubs('include,call,to_n,<<,converters,native?,each,instance_eval,register,to_proc,attr_reader,new,stopped?,arguments,!,prevented?,class_for,off,target,[],delegated,delete,last,empty?,first,raise,name_for,handlers,[]=,include?,callback=,on!,delegate,on,handlers=,push,callbacks,attach,attach!,supports?,name,==,event,warn,===,detach,gsub,delete_if,=~,clear,none?,is_a?,create,dispatch,trigger,bubbles=,private,nil?,dup,on=,parent');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -31699,7 +31624,7 @@ Opal.modules["browser/event/base"] = function(Opal) {/* Generated by Opal 1.4.1 
         $const_set($nesting[0], 'Delegates', $$('Struct').$new("callback", "handlers"));
         
         $def(self, '$on', function $$on(name, selector) {
-          var block = $$on.$$p || nil, self = this, delegate = nil, pair = nil, $writer = nil, callback = nil;
+          var block = $$on.$$p || nil, $a, self = this, delegate = nil, pair = nil, callback = nil;
 
           delete $$on.$$p;
           
@@ -31718,33 +31643,24 @@ Opal.modules["browser/event/base"] = function(Opal) {/* Generated by Opal 1.4.1 
               return $$('Delegate').$new(self, name, pair);
             } else {
               
-              delegate = (($writer = [name, $$('Delegates').$new()]), $send(self.$delegated(), '[]=', $to_a($writer)), $writer[$rb_minus($writer["length"], 1)]);
+              delegate = ($a = [name, $$('Delegates').$new()], $send(self.$delegated(), '[]=', $a), $a[$a.length - 1]);
               if ($truthy(["blur", "focus"]['$include?'](name))) {
-                
-                $writer = [$send(self, 'on!', [name], function $$7(e){var self = $$7.$$s == null ? this : $$7.$$s;
+                delegate['$callback=']($send(self, 'on!', [name], function $$7(e){var self = $$7.$$s == null ? this : $$7.$$s;
 
                   
                   
                   if (e == null) e = nil;;
-                  return self.$delegate(delegate, e);}, {$$arity: 1, $$s: self})];
-                $send(delegate, 'callback=', $to_a($writer));
-                $writer[$rb_minus($writer["length"], 1)];
+                  return self.$delegate(delegate, e);}, {$$arity: 1, $$s: self}))
               } else {
-                
-                $writer = [$send(self, 'on', [name], function $$8(e){var self = $$8.$$s == null ? this : $$8.$$s;
+                delegate['$callback=']($send(self, 'on', [name], function $$8(e){var self = $$8.$$s == null ? this : $$8.$$s;
 
                   
                   
                   if (e == null) e = nil;;
-                  return self.$delegate(delegate, e);}, {$$arity: 1, $$s: self})];
-                $send(delegate, 'callback=', $to_a($writer));
-                $writer[$rb_minus($writer["length"], 1)];
+                  return self.$delegate(delegate, e);}, {$$arity: 1, $$s: self}))
               };
               pair = [selector, block];
-              
-              $writer = [[pair]];
-              $send(delegate, 'handlers=', $to_a($writer));
-              $writer[$rb_minus($writer["length"], 1)];;
+              delegate['$handlers=']([pair]);
               return $$('Delegate').$new(self, name, pair);
             }
           } else {
@@ -31822,18 +31738,22 @@ Opal.modules["browser/event/base"] = function(Opal) {/* Generated by Opal 1.4.1 
           }, 1);
           
           $def(self, '$attach!', function $Target_attach$excl$11(callback) {
-            var self = this, $ret_or_1 = nil;
+            var self = this;
             if (self["native"] == null) self["native"] = nil;
 
             
-            if ($eqeqeq("blur", ($ret_or_1 = callback.$name()))) {
-              self["native"].attachEvent("onfocusout", callback.$to_proc())
-            } else if ($eqeqeq("focus", $ret_or_1)) {
-              self["native"].attachEvent("onfocusin", callback.$to_proc())
-            } else {
-              
-              self.$warn("attach: capture doesn't work on this browser");
-              self.$attach(callback);
+            
+            switch (callback.$name()) {
+              case "blur":
+                self["native"].attachEvent("onfocusout", callback.$to_proc())
+                break;
+              case "focus":
+                self["native"].attachEvent("onfocusin", callback.$to_proc())
+                break;
+              default:
+                
+                self.$warn("attach: capture doesn't work on this browser");
+                self.$attach(callback);
             };
             return callback;
           }, 1);
@@ -32006,7 +31926,7 @@ Opal.modules["browser/event/base"] = function(Opal) {/* Generated by Opal 1.4.1 
           $post_args = Opal.slice.call(arguments, 1);
           
           args = $post_args;;
-          return $send(self, 'trigger', [event].concat($to_a(args)), function $$19(e){var $writer = nil;
+          return $send(self, 'trigger', [event].concat($to_a(args)), function $$19(e){var $b;
 
             
             
@@ -32014,10 +31934,7 @@ Opal.modules["browser/event/base"] = function(Opal) {/* Generated by Opal 1.4.1 
             if ($truthy(block)) {
               block.$call(e)
             };
-            
-            $writer = [false];
-            $send(e, 'bubbles=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];;}, 1);
+            return ($b = [false], $send(e, 'bubbles=', $b), $b[$b.length - 1]);}, 1);
         }, -2);
         if ($truthy($$('Browser')['$supports?']("Event.dispatch"))) {
           
@@ -32088,7 +32005,7 @@ Opal.modules["browser/event/base"] = function(Opal) {/* Generated by Opal 1.4.1 
           if (($truthy(element['$nil?']()) || ($eqeq(element, event.$on())))) {
             return nil
           };
-          $send(delegates.$handlers(), 'each', [], function $$20(selector, block){var new$ = nil, $writer = nil;
+          $send(delegates.$handlers(), 'each', [], function $$20(selector, block){var new$ = nil;
 
             
             
@@ -32098,10 +32015,7 @@ Opal.modules["browser/event/base"] = function(Opal) {/* Generated by Opal 1.4.1 
             if ($truthy(element['$=~'](selector))) {
               
               new$ = event.$dup();
-              
-              $writer = [element];
-              $send(new$, 'on=', $to_a($writer));
-              $writer[$rb_minus($writer["length"], 1)];;
+              new$['$on='](element);
               return $send(block, 'call', [new$].concat($to_a(new$.$arguments())));
             } else {
               return nil
@@ -32113,7 +32027,7 @@ Opal.modules["browser/event/base"] = function(Opal) {/* Generated by Opal 1.4.1 
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/ui"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/ui"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('supports?,supported?,alias_native');
@@ -32182,7 +32096,7 @@ Opal.modules["browser/event/ui"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/mouse"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/mouse"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $gvars = Opal.gvars, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,!,nil?,[],include,new,try_convert,supported?,supports?,alias_native,x,screen,y,DOM,==,downcase,name');
@@ -32617,10 +32531,10 @@ Opal.modules["browser/event/mouse"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/keyboard"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/keyboard"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy, $const_set = Opal.const_set, $hash2 = Opal.hash2, $alias = Opal.alias;
 
-  Opal.add_stubs('handles,supports?,supported?,alias_native,[],code,chr,==,downcase,name');
+  Opal.add_stubs('handles,supports?,supported?,alias_native,[],code,chr,key,==,downcase,name');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -32796,10 +32710,10 @@ Opal.modules["browser/event/keyboard"] = function(Opal) {/* Generated by Opal 1.
   })($nesting[0], $nesting)
 };
 
-Opal.modules["ostruct"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $hash2 = Opal.hash2, $truthy = Opal.truthy, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $def = Opal.def, $rb_gt = Opal.rb_gt, $neqeq = Opal.neqeq, $range = Opal.range, $send2 = Opal.send2, $find_super = Opal.find_super, $rb_plus = Opal.rb_plus, $alias = Opal.alias;
+Opal.modules["ostruct"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $klass = Opal.klass, $hash2 = Opal.hash2, $truthy = Opal.truthy, $send = Opal.send, $def = Opal.def, $rb_gt = Opal.rb_gt, $neqeq = Opal.neqeq, $range = Opal.range, $send2 = Opal.send2, $find_super = Opal.find_super, $rb_plus = Opal.rb_plus, $alias = Opal.alias;
 
-  Opal.add_stubs('each_pair,new_ostruct_member,[]=,-,[],to_sym,>,length,raise,new,end_with?,!=,chomp,to_s,key?,enum_for,is_a?,==,instance_variable_get,===,eql?,dup,to_n,hash,attr_reader,__send__,singleton_class,delete,respond_to?,define_singleton_method,__id__,class,any?,+,join,map,inspect');
+  Opal.add_stubs('each_pair,[]=,new_ostruct_member,[],to_sym,>,length,raise,new,end_with?,!=,chomp,to_s,key?,enum_for,is_a?,==,instance_variable_get,===,eql?,dup,to_n,hash,attr_reader,__send__,singleton_class,delete,respond_to?,define_singleton_method,__id__,class,any?,+,join,map,inspect');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'OpenStruct');
 
@@ -32816,7 +32730,7 @@ Opal.modules["ostruct"] = function(Opal) {/* Generated by Opal 1.4.1 */
       if (hash == null) hash = nil;;
       self.table = $hash2([], {});
       if ($truthy(hash)) {
-        return $send(hash, 'each_pair', [], function $$1(key, value){var self = $$1.$$s == null ? this : $$1.$$s, $writer = nil;
+        return $send(hash, 'each_pair', [], function $$1(key, value){var $a, self = $$1.$$s == null ? this : $$1.$$s;
           if (self.table == null) self.table = nil;
 
           
@@ -32824,9 +32738,7 @@ Opal.modules["ostruct"] = function(Opal) {/* Generated by Opal 1.4.1 */
           if (key == null) key = nil;;
           
           if (value == null) value = nil;;
-          $writer = [self.$new_ostruct_member(key), value];
-          $send(self.table, '[]=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 2, $$s: self})
+          return ($a = [self.$new_ostruct_member(key), value], $send(self.table, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 2, $$s: self})
       } else {
         return nil
       };
@@ -32839,16 +32751,13 @@ Opal.modules["ostruct"] = function(Opal) {/* Generated by Opal 1.4.1 */
     }, 1);
     
     $def(self, '$[]=', function $OpenStruct_$$$eq$3(name, value) {
-      var self = this, $writer = nil;
+      var $a, self = this;
 
-      
-      $writer = [self.$new_ostruct_member(name), value];
-      $send(self.table, '[]=', $to_a($writer));
-      return $writer[$rb_minus($writer["length"], 1)];
+      return ($a = [self.$new_ostruct_member(name), value], $send(self.table, '[]=', $a), $a[$a.length - 1])
     }, 2);
     
     $def(self, '$method_missing', function $$method_missing(name, $a) {
-      var $post_args, args, self = this, $writer = nil;
+      var $post_args, args, $b, self = this;
 
       
       
@@ -32863,10 +32772,7 @@ Opal.modules["ostruct"] = function(Opal) {/* Generated by Opal 1.4.1 */
         if ($neqeq(args.$length(), 1)) {
           self.$raise($$('ArgumentError'), "wrong number of arguments (0 for 1)")
         };
-        
-        $writer = [self.$new_ostruct_member(name['$[]']($range(0, -2, false))), args['$[]'](0)];
-        $send(self.table, '[]=', $to_a($writer));
-        return $writer[$rb_minus($writer["length"], 1)];;
+        return ($b = [self.$new_ostruct_member(name['$[]']($range(0, -2, false))), args['$[]'](0)], $send(self.table, '[]=', $b), $b[$b.length - 1]);
       } else {
         return self.table['$[]'](name.$to_sym())
       };
@@ -32880,7 +32786,7 @@ Opal.modules["ostruct"] = function(Opal) {/* Generated by Opal 1.4.1 */
       
       if (include_private == null) include_private = false;;
       mname = mid.$to_s().$chomp("=").$to_sym();
-      if ($truthy(($ret_or_1 = ($a = self.table, ($a === nil || $a == null) ? nil : $send($a, 'key?', [mname]))))) {
+      if ($truthy(($ret_or_1 = ($a = self.table, ($a === nil || $a == null) ? nil : self.table['$key?'](mname))))) {
         return $ret_or_1
       } else {
         return $send2(self, $find_super(self, 'respond_to_missing?', $OpenStruct_respond_to_missing$ques$4, false, true), 'respond_to_missing?', [mid, include_private], $yield)
@@ -32980,15 +32886,13 @@ Opal.modules["ostruct"] = function(Opal) {/* Generated by Opal 1.4.1 */
           if (self.table == null) self.table = nil;
 
           return self.table['$[]'](name)}, {$$arity: 0, $$s: self});
-        $send(self, 'define_singleton_method', ["" + (name) + "="], function $$10(x){var self = $$10.$$s == null ? this : $$10.$$s, $writer = nil;
+        $send(self, 'define_singleton_method', ["" + (name) + "="], function $$10(x){var $a, self = $$10.$$s == null ? this : $$10.$$s;
           if (self.table == null) self.table = nil;
 
           
           
           if (x == null) x = nil;;
-          $writer = [name, x];
-          $send(self.table, '[]=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});
+          return ($a = [name, x], $send(self.table, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 1, $$s: self});
       };
       return name;
     }, 1);
@@ -33039,7 +32943,7 @@ Opal.modules["ostruct"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["browser/event/custom"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/custom"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $truthy = Opal.truthy, $range = Opal.range, $def = Opal.def, $send2 = Opal.send2, $find_super = Opal.find_super, $to_a = Opal.to_a;
 
   Opal.add_stubs('require,supports?,end_with?,[],to_n,merge!,Native,new,has_key?');
@@ -33151,10 +33055,10 @@ Opal.modules["browser/event/custom"] = function(Opal) {/* Generated by Opal 1.4.
   })($nesting[0], $nesting);
 };
 
-Opal.modules["browser/event"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $truthy = Opal.truthy, $hash2 = Opal.hash2, $defs = Opal.defs, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $eqeq = Opal.eqeq, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def;
+Opal.modules["browser/event"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $truthy = Opal.truthy, $hash2 = Opal.hash2, $defs = Opal.defs, $send = Opal.send, $return_val = Opal.return_val, $eqeq = Opal.eqeq, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def;
 
-  Opal.add_stubs('require,gsub,[],aliases,each,[]=,handlers,-,handles,name_for,class_for,new,construct,const_get,to_proc,arguments=,supports?,merge!,Native,to_n,==,name,attr_reader,attr_writer,convert,alias_native,off,prevent,stop');
+  Opal.add_stubs('require,gsub,[],aliases,each,[]=,handlers,handles,name_for,class_for,new,construct,const_get,to_proc,arguments=,supports?,merge!,Native,to_n,==,name,attr_reader,attr_writer,convert,alias_native,off,prevent,stop');
   
   self.$require("browser/event/base");
   (function($base, $parent_nesting) {
@@ -33194,14 +33098,12 @@ Opal.modules["browser/event"] = function(Opal) {/* Generated by Opal 1.4.1 */
         $post_args = Opal.slice.call(arguments);
         
         events = $post_args;;
-        return $send(events, 'each', [], function $$1(event){var self = $$1.$$s == null ? this : $$1.$$s, $writer = nil;
+        return $send(events, 'each', [], function $$1(event){var $b, self = $$1.$$s == null ? this : $$1.$$s;
 
           
           
           if (event == null) event = nil;;
-          $writer = [event, self];
-          $send($$('Event').$handlers(), '[]=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 1, $$s: self});
+          return ($b = [event, self], $send($$('Event').$handlers(), '[]=', $b), $b[$b.length - 1]);}, {$$arity: 1, $$s: self});
       }, -1);
       self.$handles("abort", "afterprint", "beforeprint", "cached", "canplay", "canplaythrough", "change", "chargingchange", "chargingtimechange", "checking", "close", "dischargingtimechange", "DOMContentLoaded", "downloading", "durationchange", "emptied", "ended", "error", "fullscreenchange", "fullscreenerror", "input", "invalid", "levelchange", "loadeddata", "loadedmetadata", "noupdate", "obsolete", "offline", "online", "open", "orientationchange", "pause", "pointerlockchange", "pointerlockerror", "play", "playing", "ratechange", "readystatechange", "reset", "seeked", "seeking", "stalled", "submit", "success", "suspend", "timeupdate", "updateready", "visibilitychange", "volumechange", "waiting");
       $defs(self, '$class_for', function $$class_for(name) {
@@ -33214,12 +33116,9 @@ Opal.modules["browser/event"] = function(Opal) {/* Generated by Opal 1.4.1 */
           return $$('Custom')
         }
       }, 1);
-      $defs(self, '$supported?', function $Event_supported$ques$2() {
-        
-        return true
-      }, 0);
+      $defs(self, '$supported?', $return_val(true), 0);
       $defs(self, '$create', function $$create(name, $a) {
-        var block = $$create.$$p || nil, $post_args, args, self = this, klass = nil, event = nil, $writer = nil;
+        var block = $$create.$$p || nil, $post_args, args, self = this, klass = nil, event = nil;
 
         delete $$create.$$p;
         
@@ -33231,10 +33130,7 @@ Opal.modules["browser/event"] = function(Opal) {/* Generated by Opal 1.4.1 */
         name = self.$name_for(name);
         klass = self.$class_for(name);
         event = klass.$new(klass.$construct(name, $send(klass.$const_get("Definition"), 'new', [], block.$to_proc())));
-        
-        $writer = [args];
-        $send(event, 'arguments=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];;
+        event['$arguments='](args);
         return event;
       }, -2);
       if ($truthy($$('Browser')['$supports?']("Event.constructor"))) {
@@ -33268,19 +33164,19 @@ Opal.modules["browser/event"] = function(Opal) {/* Generated by Opal 1.4.1 */
           return self.$Native(desc)['$merge!']({ type: name }).$to_n()
         }, 2)
       };
-      $defs(self, '$new', function $Event_new$3(value, callback) {
-        var $yield = $Event_new$3.$$p || nil, self = this, klass = nil;
+      $defs(self, '$new', function $Event_new$2(value, callback) {
+        var $yield = $Event_new$2.$$p || nil, self = this, klass = nil;
 
-        delete $Event_new$3.$$p;
+        delete $Event_new$2.$$p;
         
         
         if (callback == null) callback = nil;;
         if (!$eqeq(self, $$('Event'))) {
-          return $send2(self, $find_super(self, 'new', $Event_new$3, false, true), 'new', [value, callback], $yield)
+          return $send2(self, $find_super(self, 'new', $Event_new$2, false, true), 'new', [value, callback], $yield)
         };
         klass = self.$class_for(($truthy(callback) ? (callback.$name()) : (value.type)));
         if ($eqeq(klass, $$('Event'))) {
-          return $send2(self, $find_super(self, 'new', $Event_new$3, false, true), 'new', [value, callback], $yield)
+          return $send2(self, $find_super(self, 'new', $Event_new$2, false, true), 'new', [value, callback], $yield)
         } else {
           return klass.$new(value, callback)
         };
@@ -33321,13 +33217,13 @@ Opal.modules["browser/event"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return $$('Target').$convert(self["native"].srcElement || self["native"].target)
       }, 0);
       
-      $def(self, '$arguments', function $Event_arguments$4() {
+      $def(self, '$arguments', function $Event_arguments$3() {
         var self = this;
 
         return self["native"].arguments || []
       }, 0);
       
-      $def(self, '$arguments=', function $Event_arguments$eq$5(args) {
+      $def(self, '$arguments=', function $Event_arguments$eq$4(args) {
         var self = this;
 
         return self["native"].arguments = args
@@ -33348,7 +33244,7 @@ Opal.modules["browser/event"] = function(Opal) {/* Generated by Opal 1.4.1 */
         }
       }, 0);
       
-      $def(self, '$stopped?', function $Event_stopped$ques$6() {
+      $def(self, '$stopped?', function $Event_stopped$ques$5() {
         var self = this;
 
         return !!self["native"].stopped
@@ -33374,12 +33270,12 @@ Opal.modules["browser/event"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return self["native"].prevented = true;
       }, 0);
       
-      $def(self, '$prevented?', function $Event_prevented$ques$7() {
+      $def(self, '$prevented?', function $Event_prevented$ques$6() {
         var self = this;
 
         return !!self["native"].prevented
       }, 0);
-      return $def(self, '$stop!', function $Event_stop$excl$8() {
+      return $def(self, '$stop!', function $Event_stop$excl$7() {
         var self = this;
 
         
@@ -33394,7 +33290,7 @@ Opal.modules["browser/event"] = function(Opal) {/* Generated by Opal 1.4.1 */
   return self.$require("browser/event/custom");
 };
 
-Opal.modules["browser/window/view"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/window/view"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('to_n,supports?,raise');
@@ -33488,7 +33384,7 @@ Opal.modules["browser/window/view"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/window/size"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/window/size"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $to_ary = Opal.to_ary, $truthy = Opal.truthy, $hash2 = Opal.hash2;
 
   Opal.add_stubs('to_n,===,first,values_at,width,height,supports?,raise,set');
@@ -33593,7 +33489,7 @@ Opal.modules["browser/window/size"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/window"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/window"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $send = Opal.send, $eqeqeq = Opal.eqeqeq, $defs = Opal.defs, $truthy = Opal.truthy, $gvars = Opal.gvars, $def = Opal.def, $hash2 = Opal.hash2;
 
   Opal.add_stubs('require,delete,join,map,===,new,include,target,supports?,[],raise,alert,prompt,confirm');
@@ -33764,10 +33660,10 @@ Opal.modules["browser/window"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0]);
 };
 
-Opal.modules["browser/dom/node_set"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $send = Opal.send, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy, $to_a = Opal.to_a, $eqeqeq = Opal.eqeqeq, $alias = Opal.alias;
+Opal.modules["browser/dom/node_set"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $send = Opal.send, $defs = Opal.defs, $assign_ivar = Opal.assign_ivar, $def = Opal.def, $truthy = Opal.truthy, $to_a = Opal.to_a, $eqeqeq = Opal.eqeqeq, $return_ivar = Opal.return_ivar, $alias = Opal.alias;
 
-  Opal.add_stubs('new,uniq,map,flatten,DOM,convert,respond_to?,each,__send__,to_proc,===,at_css,at_xpath,[],css,select,=~,search,join,xpath');
+  Opal.add_stubs('new,uniq,map,flatten,DOM,convert,respond_to?,each,__send__,to_proc,===,at_css,at_xpath,[],css,select,=~,search,join,xpath,to_ary');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -33801,11 +33697,7 @@ Opal.modules["browser/dom/node_set"] = function(Opal) {/* Generated by Opal 1.4.
             return self.$DOM($$('Native').$convert(x));}, {$$arity: 1, $$s: self}).$uniq());
         }, -1);
         
-        $def(self, '$initialize', function $$initialize(literal) {
-          var self = this;
-
-          return (self.literal = literal)
-        }, 1);
+        $def(self, '$initialize', $assign_ivar("literal"), 0);
         
         $def(self, '$method_missing', function $$method_missing(name, $a) {
           var block = $$method_missing.$$p || nil, $post_args, args, self = this, result = nil;
@@ -33942,21 +33834,17 @@ Opal.modules["browser/dom/node_set"] = function(Opal) {/* Generated by Opal 1.4.
             return node.$xpath(path);}, 1))
         }, 1);
         
-        $def(self, '$to_ary', function $$to_ary() {
-          var self = this;
-
-          return self.literal
-        }, 0);
+        $def(self, '$to_ary', $return_ivar("literal"), 0);
         return $alias(self, "to_a", "to_ary");
       })($nesting[0], null, $nesting)
     })($nesting[0], $nesting)
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/node"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $const_set = Opal.const_set, $eqeq = Opal.eqeq, $truthy = Opal.truthy, $send2 = Opal.send2, $find_super = Opal.find_super, $defs = Opal.defs, $def = Opal.def, $send = Opal.send, $eqeqeq = Opal.eqeqeq, $alias = Opal.alias, $gvars = Opal.gvars, $hash2 = Opal.hash2;
+Opal.modules["browser/dom/node"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $const_set = Opal.const_set, $eqeq = Opal.eqeq, $truthy = Opal.truthy, $send2 = Opal.send2, $find_super = Opal.find_super, $defs = Opal.defs, $def = Opal.def, $send = Opal.send, $eqeqeq = Opal.eqeqeq, $alias = Opal.alias, $return_val = Opal.return_val, $gvars = Opal.gvars, $hash2 = Opal.hash2;
 
-  Opal.add_stubs('include,==,[],new,raise,class,convert,set_native_reference,to_n,respond_to?,each,<<,to_dom,document,native?,===,>>,DOM,to_proc,parent,last,pop,select!,=~,remove_child,remove,children,supports?,node_type,first,try_convert,select,element_children,to_s,next,!,element?,create_element,dup,inner_html,previous,name');
+  Opal.add_stubs('include,==,[],new,raise,class,convert,set_native_reference,to_n,respond_to?,each,<<,to_dom,document,native?,===,>>,DOM,to_proc,add_next_sibling,parent,last,pop,select!,=~,add_previous_sibling,remove_child,remove,children,supports?,node_type,first,try_convert,elem?,select,element_children,content,content=,to_s,next,!,element?,name,name=,create_element,dup,inner_html,previous,replace');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -34285,10 +34173,7 @@ Opal.modules["browser/dom/node"] = function(Opal) {/* Generated by Opal 1.4.1 */
           return self.$node_type()['$==']($$('COMMENT_NODE'))
         }, 0);
         
-        $def(self, '$custom?', function $Node_custom$ques$16() {
-          
-          return false
-        }, 0);
+        $def(self, '$custom?', $return_val(false), 0);
         
         $def(self, '$document', function $$document() {
           var self = this;
@@ -34300,19 +34185,19 @@ Opal.modules["browser/dom/node"] = function(Opal) {/* Generated by Opal 1.4.1 */
           }
         }, 0);
         
-        $def(self, '$document=', function $Node_document$eq$17(new_document) {
+        $def(self, '$document=', function $Node_document$eq$16(new_document) {
           var self = this;
 
           return $$('Native').$try_convert(new_document, new_document).adoptNode(self["native"])
         }, 1);
         
-        $def(self, '$document?', function $Node_document$ques$18() {
+        $def(self, '$document?', function $Node_document$ques$17() {
           var self = this;
 
           return self.$node_type()['$==']($$('DOCUMENT_NODE'))
         }, 0);
         
-        $def(self, '$elem?', function $Node_elem$ques$19() {
+        $def(self, '$elem?', function $Node_elem$ques$18() {
           var self = this;
 
           return self.$node_type()['$==']($$('ELEMENT_NODE'))
@@ -34332,7 +34217,7 @@ Opal.modules["browser/dom/node"] = function(Opal) {/* Generated by Opal 1.4.1 */
           return self.$element_children().$first()
         }, 0);
         
-        $def(self, '$fragment?', function $Node_fragment$ques$20() {
+        $def(self, '$fragment?', function $Node_fragment$ques$19() {
           var self = this;
 
           return self.$node_type()['$==']($$('DOCUMENT_FRAGMENT_NODE'))
@@ -34352,7 +34237,7 @@ Opal.modules["browser/dom/node"] = function(Opal) {/* Generated by Opal 1.4.1 */
           return self["native"].nodeName || nil
         }, 0);
         
-        $def(self, '$name=', function $Node_name$eq$21(value) {
+        $def(self, '$name=', function $Node_name$eq$20(value) {
           var self = this;
 
           return self["native"].nodeName = value.$to_s()
@@ -34415,7 +34300,7 @@ Opal.modules["browser/dom/node"] = function(Opal) {/* Generated by Opal 1.4.1 */
           }
         }, 0);
         
-        $def(self, '$parent=', function $Node_parent$eq$22(node) {
+        $def(self, '$parent=', function $Node_parent$eq$21(node) {
           var self = this;
 
           return self["native"].parentNode = $$('Native').$convert(node)
@@ -34496,7 +34381,7 @@ Opal.modules["browser/dom/node"] = function(Opal) {/* Generated by Opal 1.4.1 */
         $alias(self, "text", "content");
         $alias(self, "text=", "content=");
         
-        $def(self, '$text?', function $Node_text$ques$23() {
+        $def(self, '$text?', function $Node_text$ques$22() {
           var self = this;
 
           return self.$node_type()['$==']($$('TEXT_NODE'))
@@ -34518,7 +34403,7 @@ Opal.modules["browser/dom/node"] = function(Opal) {/* Generated by Opal 1.4.1 */
           return self["native"].nodeValue || nil
         }, 0);
         
-        $def(self, '$value=', function $Node_value$eq$24(value) {
+        $def(self, '$value=', function $Node_value$eq$23(value) {
           var self = this;
 
           return self["native"].nodeValue = value
@@ -34533,7 +34418,7 @@ Opal.modules["browser/dom/node"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/attribute"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/attribute"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def;
 
   Opal.add_stubs('include,alias_native,supports?,==,name');
@@ -34571,7 +34456,7 @@ Opal.modules["browser/dom/attribute"] = function(Opal) {/* Generated by Opal 1.4
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/character_data"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/character_data"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def;
 
   Opal.add_stubs('alias_native');
@@ -34652,7 +34537,7 @@ Opal.modules["browser/dom/character_data"] = function(Opal) {/* Generated by Opa
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/text"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/text"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $gvars = Opal.gvars, $defs = Opal.defs, $def = Opal.def;
 
   Opal.add_stubs('create_text,DOM,data');
@@ -34700,7 +34585,7 @@ Opal.modules["browser/dom/text"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/cdata"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/cdata"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def;
 
   Opal.add_stubs('value');
@@ -34728,7 +34613,7 @@ Opal.modules["browser/dom/cdata"] = function(Opal) {/* Generated by Opal 1.4.1 *
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/comment"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/comment"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def;
 
   Opal.add_stubs('value');
@@ -34756,10 +34641,10 @@ Opal.modules["browser/dom/comment"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/attributes"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $truthy = Opal.truthy, $hash2 = Opal.hash2, $eqeq = Opal.eqeq, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $alias = Opal.alias;
+Opal.modules["browser/dom/element/attributes"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $truthy = Opal.truthy, $hash2 = Opal.hash2, $eqeq = Opal.eqeq, $send = Opal.send, $alias = Opal.alias;
 
-  Opal.add_stubs('attr_reader,to_n,[],supports?,==,to_s,[]=,-,include,enum_for,each,attribute_nodes,name,value,!');
+  Opal.add_stubs('attr_reader,to_n,[],supports?,==,to_s,[]=,include,enum_for,each,attribute_nodes,name,value,!');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -34873,14 +34758,11 @@ Opal.modules["browser/dom/element/attributes"] = function(Opal) {/* Generated by
           };
           
           $def(self, '$delete', function $Attributes_delete$5(name) {
-            var self = this, attr = nil, $writer = nil;
+            var self = this, attr = nil;
 
             
             attr = self['$[]'](name);
-            
-            $writer = [name, nil];
-            $send(self, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];;
+            self['$[]='](name, nil);
             return attr;
           }, 1);
           self.$include($$('Enumerable'));
@@ -34913,16 +34795,14 @@ Opal.modules["browser/dom/element/attributes"] = function(Opal) {/* Generated by
             var self = this;
 
             
-            $send(hash, 'each', [], function $$9(name, value){var self = $$9.$$s == null ? this : $$9.$$s, $writer = nil;
+            $send(hash, 'each', [], function $$9(name, value){var $a, self = $$9.$$s == null ? this : $$9.$$s;
 
               
               
               if (name == null) name = nil;;
               
               if (value == null) value = nil;;
-              $writer = [name, value];
-              $send(self, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 2, $$s: self});
+              return ($a = [name, value], $send(self, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 2, $$s: self});
             return self;
           }, 1);
           return $alias(self, "set", "[]=");
@@ -34932,10 +34812,10 @@ Opal.modules["browser/dom/element/attributes"] = function(Opal) {/* Generated by
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/data"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def, $send = Opal.send, $gvars = Opal.gvars, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["browser/dom/element/data"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def, $send = Opal.send, $gvars = Opal.gvars;
 
-  Opal.add_stubs('attr_reader,to_n,include,enum_for,call,each,attributes,=~,[]=,-,[],include?,respond_to?,to_str,to_s,to_int');
+  Opal.add_stubs('attr_reader,to_n,include,enum_for,call,each,attributes,=~,[]=,[],include?,respond_to?,to_str,to_s,to_int');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -35009,16 +34889,14 @@ Opal.modules["browser/dom/element/data"] = function(Opal) {/* Generated by Opal 
             var self = this;
 
             
-            $send(data, 'each', [], function $$2(name, value){var self = $$2.$$s == null ? this : $$2.$$s, $writer = nil;
+            $send(data, 'each', [], function $$2(name, value){var $a, self = $$2.$$s == null ? this : $$2.$$s;
 
               
               
               if (name == null) name = nil;;
               
               if (value == null) value = nil;;
-              $writer = [name, value];
-              $send(self, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 2, $$s: self});
+              return ($a = [name, value], $send(self, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 2, $$s: self});
             return self;
           }, 1);
           
@@ -35042,38 +34920,26 @@ Opal.modules["browser/dom/element/data"] = function(Opal) {/* Generated by Opal 
           }, 1);
           
           $def(self, '$[]=', function $Data_$$$eq$4(name, value) {
-            var self = this, $writer = nil;
+            var $a, self = this;
 
             
             delete self["native"].$data[name];
             if ($truthy([true, false, nil]['$include?'](value))) {
-              
-              $writer = ["data-" + (name), value];
-              $send(self.element, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];
+              return ($a = ["data-" + (name), value], $send(self.element, '[]=', $a), $a[$a.length - 1])
             } else if ($truthy(value['$respond_to?']("to_str"))) {
-              
-              $writer = ["data-" + (name), value.$to_str()];
-              $send(self.element, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];
+              return ($a = ["data-" + (name), value.$to_str()], $send(self.element, '[]=', $a), $a[$a.length - 1])
             } else if ($truthy(value['$respond_to?']("to_int"))) {
-              
-              $writer = ["data-" + (name), value.$to_int().$to_s()];
-              $send(self.element, '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];
+              return ($a = ["data-" + (name), value.$to_int().$to_s()], $send(self.element, '[]=', $a), $a[$a.length - 1])
             } else {
               return self["native"].$data[name] = value
             };
           }, 2);
           return $def(self, '$delete', function $Data_delete$5(name) {
-            var self = this, data = nil, $writer = nil;
+            var self = this, data = nil;
 
             
             data = self['$[]'](name);
-            
-            $writer = [name, nil];
-            $send(self, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];;
+            self['$[]='](name, nil);
             return data;
           }, 1);
         })($nesting[0], null, $nesting)
@@ -35082,10 +34948,10 @@ Opal.modules["browser/dom/element/data"] = function(Opal) {/* Generated by Opal 
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/position"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $eqeq = Opal.eqeq, $truthy = Opal.truthy, $rb_plus = Opal.rb_plus, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["browser/dom/element/position"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $eqeq = Opal.eqeq, $truthy = Opal.truthy, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus;
 
-  Opal.add_stubs('attr_reader,to_n,offset,get,parent,new,==,[],style,=~,+,x,to_i,x=,-,y,y=');
+  Opal.add_stubs('attr_reader,to_n,offset,get,parent,new,==,[],style,=~,x=,+,x,to_i,y=,y,-');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -35119,7 +34985,7 @@ Opal.modules["browser/dom/element/position"] = function(Opal) {/* Generated by O
           }, 1);
           
           $def(self, '$get', function $$get() {
-            var self = this, offset = nil, position = nil, parent = nil, parent_offset = nil, $writer = nil;
+            var self = this, offset = nil, position = nil, parent = nil, parent_offset = nil;
 
             
             offset = self.element.$offset();
@@ -35131,14 +34997,8 @@ Opal.modules["browser/dom/element/position"] = function(Opal) {/* Generated by O
               if (!$truthy(parent['$=~']("html"))) {
                 parent_offset = parent.$offset()
               };
-              
-              $writer = [$rb_plus(parent_offset.$x(), parent.$style()['$[]']("border-top-width").$to_i())];
-              $send(parent_offset, 'x=', $to_a($writer));
-              $writer[$rb_minus($writer["length"], 1)];;
-              
-              $writer = [$rb_plus(parent_offset.$y(), parent.$style()['$[]']("border-left-width").$to_i())];
-              $send(parent_offset, 'y=', $to_a($writer));
-              $writer[$rb_minus($writer["length"], 1)];;
+              parent_offset['$x=']($rb_plus(parent_offset.$x(), parent.$style()['$[]']("border-top-width").$to_i()));
+              parent_offset['$y=']($rb_plus(parent_offset.$y(), parent.$style()['$[]']("border-left-width").$to_i()));
             };
             return $$$($$('Browser'), 'Position').$new($rb_minus($rb_minus(position.$x(), parent_offset.$x()), self.element.$style()['$[]']("margin-left").$to_i()), $rb_minus($rb_minus(position.$y(), parent_offset.$y()), self.element.$style()['$[]']("margin-top").$to_i()));
           }, 0);
@@ -35159,10 +35019,10 @@ Opal.modules["browser/dom/element/position"] = function(Opal) {/* Generated by O
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/offset"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $truthy = Opal.truthy, $eqeq = Opal.eqeq, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $eqeqeq = Opal.eqeqeq, $to_ary = Opal.to_ary, $rb_plus = Opal.rb_plus;
+Opal.modules["browser/dom/element/offset"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $truthy = Opal.truthy, $eqeq = Opal.eqeq, $eqeqeq = Opal.eqeqeq, $to_ary = Opal.to_ary, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $send = Opal.send;
 
-  Opal.add_stubs('attr_reader,to_n,DOM,root,document,x,get,set,y,supports?,window,new,[],style!,==,[]=,style,-,to_u,===,first,+,px');
+  Opal.add_stubs('attr_reader,to_n,DOM,root,document,x,get,set,y,supports?,window,new,[],style!,==,[]=,style,to_u,===,first,+,-,px');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -35257,7 +35117,7 @@ Opal.modules["browser/dom/element/offset"] = function(Opal) {/* Generated by Opa
             }, 0)
           };
           return $def(self, '$set', function $$set($a) {
-            var $post_args, value, $b, $c, self = this, position = nil, $writer = nil, offset = nil, top = nil, left = nil, x = nil, y = nil;
+            var $post_args, value, $b, $c, self = this, position = nil, offset = nil, top = nil, left = nil, x = nil, y = nil;
 
             
             
@@ -35266,10 +35126,7 @@ Opal.modules["browser/dom/element/offset"] = function(Opal) {/* Generated by Opa
             value = $post_args;;
             position = self.element['$style!']()['$[]']("position");
             if ($eqeq(position, "static")) {
-              
-              $writer = ["position", "relative"];
-              $send(self.element.$style(), '[]=', $to_a($writer));
-              $writer[$rb_minus($writer["length"], 1)];
+              self.element.$style()['$[]=']("position", "relative")
             };
             offset = self.$get();
             top = self.element['$style!']()['$[]']("top").$to_u();
@@ -35282,16 +35139,10 @@ Opal.modules["browser/dom/element/offset"] = function(Opal) {/* Generated by Opa
               $c = value, $b = $to_ary($c), (x = ($b[0] == null ? nil : $b[0])), (y = ($b[1] == null ? nil : $b[1])), $c
             };
             if ($truthy(x)) {
-              
-              $writer = ["left", $rb_plus($rb_minus(x.$px(), offset.$x()), left)];
-              $send(self.element.$style(), '[]=', $to_a($writer));
-              $writer[$rb_minus($writer["length"], 1)];
+              self.element.$style()['$[]=']("left", $rb_plus($rb_minus(x.$px(), offset.$x()), left))
             };
             if ($truthy(y)) {
-              
-              $writer = ["top", $rb_plus($rb_minus(y.$px(), offset.$y()), top)];
-              $send(self.element.$style(), '[]=', $to_a($writer));
-              return $writer[$rb_minus($writer["length"], 1)];
+              return ($b = ["top", $rb_plus($rb_minus(y.$px(), offset.$y()), top)], $send(self.element.$style(), '[]=', $b), $b[$b.length - 1])
             } else {
               return nil
             };
@@ -35302,7 +35153,7 @@ Opal.modules["browser/dom/element/offset"] = function(Opal) {/* Generated by Opa
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/scroll"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/element/scroll"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def, $eqeqeq = Opal.eqeqeq, $to_ary = Opal.to_ary, $rb_plus = Opal.rb_plus;
 
   Opal.add_stubs('attr_reader,to_n,include?,class,===,first,[],set,set_by,supports?,private,+,x,y,new,raise,position');
@@ -35514,10 +35365,10 @@ Opal.modules["browser/dom/element/scroll"] = function(Opal) {/* Generated by Opa
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/size"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["browser/dom/element/size"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $send = Opal.send;
 
-  Opal.add_stubs('attr_reader,to_n,[]=,style,-');
+  Opal.add_stubs('attr_reader,to_n,[]=,style');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -35562,12 +35413,9 @@ Opal.modules["browser/dom/element/size"] = function(Opal) {/* Generated by Opal 
           }, 0);
           
           $def(self, '$width=', function $Size_width$eq$1(value) {
-            var self = this, $writer = nil;
+            var $a, self = this;
 
-            
-            $writer = ["width", value];
-            $send(self.element.$style(), '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];
+            return ($a = ["width", value], $send(self.element.$style(), '[]=', $a), $a[$a.length - 1])
           }, 1);
           
           $def(self, '$height', function $$height() {
@@ -35577,12 +35425,9 @@ Opal.modules["browser/dom/element/size"] = function(Opal) {/* Generated by Opal 
           }, 0);
           
           $def(self, '$height=', function $Size_height$eq$2(value) {
-            var self = this, $writer = nil;
+            var $a, self = this;
 
-            
-            $writer = ["height", value];
-            $send(self.element.$style(), '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];
+            return ($a = ["height", value], $send(self.element.$style(), '[]=', $a), $a[$a.length - 1])
           }, 1);
           
           $def(self, '$client_width', function $$client_width() {
@@ -35601,7 +35446,7 @@ Opal.modules["browser/dom/element/size"] = function(Opal) {/* Generated by Opal 
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/button"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/element/button"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def;
 
   Opal.add_stubs('def_selector');
@@ -35669,7 +35514,7 @@ Opal.modules["browser/dom/element/button"] = function(Opal) {/* Generated by Opa
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/image"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/element/image"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $const_set = Opal.const_set;
 
   Opal.add_stubs('def_selector');
@@ -35727,7 +35572,7 @@ Opal.modules["browser/dom/element/image"] = function(Opal) {/* Generated by Opal
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/form"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/element/form"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def;
 
   Opal.add_stubs('def_selector,create,alias_native,[],new');
@@ -35791,7 +35636,7 @@ Opal.modules["browser/dom/element/form"] = function(Opal) {/* Generated by Opal 
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/input"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/element/input"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $send = Opal.send;
 
   Opal.add_stubs('def_selector,map,new,to_n');
@@ -35906,7 +35751,7 @@ Opal.modules["browser/dom/element/input"] = function(Opal) {/* Generated by Opal
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/select"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/element/select"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def;
 
   Opal.add_stubs('def_selector,to_n,[],new,DOM,alias_native');
@@ -35985,7 +35830,7 @@ Opal.modules["browser/dom/element/select"] = function(Opal) {/* Generated by Opa
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/template"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/element/template"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def;
 
   Opal.add_stubs('def_selector,DOM');
@@ -36023,7 +35868,7 @@ Opal.modules["browser/dom/element/template"] = function(Opal) {/* Generated by O
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/textarea"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/element/textarea"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def;
 
   Opal.add_stubs('def_selector');
@@ -36080,7 +35925,7 @@ Opal.modules["browser/dom/element/textarea"] = function(Opal) {/* Generated by O
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/iframe"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/element/iframe"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $hash2 = Opal.hash2;
 
   Opal.add_stubs('def_selector,alias_native,new,DOM,send,content_window');
@@ -36142,7 +35987,7 @@ Opal.modules["browser/dom/element/iframe"] = function(Opal) {/* Generated by Opa
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element/media"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/element/media"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def;
 
   Opal.add_stubs('def_selector');
@@ -36191,10 +36036,10 @@ Opal.modules["browser/dom/element/media"] = function(Opal) {/* Generated by Opal
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/element"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $eqeqeq = Opal.eqeqeq, $gvars = Opal.gvars, $eqeq = Opal.eqeq, $send = Opal.send, $to_a = Opal.to_a, $truthy = Opal.truthy, $hash2 = Opal.hash2, $hash = Opal.hash, $defs = Opal.defs, $not = Opal.not, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $alias = Opal.alias, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $to_ary = Opal.to_ary;
+Opal.modules["browser/dom/element"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $eqeqeq = Opal.eqeqeq, $gvars = Opal.gvars, $eqeq = Opal.eqeq, $send = Opal.send, $to_a = Opal.to_a, $truthy = Opal.truthy, $hash2 = Opal.hash2, $hash = Opal.hash, $defs = Opal.defs, $return_ivar = Opal.return_ivar, $not = Opal.not, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $alias = Opal.alias, $rb_plus = Opal.rb_plus, $rb_minus = Opal.rb_minus, $to_ary = Opal.to_ary;
 
-  Opal.add_stubs('===,first,shift,==,create_element,to_proc,last,pop,upcase,scan,flatten,delete,|,to_h,map,merge,raise,<<,subclasses,=~,native?,[],!,length,create,select,native_is?,new,include,target,DOM,tag_name,native_matches?,selector,supports?,loaded?,xpath,get,attributes,set,+,class_names,empty?,join,uniq,css,each,alias_native,reject,split,assign,height,size,height=,-,to_s,to_a,document,inner_dom=,clear,downcase,name,id,gsub,class,offset,concat,replace,apply,to_n,window,partition,include?,add_class,remove_class,width,width=,require');
+  Opal.add_stubs('===,first,shift,==,create_element,to_proc,last,pop,upcase,scan,flatten,delete,|,to_h,map,merge,raise,<<,subclasses,=~,native?,[],!,length,create,select,native_is?,new,include,target,DOM,tag_name,native_matches?,selector,supports?,loaded?,xpath,get,attributes,set,+,class_names,empty?,join,uniq,css,each,alias_native,reject,split,assign,height,size,height=,to_s,inner_dom=,to_a,document,clear,downcase,name,id,gsub,class,offset,concat,[]=,replace,apply,to_n,window,-,partition,include?,add_class,remove_class,width,width=,require');
   
   (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
@@ -36288,18 +36133,8 @@ Opal.modules["browser/dom/element"] = function(Opal) {/* Generated by Opal 1.4.1
             return (self.tag_name = selector.$upcase())
           };
         }, 1);
-        $defs(self, '$selector', function $$selector() {
-          var self = this;
-          if (self.selector == null) self.selector = nil;
-
-          return self.selector
-        }, 0);
-        $defs(self, '$tag_name', function $$tag_name() {
-          var self = this;
-          if (self.tag_name == null) self.tag_name = nil;
-
-          return self.tag_name
-        }, 0);
+        $defs(self, '$selector', $return_ivar("selector"), 0);
+        $defs(self, '$tag_name', $return_ivar("tag_name"), 0);
         $defs(self, '$new', function $Element_new$2($a) {
           var block = $Element_new$2.$$p || nil, $post_args, args, self = this, node = nil, subclass = nil;
 
@@ -36606,12 +36441,9 @@ Opal.modules["browser/dom/element"] = function(Opal) {/* Generated by Opal 1.4.1
         }, 0);
         
         $def(self, '$height=', function $Element_height$eq$20(value) {
-          var self = this, $writer = nil;
+          var $a, self = this;
 
-          
-          $writer = [value];
-          $send(self.$size(), 'height=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];
+          return ($a = [value], $send(self.$size(), 'height=', $a), $a[$a.length - 1])
         }, 1);
         
         $def(self, '$id', function $$id() {
@@ -36636,17 +36468,14 @@ Opal.modules["browser/dom/element"] = function(Opal) {/* Generated by Opal 1.4.1
         }, 1);
         
         $def(self, '$inner_dom', function $$inner_dom(builder) {
-          var block = $$inner_dom.$$p || nil, self = this, $writer = nil;
+          var block = $$inner_dom.$$p || nil, self = this;
 
           delete $$inner_dom.$$p;
           
           ;
           
           if (builder == null) builder = nil;;
-          
-          $writer = [$send($$('Builder'), 'new', [self.$document(), builder], block.$to_proc()).$to_a()];
-          $send(self, 'inner_dom=', $to_a($writer));
-          $writer[$rb_minus($writer["length"], 1)];;
+          self['$inner_dom=']($send($$('Builder'), 'new', [self.$document(), builder], block.$to_proc()).$to_a());
           return self;
         }, -1);
         
@@ -36865,12 +36694,9 @@ Opal.modules["browser/dom/element"] = function(Opal) {/* Generated by Opal 1.4.1
         }, 0);
         
         $def(self, '$width=', function $Element_width$eq$31(value) {
-          var self = this, $writer = nil;
+          var $a, self = this;
 
-          
-          $writer = [value];
-          $send(self.$size(), 'width=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];
+          return ($a = [value], $send(self.$size(), 'width=', $a), $a[$a.length - 1])
         }, 1);
         
         $def(self, '$window', function $$window() {
@@ -36924,10 +36750,10 @@ Opal.modules["browser/dom/element"] = function(Opal) {/* Generated by Opal 1.4.1
   return self.$require("browser/dom/element/media");
 };
 
-Opal.modules["browser/dom/document_or_shadow_root"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/document_or_shadow_root"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $send = Opal.send, $def = Opal.def, $alias = Opal.alias;
 
-  Opal.add_stubs('new');
+  Opal.add_stubs('new,style_sheets');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -36961,10 +36787,10 @@ Opal.modules["browser/dom/document_or_shadow_root"] = function(Opal) {/* Generat
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/document"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def, $alias = Opal.alias, $hash2 = Opal.hash2, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus;
+Opal.modules["browser/dom/document"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def, $alias = Opal.alias, $hash2 = Opal.hash2, $send = Opal.send, $return_self = Opal.return_self, $return_val = Opal.return_val;
 
-  Opal.add_stubs('include,DOM,first,css,xpath,raise,dig,[]=,-,[],to_n,join,Array,each,inner_dom,to_proc,<<,supports?,ready?,call,on,off,convert,new');
+  Opal.add_stubs('include,DOM,first,css,xpath,[],raise,[]=,dig,to_n,join,Array,each,inner_dom,to_proc,<<,supports?,ready?,call,on,off,convert,new');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -37018,7 +36844,7 @@ Opal.modules["browser/dom/document"] = function(Opal) {/* Generated by Opal 1.4.
         }, 0);
         
         $def(self, '$create_element', function $$create_element(name, $a, $b) {
-          var block = $$create_element.$$p || nil, $post_args, $kwargs, builder, options, self = this, opts = nil, $writer = nil, ns = nil, elem = nil, dom = nil;
+          var block = $$create_element.$$p || nil, $post_args, $kwargs, builder, options, $c, self = this, opts = nil, ns = nil, elem = nil, dom = nil;
 
           delete $$create_element.$$p;
           
@@ -37039,11 +36865,8 @@ Opal.modules["browser/dom/document"] = function(Opal) {/* Generated by Opal 1.4.
           
           options = Opal.kwrestargs($kwargs, {});;
           opts = $hash2([], {});
-          if (($truthy(options['$[]']("is")) || ($truthy((($writer = ["is", options.$dig("attrs", "is")]), $send(options, '[]=', $to_a($writer)), $writer[$rb_minus($writer["length"], 1)]))))) {
-            
-            $writer = ["is", options['$[]']("is")];
-            $send(opts, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];
+          if (($truthy(options['$[]']("is")) || ($truthy(($c = ["is", options.$dig("attrs", "is")], $send(options, '[]=', $c), $c[$c.length - 1]))))) {
+            opts['$[]=']("is", options['$[]']("is"))
           };
           if ($truthy((ns = options['$[]']("namespace")))) {
             elem = self["native"].createElementNS(ns, name, opts.$to_n())
@@ -37096,11 +36919,7 @@ Opal.modules["browser/dom/document"] = function(Opal) {/* Generated by Opal 1.4.
           return self.$DOM(self["native"].createComment(content))
         }, 1);
         
-        $def(self, '$document', function $$document() {
-          var self = this;
-
-          return self
-        }, 0);
+        $def(self, '$document', $return_self, 0);
         
         $def(self, '$head', function $$head() {
           var self = this;
@@ -37108,10 +36927,7 @@ Opal.modules["browser/dom/document"] = function(Opal) {/* Generated by Opal 1.4.
           return self.$DOM(self["native"].getElementsByTagName("head")[0])
         }, 0);
         
-        $def(self, '$inspect', function $$inspect() {
-          
-          return "#<DOM::Document>"
-        }, 0);
+        $def(self, '$inspect', $return_val("#<DOM::Document>"), 0);
         if ($truthy($$('Browser')['$supports?']("Event.addListener"))) {
           
           $def(self, '$ready', function $$ready() {
@@ -37243,7 +37059,7 @@ Opal.modules["browser/dom/document"] = function(Opal) {/* Generated by Opal 1.4.
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/document_fragment"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/document_fragment"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $eqeq = Opal.eqeq, $truthy = Opal.truthy, $send2 = Opal.send2, $find_super = Opal.find_super, $defs = Opal.defs, $gvars = Opal.gvars;
 
   Opal.add_stubs('==,new,create_document_fragment');
@@ -37287,7 +37103,7 @@ Opal.modules["browser/dom/document_fragment"] = function(Opal) {/* Generated by 
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/shadow_root"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/shadow_root"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs;
 
   Opal.add_stubs('include,raise');
@@ -37318,10 +37134,10 @@ Opal.modules["browser/dom/shadow_root"] = function(Opal) {/* Generated by Opal 1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom/mutation_observer"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $eqeqeq = Opal.eqeqeq, $def = Opal.def, $truthy = Opal.truthy, $send = Opal.send, $send2 = Opal.send2, $find_super = Opal.find_super, $hash2 = Opal.hash2, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $eqeq = Opal.eqeq;
+Opal.modules["browser/dom/mutation_observer"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy, $send = Opal.send, $send2 = Opal.send2, $find_super = Opal.find_super, $hash2 = Opal.hash2, $eqeq = Opal.eqeq;
 
-  Opal.add_stubs('supports?,include,===,==,type,new,[],DOM,alias_native,call,map,convert,private,Native,[]=,-,to_n');
+  Opal.add_stubs('supports?,include,==,type,new,[],DOM,alias_native,call,map,convert,private,Native,[]=,to_n');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -37354,16 +37170,18 @@ Opal.modules["browser/dom/mutation_observer"] = function(Opal) {/* Generated by 
           self.$include($$$($$('Browser'), 'NativeCachedWrapper'));
           
           $def(self, '$type', function $$type() {
-            var self = this, $ret_or_1 = nil;
+            var self = this;
 
-            if ($eqeqeq("attributes", ($ret_or_1 = self["native"].type))) {
-              return "attribute"
-            } else if ($eqeqeq("childList", $ret_or_1)) {
-              return "tree"
-            } else if ($eqeqeq("characterData", $ret_or_1)) {
-              return "cdata"
-            } else {
-              return nil
+            
+            switch (self["native"].type) {
+              case "attributes":
+                return "attribute"
+              case "childList":
+                return "tree"
+              case "characterData":
+                return "cdata"
+              default:
+                return nil
             }
           }, 0);
           
@@ -37459,52 +37277,31 @@ Opal.modules["browser/dom/mutation_observer"] = function(Opal) {/* Generated by 
         }, 0);
         self.$private();
         return $def(self, '$convert', function $$convert(hash) {
-          var self = this, options = nil, $writer = nil, attrs = nil, filter = nil, cdata = nil;
+          var self = this, options = nil, attrs = nil, filter = nil, cdata = nil;
 
           
           options = self.$Native({});
           if ($truthy(hash['$[]']("children"))) {
-            
-            $writer = ["childList", true];
-            $send(options, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];
+            options['$[]=']("childList", true)
           };
           if ($truthy(hash['$[]']("tree"))) {
-            
-            $writer = ["subtree", true];
-            $send(options, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];
+            options['$[]=']("subtree", true)
           };
           if ($truthy((attrs = hash['$[]']("attributes")))) {
             
-            
-            $writer = ["attributes", true];
-            $send(options, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];;
+            options['$[]=']("attributes", true);
             if ($eqeq(attrs, "old")) {
-              
-              $writer = ["attributeOldValue", true];
-              $send(options, '[]=', $to_a($writer));
-              $writer[$rb_minus($writer["length"], 1)];
+              options['$[]=']("attributeOldValue", true)
             };
           };
           if ($truthy((filter = hash['$[]']("filter")))) {
-            
-            $writer = ["attributeFilter", filter];
-            $send(options, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];
+            options['$[]=']("attributeFilter", filter)
           };
           if ($truthy((cdata = hash['$[]']("cdata")))) {
             
-            
-            $writer = ["characterData", true];
-            $send(options, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];;
+            options['$[]=']("characterData", true);
             if ($eqeq(cdata, "old")) {
-              
-              $writer = ["characterDataOldValue", true];
-              $send(options, '[]=', $to_a($writer));
-              $writer[$rb_minus($writer["length"], 1)];
+              options['$[]=']("characterDataOldValue", true)
             };
           };
           return options.$to_n();
@@ -37514,7 +37311,7 @@ Opal.modules["browser/dom/mutation_observer"] = function(Opal) {/* Generated by 
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/dom"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $def = Opal.def, $truthy = Opal.truthy, $gvars = Opal.gvars, $send = Opal.send, $eqeq = Opal.eqeq, $eqeqeq = Opal.eqeqeq, $klass = Opal.klass;
   if ($gvars.window == null) $gvars.window = nil;
 
@@ -37631,10 +37428,10 @@ Opal.modules["browser/dom"] = function(Opal) {/* Generated by Opal 1.4.1 */
   return ($gvars.document = $gvars.window.$document());
 };
 
-Opal.modules["browser/css/declaration"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $range = Opal.range;
+Opal.modules["browser/css/declaration"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def, $send = Opal.send, $range = Opal.range;
 
-  Opal.add_stubs('include,new,each,[]=,-,to_proc,important,name,value,to_s,enum_for,[],alias_native,end_with?');
+  Opal.add_stubs('include,new,each,[]=,to_proc,important,name,value,to_s,enum_for,[],alias_native,end_with?');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -37669,16 +37466,14 @@ Opal.modules["browser/css/declaration"] = function(Opal) {/* Generated by Opal 1
           var self = this;
 
           
-          $send(data, 'each', [], function $$1(name, value){var self = $$1.$$s == null ? this : $$1.$$s, $writer = nil;
+          $send(data, 'each', [], function $$1(name, value){var $a, self = $$1.$$s == null ? this : $$1.$$s;
 
             
             
             if (name == null) name = nil;;
             
             if (value == null) value = nil;;
-            $writer = [name, value];
-            $send(self, '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];}, {$$arity: 2, $$s: self});
+            return ($a = [name, value], $send(self, '[]=', $a), $a[$a.length - 1]);}, {$$arity: 2, $$s: self});
           return self;
         }, 1);
         
@@ -37760,16 +37555,13 @@ Opal.modules["browser/css/declaration"] = function(Opal) {/* Generated by Opal 1
         self.$alias_native("length");
         self.$alias_native("to_s", "cssText");
         return $def(self, '$method_missing', function $$method_missing(name, value) {
-          var self = this, $writer = nil;
+          var $a, self = this;
 
           
           
           if (value == null) value = nil;;
           if ($truthy(name['$end_with?']("="))) {
-            
-            $writer = [name['$[]']($range(0, -2, false)), value];
-            $send(self, '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];
+            return ($a = [name['$[]']($range(0, -2, false)), value], $send(self, '[]=', $a), $a[$a.length - 1])
           } else {
             return self['$[]'](name)
           };
@@ -37779,7 +37571,7 @@ Opal.modules["browser/css/declaration"] = function(Opal) {/* Generated by Opal 1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/css/style_sheet"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/css/style_sheet"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $eqeqeq = Opal.eqeqeq, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $truthy = Opal.truthy, $send = Opal.send, $to_a = Opal.to_a;
 
   Opal.add_stubs('include,===,to_n,alias_native,new,DOM,join,map,insert,length,find,rules,log,==,id,__send__,to_proc');
@@ -37936,7 +37728,7 @@ Opal.modules["browser/css/style_sheet"] = function(Opal) {/* Generated by Opal 1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/css/rule"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/css/rule"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $const_set = Opal.const_set, $eqeq = Opal.eqeq, $truthy = Opal.truthy, $send2 = Opal.send2, $find_super = Opal.find_super, $defs = Opal.defs, $def = Opal.def;
 
   Opal.add_stubs('include,==,[],new,raise,alias_native');
@@ -38016,7 +37808,7 @@ Opal.modules["browser/css/rule"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/css/rule/style"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/css/rule/style"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a;
 
   Opal.add_stubs('alias_native,new,__send__,declaration,to_proc');
@@ -38068,10 +37860,10 @@ Opal.modules["browser/css/rule/style"] = function(Opal) {/* Generated by Opal 1.
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/css"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $module = Opal.module, $truthy = Opal.truthy, $rb_gt = Opal.rb_gt, $gvars = Opal.gvars, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $def = Opal.def;
+Opal.modules["browser/css"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $module = Opal.module, $truthy = Opal.truthy, $rb_gt = Opal.rb_gt, $gvars = Opal.gvars, $send = Opal.send, $def = Opal.def;
 
-  Opal.add_stubs('require,>,length,pop,create_element,[]=,-,css,to_proc,inner_text=,join');
+  Opal.add_stubs('require,>,length,pop,create_element,[]=,inner_text=,css,to_proc,join');
   
   self.$require("browser/css/declaration");
   self.$require("browser/css/style_sheet");
@@ -38083,7 +37875,7 @@ Opal.modules["browser/css"] = function(Opal) {/* Generated by Opal 1.4.1 */
     var $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting);
 
     return $def(self, '$CSS', function $$CSS($a) {
-      var block = $$CSS.$$p || nil, $post_args, args, document = nil, $ret_or_1 = nil, style = nil, $writer = nil;
+      var block = $$CSS.$$p || nil, $post_args, args, document = nil, $ret_or_1 = nil, style = nil;
       if ($gvars.document == null) $gvars.document = nil;
 
       delete $$CSS.$$p;
@@ -38095,27 +37887,18 @@ Opal.modules["browser/css"] = function(Opal) {/* Generated by Opal 1.4.1 */
       args = $post_args;;
       document = ($truthy(($ret_or_1 = (($truthy($rb_gt(args.$length(), 1)) || ((block !== nil))) ? (args.$pop()) : nil))) ? ($ret_or_1) : ($gvars.document));
       style = document.$create_element("style");
-      
-      $writer = ["type", "text/css"];
-      $send(style, '[]=', $to_a($writer));
-      $writer[$rb_minus($writer["length"], 1)];;
+      style['$[]=']("type", "text/css");
       if ($truthy(block)) {
-        
-        $writer = [$send($$('Paggio'), 'css', [], block.$to_proc())];
-        $send(style, 'inner_text=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];
+        style['$inner_text=']($send($$('Paggio'), 'css', [], block.$to_proc()))
       } else {
-        
-        $writer = [args.$join("")];
-        $send(style, 'inner_text=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];
+        style['$inner_text='](args.$join(""))
       };
       return style;
     }, -1)
   })($nesting[0], $nesting);
 };
 
-Opal.modules["browser/setup/mini"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/setup/mini"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, nil = Opal.nil;
 
   Opal.add_stubs('require');
@@ -38127,7 +37910,7 @@ Opal.modules["browser/setup/mini"] = function(Opal) {/* Generated by Opal 1.4.1 
   return self.$require("browser/css");
 };
 
-Opal.modules["browser/delay"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/delay"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $send = Opal.send, $gvars = Opal.gvars;
 
   Opal.add_stubs('attr_reader,convert,to_n,tap,new,to_proc,start,resolve,after,after!,resolve_after');
@@ -38257,8 +38040,8 @@ Opal.modules["browser/delay"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null);
 };
 
-Opal.modules["browser/interval"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $truthy = Opal.truthy, $send = Opal.send, $gvars = Opal.gvars;
+Opal.modules["browser/interval"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $return_ivar = Opal.return_ivar, $truthy = Opal.truthy, $send = Opal.send, $gvars = Opal.gvars;
 
   Opal.add_stubs('attr_reader,convert,nil?,stopped?,aborted?,raise,call,tap,new,to_proc,every,every!');
   
@@ -38273,7 +38056,7 @@ Opal.modules["browser/interval"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
       var $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting), $proto = self.$$prototype;
 
-      $proto.id = $proto.aborted = $proto.window = $proto.block = $proto.every = nil;
+      $proto.id = $proto.window = $proto.block = $proto.every = nil;
       
       self.$attr_reader("every");
       
@@ -38295,11 +38078,7 @@ Opal.modules["browser/interval"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return self.id['$nil?']()
       }, 0);
       
-      $def(self, '$aborted?', function $Interval_aborted$ques$2() {
-        var self = this;
-
-        return self.aborted
-      }, 0);
+      $def(self, '$aborted?', $return_ivar("aborted"), 0);
       
       $def(self, '$abort', function $$abort() {
         var self = this;
@@ -38356,10 +38135,10 @@ Opal.modules["browser/interval"] = function(Opal) {/* Generated by Opal 1.4.1 */
         ;
         return $send($send($$('Interval'), 'new', [self["native"], time], block.$to_proc()), 'tap', [], "start".$to_proc());
       }, 1);
-      return $def(self, '$every!', function $Window_every$excl$3(time) {
-        var block = $Window_every$excl$3.$$p || nil, self = this;
+      return $def(self, '$every!', function $Window_every$excl$2(time) {
+        var block = $Window_every$excl$2.$$p || nil, self = this;
 
-        delete $Window_every$excl$3.$$p;
+        delete $Window_every$excl$2.$$p;
         
         ;
         return $send($$('Interval'), 'new', [self["native"], time], block.$to_proc());
@@ -38381,11 +38160,11 @@ Opal.modules["browser/interval"] = function(Opal) {/* Generated by Opal 1.4.1 */
       ;
       return $send($gvars.window, 'every', [time], block.$to_proc());
     }, 1);
-    return $def(self, '$every!', function $Kernel_every$excl$4(time) {
-      var block = $Kernel_every$excl$4.$$p || nil;
+    return $def(self, '$every!', function $Kernel_every$excl$3(time) {
+      var block = $Kernel_every$excl$3.$$p || nil;
       if ($gvars.window == null) $gvars.window = nil;
 
-      delete $Kernel_every$excl$4.$$p;
+      delete $Kernel_every$excl$3.$$p;
       
       ;
       return $send($gvars.window, 'every!', [time], block.$to_proc());
@@ -38403,7 +38182,7 @@ Opal.modules["browser/interval"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
       return $send($gvars.window, 'every', [time], self.$to_proc())
     }, 1);
-    return $def(self, '$every!', function $Proc_every$excl$5(time) {
+    return $def(self, '$every!', function $Proc_every$excl$4(time) {
       var self = this;
       if ($gvars.window == null) $gvars.window = nil;
 
@@ -38412,10 +38191,10 @@ Opal.modules["browser/interval"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null);
 };
 
-Opal.modules["browser/immediate"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $truthy = Opal.truthy, $send = Opal.send, $to_a = Opal.to_a, $class_variable_set = Opal.class_variable_set, $hash2 = Opal.hash2, $gvars = Opal.gvars, $class_variable_get = Opal.class_variable_get, $eqeqeq = Opal.eqeqeq, $rb_minus = Opal.rb_minus, $defs = Opal.defs;
+Opal.modules["browser/immediate"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $truthy = Opal.truthy, $send = Opal.send, $to_a = Opal.to_a, $class_variable_set = Opal.class_variable_set, $hash2 = Opal.hash2, $gvars = Opal.gvars, $class_variable_get = Opal.class_variable_get, $eqeqeq = Opal.eqeqeq, $return_val = Opal.return_val, $return_ivar = Opal.return_ivar, $defs = Opal.defs;
 
-  Opal.add_stubs('supports?,call,to_proc,rand,on,start_with?,data,===,delete,[],length,to_s,[]=,-,send,aborted?,prevent,tap,new,defer,proc,resolve,reject');
+  Opal.add_stubs('supports?,call,to_proc,rand,on,start_with?,data,===,delete,[],length,to_s,[]=,send,aborted?,prevent,tap,new,defer,proc,resolve,reject');
   
   (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
@@ -38428,7 +38207,7 @@ Opal.modules["browser/immediate"] = function(Opal) {/* Generated by Opal 1.4.1 *
       var $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting), $proto = self.$$prototype;
       if ($gvars.window == null) $gvars.window = nil;
 
-      $proto["function"] = $proto["arguments"] = $proto.block = $proto.id = $proto.aborted = nil;
+      $proto["function"] = $proto["arguments"] = $proto.block = $proto.id = nil;
       
       
       $def(self, '$initialize', function $$initialize(func, args) {
@@ -38494,15 +38273,12 @@ Opal.modules["browser/immediate"] = function(Opal) {/* Generated by Opal 1.4.1 *
           };}, 1);
         
         $def(self, '$dispatch', function $$dispatch() {
-          var self = this, $writer = nil;
+          var self = this;
           if ($gvars.window == null) $gvars.window = nil;
 
           
           self.id = self.$rand(1000000).$to_s();
-          
-          $writer = [self.id, [self["function"], self["arguments"], self.block]];
-          $send($class_variable_get($nesting[0], '@@tasks', false), '[]=', $to_a($writer));
-          $writer[$rb_minus($writer["length"], 1)];;
+          $class_variable_get($nesting[0], '@@tasks', false)['$[]='](self.id, [self["function"], self["arguments"], self.block]);
           return $gvars.window.$send("" + ($class_variable_get($nesting[0], '@@prefix', false)) + (self.id));
         }, 0);
         
@@ -38533,10 +38309,7 @@ Opal.modules["browser/immediate"] = function(Opal) {/* Generated by Opal 1.4.1 *
       
         }, 0);
         
-        $def(self, '$prevent', function $$prevent() {
-          
-          return nil
-        }, 0);
+        $def(self, '$prevent', $return_val(nil), 0);
       } else {
         
         
@@ -38566,11 +38339,7 @@ Opal.modules["browser/immediate"] = function(Opal) {/* Generated by Opal 1.4.1 *
         self.$prevent();
         return self;
       }, 0);
-      return $def(self, '$aborted?', function $Immediate_aborted$ques$2() {
-        var self = this;
-
-        return self.aborted
-      }, 0);
+      return $def(self, '$aborted?', $return_ivar("aborted"), 0);
     })($nesting[0], null, $nesting)
   })($nesting[0], $nesting);
   (function($base, $parent_nesting) {
@@ -38624,12 +38393,12 @@ Opal.modules["browser/immediate"] = function(Opal) {/* Generated by Opal 1.4.1 *
       $post_args = Opal.slice.call(arguments);
       
       args = $post_args;;
-      return $send(self.$new(), 'tap', [], function $$3(promise){var self = $$3.$$s == null ? this : $$3.$$s;
+      return $send(self.$new(), 'tap', [], function $$2(promise){var self = $$2.$$s == null ? this : $$2.$$s;
 
         
         
         if (promise == null) promise = nil;;
-        return $send(self, 'proc', [], function $$4(){var e = nil;
+        return $send(self, 'proc', [], function $$3(){var e = nil;
 
           try {
             return promise.$resolve($send(block, 'call', $to_a(args)))
@@ -38644,10 +38413,10 @@ Opal.modules["browser/immediate"] = function(Opal) {/* Generated by Opal 1.4.1 *
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $send = Opal.send, $defs = Opal.defs, $send2 = Opal.send2, $find_super = Opal.find_super, $hash2 = Opal.hash2, $def = Opal.def, $truthy = Opal.truthy, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $eqeqeq = Opal.eqeqeq, $gvars = Opal.gvars, $rb_times = Opal.rb_times;
+Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $send = Opal.send, $defs = Opal.defs, $send2 = Opal.send2, $find_super = Opal.find_super, $hash2 = Opal.hash2, $def = Opal.def, $return_ivar = Opal.return_ivar, $assign_ivar_val = Opal.assign_ivar_val, $truthy = Opal.truthy, $to_a = Opal.to_a, $eqeqeq = Opal.eqeqeq, $gvars = Opal.gvars, $rb_times = Opal.rb_times;
 
-  Opal.add_stubs('require,delete,create_id,[],map,parse,attr_reader,autosave!,reload,include,enum_for,each,to_proc,__send__,[]=,-,autosave?,save,tap,clear,===,replace,call,raise,supports?,dump,options,cookies,*,<<,new,to_json,name,class,to_s,seek,string,to_n');
+  Opal.add_stubs('require,delete,create_id,[],map,parse,attr_reader,autosave!,reload,include,enum_for,each,to_proc,__send__,[]=,autosave?,save,tap,clear,===,replace,call,raise,supports?,dump,options,cookies,*,<<,new,to_json,name,class,to_s,seek,string,to_n');
   
   self.$require("json");
   self.$require("stringio");
@@ -38662,7 +38431,7 @@ Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
       var $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting), $proto = self.$$prototype;
 
-      $proto.autosave = $proto.data = $proto.window = $proto.name = $proto.element = nil;
+      $proto.data = $proto.autosave = $proto.window = $proto.name = $proto.element = nil;
       
       $defs(self, '$json_create', function $$json_create(data) {
         
@@ -38691,23 +38460,11 @@ Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return self.$reload();
       }, 2);
       
-      $def(self, '$autosave?', function $Storage_autosave$ques$2() {
-        var self = this;
-
-        return self.autosave
-      }, 0);
+      $def(self, '$autosave?', $return_ivar("autosave"), 0);
       
-      $def(self, '$autosave!', function $Storage_autosave$excl$3() {
-        var self = this;
-
-        return (self.autosave = true)
-      }, 0);
+      $def(self, '$autosave!', $assign_ivar_val("autosave", true), 0);
       
-      $def(self, '$no_autosave!', function $Storage_no_autosave$excl$4() {
-        var self = this;
-
-        return (self.autosave = false)
-      }, 0);
+      $def(self, '$no_autosave!', $assign_ivar_val("autosave", false), 0);
       self.$include($$('Enumerable'));
       
       $def(self, '$each', function $$each() {
@@ -38736,14 +38493,11 @@ Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return $send(self.data, '__send__', $to_a(args), block.$to_proc());
       }, -1);
       
-      $def(self, '$[]=', function $Storage_$$$eq$5(key, value) {
-        var self = this, $writer = nil;
+      $def(self, '$[]=', function $Storage_$$$eq$2(key, value) {
+        var self = this;
 
         
-        
-        $writer = [key, value];
-        $send(self.data, '[]=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];;
+        self.data['$[]='](key, value);
         if ($truthy(self['$autosave?']())) {
           return self.$save()
         } else {
@@ -38751,10 +38505,10 @@ Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
         };
       }, 2);
       
-      $def(self, '$delete', function $Storage_delete$6(key) {
+      $def(self, '$delete', function $Storage_delete$3(key) {
         var self = this;
 
-        return $send(self.data.$delete(key), 'tap', [], function $$7(){var self = $$7.$$s == null ? this : $$7.$$s;
+        return $send(self.data.$delete(key), 'tap', [], function $$4(){var self = $$4.$$s == null ? this : $$4.$$s;
 
           if ($truthy(self['$autosave?']())) {
             return self.$save()
@@ -38766,7 +38520,7 @@ Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
       $def(self, '$clear', function $$clear() {
         var self = this;
 
-        return $send(self.data.$clear(), 'tap', [], function $$8(){var self = $$8.$$s == null ? this : $$8.$$s;
+        return $send(self.data.$clear(), 'tap', [], function $$5(){var self = $$5.$$s == null ? this : $$5.$$s;
 
           if ($truthy(self['$autosave?']())) {
             return self.$save()
@@ -38816,11 +38570,7 @@ Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
         return result;
       }, 0);
       
-      $def(self, '$to_h', function $$to_h() {
-        var self = this;
-
-        return self.data
-      }, 0);
+      $def(self, '$to_h', $return_ivar("data"), 0);
       if ($truthy($$('Browser')['$supports?']("Storage.local"))) {
         
         
@@ -38888,13 +38638,10 @@ Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
         }, 0);
         
         $def(self, '$save', function $$save() {
-          var self = this, $writer = nil;
+          var $a, self = this;
           if ($gvars.document == null) $gvars.document = nil;
 
-          
-          $writer = [self.name, $$('JSON').$dump(self)];
-          $send($gvars.document.$cookies(), '[]=', $to_a($writer));
-          return $writer[$rb_minus($writer["length"], 1)];
+          return ($a = [self.name, $$('JSON').$dump(self)], $send($gvars.document.$cookies(), '[]=', $a), $a[$a.length - 1])
         }, 0);
       };
       return $def(self, '$to_json', function $$to_json() {
@@ -38903,7 +38650,7 @@ Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
         
         io = $$('StringIO').$new()['$<<']("{");
         io['$<<']($$('JSON').$create_id().$to_json())['$<<'](":")['$<<'](self.$class().$name().$to_json())['$<<'](",");
-        $send(self.data, 'each', [], function $$9(key, value){
+        $send(self.data, 'each', [], function $$6(key, value){
           
           
           if (key == null) key = nil;;
@@ -38922,7 +38669,7 @@ Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
 
       $proto.window = $proto.name = nil;
       
-      $defs(self, '$supported?', function $SessionStorage_supported$ques$10() {
+      $defs(self, '$supported?', function $SessionStorage_supported$ques$7() {
         
         return $$('Browser')['$supports?']("Storage.session")
       }, 0);
@@ -38965,7 +38712,7 @@ Opal.modules["browser/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $nesting);
 };
 
-Opal.modules["browser/blob"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/blob"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $hash2 = Opal.hash2, $defs = Opal.defs, $def = Opal.def, $send = Opal.send, $gvars = Opal.gvars, $truthy = Opal.truthy, $rb_divide = Opal.rb_divide;
 
   Opal.add_stubs('include,new,convert,to_n,proc,resolve,call,create,type,respond_to?,last_modified,now,at,/');
@@ -39102,10 +38849,10 @@ Opal.modules["browser/blob"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/socket"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/socket"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $truthy = Opal.truthy, $send = Opal.send, $send2 = Opal.send2, $find_super = Opal.find_super, $eqeq = Opal.eqeq, $def = Opal.def, $alias = Opal.alias;
 
-  Opal.add_stubs('supports?,include,target,is_a?,new,native?,to_s,to_n,==,arity,instance_exec,to_proc,call,alias_native,split,state');
+  Opal.add_stubs('supports?,include,target,is_a?,new,native?,to_s,to_n,==,arity,instance_exec,to_proc,call,alias_native,split,state,write');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -39236,7 +38983,7 @@ Opal.modules["browser/socket"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/location"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/location"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $rb_plus = Opal.rb_plus, $truthy = Opal.truthy;
 
   Opal.add_stubs('include,to_s,alias_native,+,path,query,fragment,new');
@@ -39336,7 +39083,7 @@ Opal.modules["browser/location"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/history"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/history"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $gvars = Opal.gvars, $truthy = Opal.truthy;
 
   Opal.add_stubs('require,supports?,include,alias_native,to_n,full_path,location,raise,new');
@@ -39445,10 +39192,10 @@ Opal.modules["browser/history"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $nesting);
 };
 
-Opal.modules["browser/navigator"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/navigator"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $const_set = Opal.const_set, $def = Opal.def, $send2 = Opal.send2, $find_super = Opal.find_super, $send = Opal.send, $hash2 = Opal.hash2, $alias = Opal.alias, $truthy = Opal.truthy;
 
-  Opal.add_stubs('include,new,alias_native,split,proc,resolve,reject,Native,to_n,call');
+  Opal.add_stubs('include,new,alias_native,split,operating_system,proc,resolve,reject,Native,to_n,call');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -39779,7 +39526,7 @@ Opal.modules["browser/navigator"] = function(Opal) {/* Generated by Opal 1.4.1 *
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/focus"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/focus"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,convert,supported?,DOM');
@@ -39853,7 +39600,7 @@ Opal.modules["browser/event/focus"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/wheel"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/wheel"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $gvars = Opal.gvars, $defs = Opal.defs, $def = Opal.def, $eqeqeq = Opal.eqeqeq;
 
   Opal.add_stubs('handles,!,nil?,[],===,alias_native');
@@ -39938,7 +39685,7 @@ Opal.modules["browser/event/wheel"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/data_transfer"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/data_transfer"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $def = Opal.def, $send = Opal.send, $truthy = Opal.truthy, $not = Opal.not;
 
   Opal.add_stubs('require,include,convert,to_n,map,new,==,kind,to_file,!,proc,resolve');
@@ -40094,7 +39841,7 @@ Opal.modules["browser/event/data_transfer"] = function(Opal) {/* Generated by Op
   })($nesting[0], $nesting);
 };
 
-Opal.modules["browser/event/composition"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/composition"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native,==,downcase,name');
@@ -40181,7 +39928,7 @@ Opal.modules["browser/event/composition"] = function(Opal) {/* Generated by Opal
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/animation"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/animation"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native');
@@ -40251,7 +39998,7 @@ Opal.modules["browser/event/animation"] = function(Opal) {/* Generated by Opal 1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/audio_processing"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/audio_processing"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native');
@@ -40317,7 +40064,7 @@ Opal.modules["browser/event/audio_processing"] = function(Opal) {/* Generated by
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/before_unload"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/before_unload"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?');
@@ -40359,7 +40106,7 @@ Opal.modules["browser/event/before_unload"] = function(Opal) {/* Generated by Op
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/clipboard"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/clipboard"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native,new');
@@ -40424,7 +40171,7 @@ Opal.modules["browser/event/clipboard"] = function(Opal) {/* Generated by Opal 1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/device_light"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/device_light"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native');
@@ -40475,7 +40222,7 @@ Opal.modules["browser/event/device_light"] = function(Opal) {/* Generated by Opa
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/device_motion"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/device_motion"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $const_set = Opal.const_set, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,new,to_n,supported?,alias_native');
@@ -40561,7 +40308,7 @@ Opal.modules["browser/event/device_motion"] = function(Opal) {/* Generated by Op
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/device_orientation"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/device_orientation"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native');
@@ -40645,7 +40392,7 @@ Opal.modules["browser/event/device_orientation"] = function(Opal) {/* Generated 
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/device_proximity"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/device_proximity"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native');
@@ -40711,7 +40458,7 @@ Opal.modules["browser/event/device_proximity"] = function(Opal) {/* Generated by
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/drag"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/drag"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,include,new,convert,supported?,alias_native,x,screen,y,DOM');
@@ -40904,7 +40651,7 @@ Opal.modules["browser/event/drag"] = function(Opal) {/* Generated by Opal 1.4.1 
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/gamepad"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/gamepad"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?');
@@ -41012,7 +40759,7 @@ Opal.modules["browser/event/gamepad"] = function(Opal) {/* Generated by Opal 1.4
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/hash_change"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/hash_change"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native');
@@ -41071,7 +40818,7 @@ Opal.modules["browser/event/hash_change"] = function(Opal) {/* Generated by Opal
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/progress"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/progress"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native');
@@ -41148,7 +40895,7 @@ Opal.modules["browser/event/progress"] = function(Opal) {/* Generated by Opal 1.
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/page_transition"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/page_transition"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native');
@@ -41199,7 +40946,7 @@ Opal.modules["browser/event/page_transition"] = function(Opal) {/* Generated by 
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/pop_state"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/pop_state"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native');
@@ -41261,7 +41008,7 @@ Opal.modules["browser/event/pop_state"] = function(Opal) {/* Generated by Opal 1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/storage"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/storage"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native');
@@ -41341,7 +41088,7 @@ Opal.modules["browser/event/storage"] = function(Opal) {/* Generated by Opal 1.4
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/touch"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/touch"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native,==,downcase,name');
@@ -41443,7 +41190,7 @@ Opal.modules["browser/event/touch"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/sensor"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/sensor"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?');
@@ -41485,10 +41232,10 @@ Opal.modules["browser/event/sensor"] = function(Opal) {/* Generated by Opal 1.4.
   })($nesting[0], $nesting)
 };
 
-Opal.modules["buffer/array"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["buffer/array"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $gvars = Opal.gvars, $defs = Opal.defs, $eqeq = Opal.eqeq, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $truthy = Opal.truthy, $alias = Opal.alias;
 
-  Opal.add_stubs('include,[],name_for,attr_reader,==,for,to_n,enum_for');
+  Opal.add_stubs('include,[],name_for,attr_reader,==,for,to_n,enum_for,length');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Buffer');
 
@@ -41597,10 +41344,10 @@ Opal.modules["buffer/array"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["buffer/view"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["buffer/view"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $gvars = Opal.gvars, $defs = Opal.defs, $truthy = Opal.truthy, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $alias = Opal.alias;
 
-  Opal.add_stubs('include,!,nil?,[],attr_reader,native?,to_n,name_for');
+  Opal.add_stubs('include,!,nil?,[],attr_reader,native?,to_n,name_for,get,set,length');
   return (function($base, $super, $parent_nesting) {
     var self = $klass($base, $super, 'Buffer');
 
@@ -41825,10 +41572,10 @@ Opal.modules["buffer/view"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting)
 };
 
-Opal.modules["buffer"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["buffer"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $klass = Opal.klass, $gvars = Opal.gvars, $defs = Opal.defs, $eqeqeq = Opal.eqeqeq, $truthy = Opal.truthy, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $alias = Opal.alias;
 
-  Opal.add_stubs('require,include,!,nil?,[],===,native?,new,pack,to_a');
+  Opal.add_stubs('require,include,!,nil?,[],===,native?,new,pack,to_a,length');
   
   self.$require("native");
   self.$require("buffer/array");
@@ -41905,7 +41652,7 @@ Opal.modules["buffer"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], null, $nesting);
 };
 
-Opal.modules["browser/event/message"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/message"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('require,handles,supports?,convert,supported?,new,alias_native');
@@ -42013,7 +41760,7 @@ Opal.modules["browser/event/message"] = function(Opal) {/* Generated by Opal 1.4
   })($nesting[0], $nesting);
 };
 
-Opal.modules["browser/event/close"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/close"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $module = Opal.module, $klass = Opal.klass, $defs = Opal.defs, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('handles,supports?,supported?,alias_native');
@@ -42096,7 +41843,7 @@ Opal.modules["browser/event/close"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/event/all"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/event/all"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, nil = Opal.nil;
 
   Opal.add_stubs('require');
@@ -42127,10 +41874,10 @@ Opal.modules["browser/event/all"] = function(Opal) {/* Generated by Opal 1.4.1 *
   return self.$require("browser/event/close");
 };
 
-Opal.modules["browser/dom/builder"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $defs = Opal.defs, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def, $hash2 = Opal.hash2, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $eqeqeq = Opal.eqeqeq, $const_set = Opal.const_set, $hash = Opal.hash;
+Opal.modules["browser/dom/builder"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var $nesting = [], $$ = Opal.$r($nesting), nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $defs = Opal.defs, $klass = Opal.klass, $truthy = Opal.truthy, $def = Opal.def, $hash2 = Opal.hash2, $send = Opal.send, $eqeqeq = Opal.eqeqeq, $const_set = Opal.const_set, $return_ivar = Opal.return_ivar, $hash = Opal.hash, $to_a = Opal.to_a;
 
-  Opal.add_stubs('<<,[]=,to_h,-,[],each,===,call,raise,attr_reader,instance_method,new,to_proc,proc,build!,!,map,build,extend!,for,create_text,document,create_element,on,inner_html=');
+  Opal.add_stubs('<<,[]=,to_h,[],each,===,call,raise,attr_reader,instance_method,new,to_proc,proc,build!,!,map,build,extend!,for,create_text,document,create_element,on,inner_html=');
   
   (function($base) {
     var self = $module($base, 'Utils');
@@ -42176,7 +41923,7 @@ Opal.modules["browser/dom/builder"] = function(Opal) {/* Generated by Opal 1.4.1
 
         var $nesting = [self].concat($parent_nesting), $$ = Opal.$r($nesting), $proto = self.$$prototype;
 
-        $proto.builder = $proto.roots = nil;
+        $proto.builder = nil;
         
         $defs(self, '$to_h', function $$to_h() {
           var self = this, $ret_or_1 = nil;
@@ -42185,16 +41932,13 @@ Opal.modules["browser/dom/builder"] = function(Opal) {/* Generated by Opal 1.4.1
           return (self.builders = ($truthy(($ret_or_1 = self.builders)) ? ($ret_or_1) : ($hash2([], {}))))
         }, 0);
         $defs(self, '$for', function $Builder_for$1(klass) {
-          var block = $Builder_for$1.$$p || nil, self = this, $writer = nil;
+          var block = $Builder_for$1.$$p || nil, $a, self = this;
 
           delete $Builder_for$1.$$p;
           
           ;
           if ($truthy(block)) {
-            
-            $writer = [klass, block];
-            $send(self.$to_h(), '[]=', $to_a($writer));
-            return $writer[$rb_minus($writer["length"], 1)];
+            return ($a = [klass, block], $send(self.$to_h(), '[]=', $a), $a[$a.length - 1])
           } else {
             return self.$to_h()['$[]'](klass)
           };
@@ -42268,11 +42012,7 @@ Opal.modules["browser/dom/builder"] = function(Opal) {/* Generated by Opal 1.4.1
               return $$('Builder').$build(self, e);}, {$$arity: 1, $$s: self}));
           };
         }, -2);
-        return $def(self, '$to_a', function $$to_a() {
-          var self = this;
-
-          return self.roots
-        }, 0);
+        return $def(self, '$to_a', $return_ivar("roots"), 0);
       })($nesting[0], null, $nesting);
       $send($$('Builder'), 'for', [$$('String')], function $DOM$6(b, item){
         
@@ -42281,7 +42021,7 @@ Opal.modules["browser/dom/builder"] = function(Opal) {/* Generated by Opal 1.4.1
         
         if (item == null) item = nil;;
         return b.$document().$create_text(item);}, 2);
-      $send($$('Builder'), 'for', [$$$($$$($$('Paggio'), 'HTML'), 'Element')], function $DOM$7(b, item){var options = nil, $writer = nil, dom = nil, on = nil, inner = nil;
+      $send($$('Builder'), 'for', [$$$($$$($$('Paggio'), 'HTML'), 'Element')], function $DOM$7(b, item){var options = nil, dom = nil, on = nil, inner = nil;
 
         
         
@@ -42290,15 +42030,9 @@ Opal.modules["browser/dom/builder"] = function(Opal) {/* Generated by Opal 1.4.1
         if (item == null) item = nil;;
         options = $hash2([], {});
         if ($eqeqeq($$('Hash'), item.attributes)) {
-          
-          $writer = ["attrs", item.attributes];
-          $send(options, '[]=', $to_a($writer));
-          $writer[$rb_minus($writer["length"], 1)];
+          options['$[]=']("attrs", item.attributes)
         };
-        
-        $writer = ["classes", item.class_names];
-        $send(options, '[]=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];;
+        options['$[]=']("classes", item.class_names);
         dom = b.$document().$create_element(item.name, Opal.to_hash(options));
         if ($truthy((on = item.on || nil))) {
           $send(on, 'each', [], function $$8(args, block){
@@ -42310,10 +42044,7 @@ Opal.modules["browser/dom/builder"] = function(Opal) {/* Generated by Opal 1.4.1
             return $send(dom, 'on', $to_a(args), block.$to_proc());}, 2)
         };
         if ($truthy((inner = item.inner_html || nil))) {
-          
-          $writer = [inner];
-          $send(dom, 'inner_html=', $to_a($writer));
-          $writer[$rb_minus($writer["length"], 1)];
+          dom['$inner_html='](inner)
         } else {
           $send(item, 'each', [], function $$9(child){
             
@@ -42333,11 +42064,11 @@ Opal.modules["browser/dom/builder"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting);
 };
 
-Opal.modules["browser/dom/element/custom"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/dom/element/custom"] = function(Opal) {/* Generated by Opal 1.5.0 */
   "use strict";
-  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $module = Opal.module, $klass = Opal.klass, $hash2 = Opal.hash2, $eqeq = Opal.eqeq, $def = Opal.def, $send = Opal.send, $eqeqeq = Opal.eqeqeq, $gvars = Opal.gvars, $defs = Opal.defs;
+  var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $truthy = Opal.truthy, $module = Opal.module, $klass = Opal.klass, $hash2 = Opal.hash2, $eqeq = Opal.eqeq, $def = Opal.def, $send = Opal.send, $eqeqeq = Opal.eqeqeq, $gvars = Opal.gvars, $defs = Opal.defs, $return_val = Opal.return_val;
 
-  Opal.add_stubs('supports?,==,superclass,include?,ancestors,raise,def_selector,observe,new,each,target,===,type,observed_attributes,class,name,attribute_changed,old,[],added,attached_once,removed,detached_once,css,body,_dispatch_constructor,to_n,private,attr_accessor,attr_reader,extend,attached,detached,include');
+  Opal.add_stubs('supports?,==,superclass,include?,ancestors,raise,def_selector,observe,new,each,target,type,observed_attributes,class,name,===,attribute_changed,old,[],added,attached_once,removed,detached_once,css,body,_dispatch_constructor,to_n,private,attr_accessor,attr_reader,extend,attached,detached,include');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -42441,40 +42172,43 @@ Opal.modules["browser/dom/element/custom"] = function(Opal) {/* Generated by Opa
                 
                 
                 if (obs == null) obs = nil;;
-                return $send(obs, 'each', [], function $$2(e){var target = nil, $ret_or_1 = nil;
+                return $send(obs, 'each', [], function $$2(e){var target = nil;
 
                   
                   
                   if (e == null) e = nil;;
                   target = e.$target();
-                  if ($eqeqeq("attribute", ($ret_or_1 = e.$type()))) {
-                    if (($eqeqeq($$$($$('Custom'), 'Mixin'), target) && ($truthy(target.$class().$observed_attributes()['$include?'](e.$name()))))) {
-                      return target.$attribute_changed(e.$name(), e.$old(), target['$[]'](e.$name()))
-                    } else {
+                  
+                  switch (e.$type()) {
+                    case "attribute":
+                      if (($eqeqeq($$$($$('Custom'), 'Mixin'), target) && ($truthy(target.$class().$observed_attributes()['$include?'](e.$name()))))) {
+                        return target.$attribute_changed(e.$name(), e.$old(), target['$[]'](e.$name()))
+                      } else {
+                        return nil
+                      }
+                      break;
+                    case "tree":
+                      
+                      $send(e.$added(), 'each', [], function $$3(n){
+                        
+                        
+                        if (n == null) n = nil;;
+                        if ($eqeqeq($$$($$('Custom'), 'Mixin'), n)) {
+                          return n.$attached_once()
+                        } else {
+                          return nil
+                        };}, 1);
+                      return $send(e.$removed(), 'each', [], function $$4(n){
+                        
+                        
+                        if (n == null) n = nil;;
+                        if ($eqeqeq($$$($$('Custom'), 'Mixin'), n)) {
+                          return n.$detached_once()
+                        } else {
+                          return nil
+                        };}, 1);
+                    default:
                       return nil
-                    }
-                  } else if ($eqeqeq("tree", $ret_or_1)) {
-                    
-                    $send(e.$added(), 'each', [], function $$3(n){
-                      
-                      
-                      if (n == null) n = nil;;
-                      if ($eqeqeq($$$($$('Custom'), 'Mixin'), n)) {
-                        return n.$attached_once()
-                      } else {
-                        return nil
-                      };}, 1);
-                    return $send(e.$removed(), 'each', [], function $$4(n){
-                      
-                      
-                      if (n == null) n = nil;;
-                      if ($eqeqeq($$$($$('Custom'), 'Mixin'), n)) {
-                        return n.$detached_once()
-                      } else {
-                        return nil
-                      };}, 1);
-                  } else {
-                    return nil
                   };}, 1);}, 1).$observe($gvars.document, $hash2(["tree", "children", "attributes"], {"tree": true, "children": true, "attributes": "old"}))
             };
             if (!$truthy($$('Browser')['$supports?']("Custom Elements"))) {
@@ -42502,7 +42236,7 @@ Opal.modules["browser/dom/element/custom"] = function(Opal) {/* Generated by Opa
                   
                   
                   if (elem == null) elem = nil;;
-                  return ($a = self.$_dispatch_constructor(elem.$to_n()), ($a === nil || $a == null) ? nil : $send($a, 'attached_once', []));}, {$$arity: 1, $$s: self});
+                  return ($a = self.$_dispatch_constructor(elem.$to_n()), ($a === nil || $a == null) ? nil : self.$_dispatch_constructor(elem.$to_n()).$attached_once());}, {$$arity: 1, $$s: self});
               }, -2)
             };
             self.$private($def(self, '$_dispatch_constructor', function $$_dispatch_constructor(obj) {
@@ -42533,30 +42267,15 @@ Opal.modules["browser/dom/element/custom"] = function(Opal) {/* Generated by Opa
               return klass.$extend($$('ClassMethods'))
             }, 1);
             
-            $def(self, '$attached', function $$attached() {
-              
-              return nil
-            }, 0);
+            $def(self, '$attached', $return_val(nil), 0);
             
-            $def(self, '$detached', function $$detached() {
-              
-              return nil
-            }, 0);
+            $def(self, '$detached', $return_val(nil), 0);
             
-            $def(self, '$adopted', function $$adopted() {
-              
-              return nil
-            }, 0);
+            $def(self, '$adopted', $return_val(nil), 0);
             
-            $def(self, '$attribute_changed', function $$attribute_changed(attr, from, to) {
-              
-              return nil
-            }, 3);
+            $def(self, '$attribute_changed', $return_val(nil), 0);
             
-            $def(self, '$custom?', function $Mixin_custom$ques$6() {
-              
-              return true
-            }, 0);
+            $def(self, '$custom?', $return_val(true), 0);
             if ($truthy($$('Browser')['$supports?']("Custom Elements"))) {
               return nil
             } else {
@@ -42591,10 +42310,10 @@ Opal.modules["browser/dom/element/custom"] = function(Opal) {/* Generated by Opa
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/canvas/style"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/canvas/style"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $alias = Opal.alias;
 
-  Opal.add_stubs('include,attr_reader,to_n,[],new');
+  Opal.add_stubs('include,attr_reader,to_n,smooth,[],new');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -42784,7 +42503,7 @@ Opal.modules["browser/canvas/style"] = function(Opal) {/* Generated by Opal 1.4.
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/canvas/text"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/canvas/text"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $truthy = Opal.truthy;
 
   Opal.add_stubs('include,attr_reader,to_n');
@@ -42866,10 +42585,10 @@ Opal.modules["browser/canvas/text"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/canvas/data"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/canvas/data"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $send = Opal.send, $defs = Opal.defs, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $truthy = Opal.truthy, $alias = Opal.alias;
 
-  Opal.add_stubs('allocate,instance_eval,to_a,to_n,include,attr_reader');
+  Opal.add_stubs('allocate,instance_eval,to_a,to_n,include,attr_reader,length');
   return (function($base, $parent_nesting) {
     var self = $module($base, 'Browser');
 
@@ -42968,7 +42687,7 @@ Opal.modules["browser/canvas/data"] = function(Opal) {/* Generated by Opal 1.4.1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/canvas/gradient"] = function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.modules["browser/canvas/gradient"] = function(Opal) {/* Generated by Opal 1.5.0 */
   var $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $send2 = Opal.send2, $find_super = Opal.find_super, $eqeqeq = Opal.eqeqeq, $send = Opal.send, $def = Opal.def;
 
   Opal.add_stubs('include,attr_reader,===,length,to_n,raise,instance_eval,to_proc');
@@ -43018,10 +42737,10 @@ Opal.modules["browser/canvas/gradient"] = function(Opal) {/* Generated by Opal 1
   })($nesting[0], $nesting)
 };
 
-Opal.modules["browser/canvas"] = function(Opal) {/* Generated by Opal 1.4.1 */
-  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $eqeqeq = Opal.eqeqeq, $truthy = Opal.truthy, $gvars = Opal.gvars, $send = Opal.send, $to_a = Opal.to_a, $rb_minus = Opal.rb_minus, $neqeq = Opal.neqeq, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $alias = Opal.alias, $to_ary = Opal.to_ary;
+Opal.modules["browser/canvas"] = function(Opal) {/* Generated by Opal 1.5.0 */
+  var self = Opal.top, $nesting = [], nil = Opal.nil, $$$ = Opal.$$$, $module = Opal.module, $klass = Opal.klass, $eqeqeq = Opal.eqeqeq, $truthy = Opal.truthy, $gvars = Opal.gvars, $neqeq = Opal.neqeq, $send2 = Opal.send2, $find_super = Opal.find_super, $def = Opal.def, $send = Opal.send, $to_a = Opal.to_a, $alias = Opal.alias, $to_ary = Opal.to_ary;
 
-  Opal.add_stubs('require,include,attr_reader,===,first,shift,create_element,width,[]=,-,height,!=,node_name,raise,to_n,new,draw_image,to_i,[],append_to,on,resolve,DOM,to_proc,move_to,line_to,length,quadratic_curve_to,bezier_curve_to,element,is_a?,save,instance_eval,restore,path,one,off,for');
+  Opal.add_stubs('require,include,attr_reader,===,first,shift,create_element,[]=,width,height,!=,node_name,raise,to_n,new,draw_image,to_i,[],append_to,on,resolve,DOM,to_proc,move_to,line_to,length,quadratic_curve_to,bezier_curve_to,element,is_a?,save,instance_eval,restore,path,one,off,for');
   
   self.$require("browser/canvas/style");
   self.$require("browser/canvas/text");
@@ -43044,7 +42763,7 @@ Opal.modules["browser/canvas"] = function(Opal) {/* Generated by Opal 1.4.1 */
       self.$attr_reader("element", "style", "text");
       
       $def(self, '$initialize', function $$initialize($a) {
-        var $post_args, args, $yield = $$initialize.$$p || nil, self = this, element = nil, $writer = nil;
+        var $post_args, args, $yield = $$initialize.$$p || nil, self = this, element = nil;
         if ($gvars.document == null) $gvars.document = nil;
 
         delete $$initialize.$$p;
@@ -43069,24 +42788,12 @@ Opal.modules["browser/canvas"] = function(Opal) {/* Generated by Opal 1.4.1 */
           self.element = $gvars.document.$create_element("canvas");
           if ($truthy(self.image)) {
             
-            
-            $writer = ["width", self.image.$width()];
-            $send(self.element, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];;
-            
-            $writer = ["height", self.image.$height()];
-            $send(self.element, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];;
+            self.element['$[]=']("width", self.image.$width());
+            self.element['$[]=']("height", self.image.$height());
           } else {
             
-            
-            $writer = ["width", args.$shift()];
-            $send(self.element, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];;
-            
-            $writer = ["height", args.$shift()];
-            $send(self.element, '[]=', $to_a($writer));
-            $writer[$rb_minus($writer["length"], 1)];;
+            self.element['$[]=']("width", args.$shift());
+            self.element['$[]=']("height", args.$shift());
           };
         };
         if ($neqeq(self.element.$node_name(), "CANVAS")) {
@@ -43115,21 +42822,15 @@ Opal.modules["browser/canvas"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }, 0);
       
       $def(self, '$width=', function $Canvas_width$eq$1(new_width) {
-        var self = this, $writer = nil;
+        var $a, self = this;
 
-        
-        $writer = ["width", new_width.$to_i()];
-        $send(self.element, '[]=', $to_a($writer));
-        return $writer[$rb_minus($writer["length"], 1)];
+        return ($a = ["width", new_width.$to_i()], $send(self.element, '[]=', $a), $a[$a.length - 1])
       }, 1);
       
       $def(self, '$height=', function $Canvas_height$eq$2(new_height) {
-        var self = this, $writer = nil;
+        var $a, self = this;
 
-        
-        $writer = ["height", new_height.$to_i()];
-        $send(self.element, '[]=', $to_a($writer));
-        return $writer[$rb_minus($writer["length"], 1)];
+        return ($a = ["height", new_height.$to_i()], $send(self.element, '[]=', $a), $a[$a.length - 1])
       }, 1);
       
       $def(self, '$append_to', function $$append_to(parent) {
@@ -43139,7 +42840,7 @@ Opal.modules["browser/canvas"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }, 1);
       
       $def(self, '$load', function $$load(path) {
-        var promise = nil, image = nil, $writer = nil;
+        var promise = nil, image = nil;
         if ($gvars.document == null) $gvars.document = nil;
 
         
@@ -43147,10 +42848,7 @@ Opal.modules["browser/canvas"] = function(Opal) {/* Generated by Opal 1.4.1 */
         image = $gvars.document.$create_element("img");
         $send(image, 'on', ["load"], function $$3(){
           return promise.$resolve(image)}, 0);
-        
-        $writer = ["src", path];
-        $send(image, '[]=', $to_a($writer));
-        $writer[$rb_minus($writer["length"], 1)];;
+        image['$[]=']("src", path);
         return promise;
       }, 1);
       
@@ -43306,25 +43004,29 @@ Opal.modules["browser/canvas"] = function(Opal) {/* Generated by Opal 1.4.1 */
       }, 6);
       
       $def(self, '$curve_to', function $$curve_to($a) {
-        var $post_args, args, self = this, $ret_or_1 = nil;
+        var $post_args, args, self = this;
 
         
         
         $post_args = Opal.slice.call(arguments);
         
         args = $post_args;;
-        if ($eqeqeq(4, ($ret_or_1 = args.$length()))) {
-          $send(self, 'quadratic_curve_to', $to_a(args))
-        } else if ($eqeqeq(6, $ret_or_1)) {
-          $send(self, 'bezier_curve_to', $to_a(args))
-        } else {
-          self.$raise($$('ArgumentError'), "don't know where to dispatch")
+        
+        switch (args.$length()) {
+          case 4:
+            $send(self, 'quadratic_curve_to', $to_a(args))
+            break;
+          case 6:
+            $send(self, 'bezier_curve_to', $to_a(args))
+            break;
+          default:
+            self.$raise($$('ArgumentError'), "don't know where to dispatch")
         };
         return self;
       }, -1);
       
       $def(self, '$draw_image', function $$draw_image(image, $a) {
-        var $post_args, args, $b, $c, self = this, source = nil, destination = nil, $ret_or_1 = nil;
+        var $post_args, args, $b, $c, self = this, source = nil, destination = nil;
 
         
         
@@ -43340,14 +43042,19 @@ Opal.modules["browser/canvas"] = function(Opal) {/* Generated by Opal 1.4.1 */
           
           $c = args, $b = $to_ary($c), (source = ($b[0] == null ? nil : $b[0])), (destination = ($b[1] == null ? nil : $b[1])), $c;
           self["native"].drawImage(image.$to_n(), source['$[]']("x"), source['$[]']("y"), source['$[]']("width"), source['$[]']("height"), destination['$[]']("x"), destination['$[]']("y"), destination['$[]']("width"), destination['$[]']("height"));
-        } else if ($eqeqeq(0, ($ret_or_1 = args.$length()))) {
-          self["native"].drawImage(image.$to_n(), 0, 0)
-        } else if ($eqeqeq(2, $ret_or_1)) {
-          self["native"].drawImage(image.$to_n(), args['$[]'](0), args['$[]'](1))
-        } else if ($eqeqeq(4, $ret_or_1)) {
-          self["native"].drawImage(image.$to_n(), args['$[]'](0), args['$[]'](1), args['$[]'](2), args['$[]'](3))
-        } else {
-          nil
+        } else 
+        switch (args.$length()) {
+          case 0:
+            self["native"].drawImage(image.$to_n(), 0, 0)
+            break;
+          case 2:
+            self["native"].drawImage(image.$to_n(), args['$[]'](0), args['$[]'](1))
+            break;
+          case 4:
+            self["native"].drawImage(image.$to_n(), args['$[]'](0), args['$[]'](1), args['$[]'](2), args['$[]'](3))
+            break;
+          default:
+            nil
         };
         return self;
       }, -2);
@@ -43548,7 +43255,7 @@ Opal.modules["browser/canvas"] = function(Opal) {/* Generated by Opal 1.4.1 */
   })($nesting[0], $nesting);
 };
 
-Opal.queue(function(Opal) {/* Generated by Opal 1.4.1 */
+Opal.queue(function(Opal) {/* Generated by Opal 1.5.0 */
   var self = Opal.top, nil = Opal.nil;
 
   Opal.add_stubs('require');
